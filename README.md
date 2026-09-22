@@ -16,6 +16,11 @@ pip install -e ".[test]" && pytest
 voms-proxy-init --voms cms --valid 192:00        # dCache access for skim
 ```
 
+## GitHub Actions
+
+The test workflow checks out `KIT-CMS/ShapeSmith` at `main` beside this repository
+and installs that checkout before installing the analysis.
+
 ## Running
 
 Two run configurations per production. The ShapeSmith core keeps the process table, the estimator

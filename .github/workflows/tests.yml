@@ -1,13 +1,30 @@
 name: tests
 on: [push, pull_request]
+
+permissions:
+  contents: read
+
 jobs:
   pytest:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: BBTauTauAnalysis-ShapeSmith
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: BBTauTauAnalysis-ShapeSmith
+          persist-credentials: false
+      - name: Checkout ShapeSmith
+        uses: actions/checkout@v4
+        with:
+          repository: KIT-CMS/ShapeSmith
+          ref: main
+          path: ShapeSmith
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install "shapesmith @ git+https://github.com/KIT-CMS/ShapeSmith.git@main"
+      - run: pip install ../ShapeSmith
       - run: pip install -e ".[test]"
       - run: pytest -q

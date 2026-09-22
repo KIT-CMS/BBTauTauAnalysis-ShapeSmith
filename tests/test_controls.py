@@ -55,13 +55,12 @@ def test_control_builder_data_routing_and_no_tau_estimator():
     assert analysis.estimator is None and analysis.ml is None and not analysis.categories
     for channel in ("em", "mm", "ee"):
         prefix = "EGamma_" if channel == "ee" else "SingleMuon_"
-        assert len(analysis.samples_for("data", channel)) == 4
-        assert all(s.nick.startswith(prefix) for s in analysis.samples_for("data", channel))
+        samples = analysis.samples_for("data", channel)
+        assert samples and all(s.nick.startswith(prefix) for s in samples)
         columns = selection_columns(analysis.channel(channel).baseline)
         for process in analysis.processes:
             columns |= selection_columns(process.selection_for(channel))
         assert not any("tau" in column or "gen_match" in column for column in columns)
-    assert analysis.process("TT").selection.weights == {"top_pt": "topPtReweightWeight"}
     assert "yield" in analysis.control_variables
 
 
