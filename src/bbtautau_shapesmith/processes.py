@@ -1,6 +1,6 @@
-"""The process table, the NN categories and the control variables.
+"""The process tables, the NN categories and the control variables.
 
-Which processes exist depends on the switches jet_fakes (ff|mc) and embedding. Gen-match splits: T = genuine
+Tau channels: which processes exist depends on the switches jet_fakes (ff|mc) and embedding. Gen-match splits: T = genuine
 di-tau, L = lepton fakes, J = jet -> tau_h fakes. In fake-factor mode the J parts and W are replaced by the
 estimated jetFakes process; with embedding the T parts are replaced by EMB.
 """
@@ -9,7 +9,7 @@ from __future__ import annotations
 import numpy as np
 from shapesmith.model import Category, Process, Selection, Variable
 
-from bbtautau_shapesmith.constants import CHANNELS, NN_CLASS_COLUMN, NN_CLASS_NAMES, NN_SCORE_COLUMN
+from bbtautau_shapesmith.constants import NN_CLASS_COLUMN, NN_CLASS_NAMES, NN_SCORE_COLUMN, TAU_CHANNELS
 from bbtautau_shapesmith.selection import TOP_PT, embedding_weights, genmatch_cuts
 
 SIGNAL = "HH2B2Tau"
@@ -26,15 +26,15 @@ def split_name(group: str, part: str) -> str:
 
 
 def _split_selection(part: str, weights: dict) -> dict[str, Selection]:
-    return {channel: Selection(cuts={"genmatch": genmatch_cuts(channel)[part]}, weights=weights) for channel in CHANNELS}
+    return {channel: Selection(cuts={"genmatch": genmatch_cuts(channel)[part]}, weights=weights) for channel in TAU_CHANNELS}
 
 
-def processes(jet_fakes: str, embedding: bool) -> tuple[Process, ...]:
+def tau_processes(jet_fakes: str, embedding: bool) -> tuple[Process, ...]:
     if jet_fakes not in ("ff", "mc"):
         raise ValueError(f"jet_fakes must be 'ff' or 'mc', got {jet_fakes!r}")
     result = [Process("data", "data", "data", "data", "data"), Process("hh2b2tau", "HH2B2Tau", SIGNAL, "signal", "signal")]
     if embedding:
-        result.append(Process("emb", "EMB", "EMB", "embedding", "EMB", {ch: Selection(cuts={"genmatch": genmatch_cuts(ch)["T"]}, weights=embedding_weights(ch)) for ch in CHANNELS}))
+        result.append(Process("emb", "EMB", "EMB", "embedding", "EMB", {ch: Selection(cuts={"genmatch": genmatch_cuts(ch)["T"]}, weights=embedding_weights(ch)) for ch in TAU_CHANNELS}))
     parts = ("L",) + (() if embedding else ("T",)) + (("J",) if jet_fakes == "mc" else ())
     for group in SPLIT_PREFIX:
         weights = TOP_PT if group == "TT" else {}  # topPtReweightWeight exists only in ttbar ntuples
@@ -48,6 +48,19 @@ def processes(jet_fakes: str, embedding: bool) -> tuple[Process, ...]:
     for key, group, name in SINGLE_HIGGS:
         result.append(Process(key, group, name, "single_higgs", "rare"))
     return tuple(result)
+
+
+def dilepton_processes() -> tuple[Process, ...]:
+    """Light-dilepton controls: every MC group unsplit and no jet-fake estimate (W is plain MC)."""
+    result = [Process("data", "data", "data", "data", "data"), Process("hh2b2tau", "HH2B2Tau", SIGNAL, "signal", "signal")]
+    for group in SPLIT_PREFIX:
+        result.append(Process(group.lower(), group, group, "other", PLOT_GROUP[group], Selection(weights=TOP_PT if group == "TT" else {})))
+    result.append(Process("w", "W", "W", "other", "rare"))
+    result.append(Process("ewk", "EWK", "EWK", "other", "rare"))
+    for key, group, name in SINGLE_HIGGS:
+        result.append(Process(key, group, name, "single_higgs", "rare"))
+    return tuple(result)
+
 
 STANDARD_BINNING = tuple(float(round(x, 4)) for x in np.linspace(0.0, 1.0, 21))
 SIGNAL_BINNING = (0.0, 0.2, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.82, 0.84, 0.86, 0.88, 0.9, 0.92, 0.94, 0.96, 0.98, 1.0)
@@ -107,7 +120,7 @@ _BINNING = {
     "bpair_eta_2": np.linspace(-3, 3, 21),
     "bpair_phi_1": np.linspace(-np.pi, np.pi, 21),
     "bpair_phi_2": np.linspace(-np.pi, np.pi, 21),
-    "bpair_btag_value_1": np.linspace(0.2, 1.0, 16),
+    "bpair_btag_value_1": np.linspace(0.0, 1.0, 21),
     "bpair_btag_value_2": np.linspace(0.0, 1.0, 21),
     "bpair_m_inv": np.arange(0, 440, 20),
     "bpair_pt_dijet": np.arange(0, 320, 20),
@@ -115,12 +128,12 @@ _BINNING = {
     "pt_tautaubb": np.arange(0, 520, 20),
     "mass_tautaubb": np.arange(100, 930, 30),
 }
-_EXPRESSIONS = {"sum_deltaR_tt_bb": "bpair_deltaR + deltaR_ditaupair", "NN_score": NN_SCORE_COLUMN}
-_EXPRESSION_BINNING = {"sum_deltaR_tt_bb": np.arange(0, 10.6, 0.2), "NN_score": np.linspace(0.0, 1.0, 21)}
+_EXPRESSIONS = {"yield": "1.0", "sum_deltaR_tt_bb": "bpair_deltaR + deltaR_ditaupair", "NN_score": NN_SCORE_COLUMN}
+_EXPRESSION_BINNING = {"yield": (0.5, 1.5), "sum_deltaR_tt_bb": np.arange(0, 10.6, 0.2), "NN_score": np.linspace(0.0, 1.0, 21)}
 
 
 def control_variables(nn_friend: bool = False) -> dict[str, Variable]:
-    """Control variables; the NN score only when the NN friend tree is part of the run (nn_friend)."""
+    """Control variables (`yield` is the one-bin event count); the NN score only when the NN friend tree is part of the run (nn_friend)."""
     variables = {name: Variable(name, name, _edges(edges)) for name, edges in _BINNING.items()}
     for name, expr in _EXPRESSIONS.items():
         if name == "NN_score" and not nn_friend:

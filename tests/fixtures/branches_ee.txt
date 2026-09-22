@@ -26,7 +26,6 @@ bpair_pt_regressed_1
 bpair_pt_regressed_2
 bpair_pt_resolution_regressed_1
 bpair_pt_resolution_regressed_2
-btag_eff_pt_clamped_njets
 btag_weight_upart
 btag_weight_upart_down
 btag_weight_upart_down_as
@@ -111,7 +110,6 @@ btag_weight_upart_up_statistic
 btag_weight_upart_up_ttbar
 btag_weight_upart_up_uncorrelated
 deltaR_ditaupair
-dilepton_veto
 dxy_1
 dxy_2
 dz_1
@@ -146,20 +144,8 @@ genjet_phi_1
 genjet_phi_2
 genjet_pt_1
 genjet_pt_2
-id_tau_vsEle_Tight_2
-id_tau_vsEle_VVLoose_2
-id_tau_vsJet_Medium_2
-id_tau_vsJet_Tight_2
-id_tau_vsJet_VVLoose_2
-id_tau_vsJet_VVVLoose_2
-id_tau_vsMu_Tight_2
-id_tau_vsMu_VLoose_2
 id_wgt_ele_1
-id_wgt_tau_vsEle_Tight_2
-id_wgt_tau_vsEle_VVLoose_2
-id_wgt_tau_vsJet_Medium_2
-id_wgt_tau_vsMu_Tight_2
-id_wgt_tau_vsMu_VLoose_2
+id_wgt_ele_2
 is_data
 is_embedding
 is_mc
@@ -208,7 +194,6 @@ mt_tot
 n_bjets
 n_jets
 nelectrons
-ntaus
 phi_1
 phi_2
 pt_1
@@ -221,9 +206,9 @@ puweight
 pzetamissvis
 q_1
 q_2
+reco_wgt_ele_1
+reco_wgt_ele_2
 run
-tau_decaymode_1
-tau_decaymode_2
 topPtReweightWeight
 trg_single_ele115
 trg_single_ele32

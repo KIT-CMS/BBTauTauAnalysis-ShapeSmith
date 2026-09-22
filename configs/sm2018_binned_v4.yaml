@@ -1,0 +1,24 @@
+# HH->bbtautau tau channels on the sm2018_binned_v4 production (2018 UL, NanoAODv15; first complete six-scope production).
+# Switches (all optional, defaults in analysis.py):
+#   sample_list:     inventory/<sample_list>.txt lists the samples to process (independent of ntuples.base)
+#   jet_fakes:       mc (MC jet fakes + ABCD QCD) | ff (fake factors, needs FF friend trees)
+#   embedding:       false (no 2018 v15 embedding ntuples yet)
+#   nn_friend:       false (NN categories only once NN friend trees exist; add them under ntuples.friends and re-skim)
+#   control_regions: true widens the skim (both charges, VVVLoose taus, >= 2 jets, lepton isolation < 0.5) and adds the
+#                    named tau control regions; the nominal selection is unchanged, so one skim serves both
+analysis: bbtautau_shapesmith.analysis:build
+era: "2018"
+channels: [et, mt, tt]
+switches: {sample_list: sm2018_binned_v2, jet_fakes: mc, embedding: false, nn_friend: false, control_regions: true}
+sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
+ntuples:
+  server: root://cmsdcache-kit-disk.gridka.de
+  base: /store/user/sdaigler/CROWN/ntuples/sm2018_binned_v4/CROWNRun
+  friends: []
+  # - {base: /store/user/sdaigler/CROWN/ntuples/sm2018_binned_v4/CROWNFriends/nn_v1, applies_to: [mc, data, embedding]}
+  # - {base: /store/user/sdaigler/CROWN/ntuples/sm2018_binned_v4/CROWNFriends/ff_v1, applies_to: [mc, data, embedding]}
+skim_dir: /ceph/sdaigler/shapesmith/sm2018_binned_v4      # shared with sm2018_binned_v4_dilepton.yaml (disjoint channels)
+output_dir: ../output/sm2018_binned_v4                    # relative to this file -> <repo>/output/...
+ml_dir: /ceph/sdaigler/shapesmith_ml/sm2018_binned_v4
+workers: 16
+combine: {cmssw_dir: /work/sdaigler/smhtt_ul/CMSSW_14_1_9, scram_arch: el9_amd64_gcc12}

@@ -1,18 +1,16 @@
 """Assemble the HH->bbtautau Analysis for ShapeSmith from the run configuration switches; ML export configuration."""
 from __future__ import annotations
 
-from pathlib import Path
-
 from shapesmith.config import RunConfig
 from shapesmith.model import Analysis, AnalysisError, Estimator, MLExportConfig, Process
 
 from bbtautau_shapesmith.constants import ERA, LUMI_PB
-from bbtautau_shapesmith.processes import SIGNAL, categories, control_variables, processes
-from bbtautau_shapesmith.samples import samples
+from bbtautau_shapesmith.processes import SIGNAL, categories, control_variables, tau_processes
+from bbtautau_shapesmith.samples import DEFAULT_SAMPLE_LIST, sample_database, samples
 from bbtautau_shapesmith.selection import channel_definition
-from bbtautau_shapesmith.systematics import lnn, style, weight_variations
+from bbtautau_shapesmith.systematics import btag_variations, lnn, style
 
-VARIABLES = (
+ML_VARIABLES = (
     "pt_1", "pt_2", "m_vis", "pt_vis", "mt_tot", "pt_tautau", "deltaR_ditaupair", "met", "n_jets", "n_bjets",
     "jpt_1", "jpt_2", "mjj", "pt_dijet", "bpair_pt_1", "bpair_pt_2", "bpair_btag_value_1", "bpair_btag_value_2",
     "bpair_m_inv", "bpair_pt_dijet", "bpair_deltaR", "pt_tautaubb", "mass_tautaubb",
@@ -33,22 +31,25 @@ def ml_config(processes: tuple[Process, ...], jet_fakes: str) -> MLExportConfig:
     if jet_fakes == "ff":
         labels["jetFakes"] = "is_jetFakes"
         region_of["jetFakes"] = "anti_iso"
-    return MLExportConfig(variables=VARIABLES, processes=tuple(labels), label_of=labels, region_of=region_of)
+    return MLExportConfig(variables=ML_VARIABLES, processes=tuple(labels), label_of=labels, region_of=region_of)
 
 
-DEFAULT_SWITCHES = {"jet_fakes": "mc", "embedding": False, "nn_friend": False, "sample_list": "sm2018_binned_v2"}
-
-
-def _database(config: RunConfig) -> Path:
-    if config.sample_database is None:
-        raise AnalysisError("sample_database (path to a KingMaker datasets.json) is missing in the run configuration")
-    return config.sample_database
+DEFAULT_SWITCHES = {"jet_fakes": "mc", "embedding": False, "nn_friend": False, "sample_list": DEFAULT_SAMPLE_LIST, "control_regions": False}
 
 
 def build(config: RunConfig) -> Analysis:
+    if "production" in config.switches:
+        raise AnalysisError("switch production was renamed to sample_list; use ntuples.base to select production output")
+    unknown = set(config.switches) - set(DEFAULT_SWITCHES)
+    if unknown:
+        raise AnalysisError(f"unknown analysis switches: {sorted(unknown)}")
+    if not isinstance(config.switches.get("control_regions", False), bool):
+        raise AnalysisError("control_regions must be a boolean")
     switches = {**DEFAULT_SWITCHES, **config.switches}
     jet_fakes, embedding, nn_friend = switches["jet_fakes"], bool(switches["embedding"]), bool(switches["nn_friend"])
-    table = processes(jet_fakes, embedding)
+    if switches["control_regions"] and jet_fakes != "mc":
+        raise AnalysisError("control_regions requires jet_fakes: mc for raw pass/fail data/MC comparisons")
+    table = tau_processes(jet_fakes, embedding)
     genuine = ("EMB",) if embedding else tuple(p.name for p in table if p.kind == "true_tau")
     lepton_fakes = tuple(p.name for p in table if p.kind == "lepton_fake")
     if jet_fakes == "ff":
@@ -60,13 +61,13 @@ def build(config: RunConfig) -> Analysis:
         name="hh_bbtautau_2018_v15",
         era=ERA,
         lumi_pb=LUMI_PB,
-        channels={channel: channel_definition(channel, jet_fakes) for channel in config.channels},
-        samples=samples(_database(config), switches["sample_list"]),
+        channels={channel: channel_definition(channel, jet_fakes, switches["control_regions"]) for channel in config.channels},
+        samples=samples(sample_database(config), switches["sample_list"]),
         processes=table,
         signal=SIGNAL,
         categories=categories() if nn_friend else (),
         control_variables=control_variables(nn_friend),
-        weight_variations=weight_variations(),
+        weight_variations=btag_variations(),
         lnn=lnn(table, estimator.output),
         estimator=estimator,
         style=style(),

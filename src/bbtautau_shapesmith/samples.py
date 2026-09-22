@@ -6,10 +6,10 @@ shapesmith resolves the database entry by nick first and by DBS path second.
 """
 from __future__ import annotations
 
-from collections import Counter
 from pathlib import Path
 
-from shapesmith.model import Sample
+from shapesmith.config import RunConfig
+from shapesmith.model import AnalysisError, Sample
 from shapesmith.samples import normalisation, read_inventory
 
 INVENTORY_DIR = Path(__file__).resolve().parents[2] / "inventory"
@@ -20,14 +20,23 @@ def inventory_path(sample_list: str = DEFAULT_SAMPLE_LIST) -> Path:
     """`inventory/<sample_list>.txt`: one `<nick> <dbs>` line per sample to process."""
     path = INVENTORY_DIR / f"{sample_list}.txt"
     if not path.exists():
-        known = sorted(p.stem for p in INVENTORY_DIR.glob("sm*.txt"))
+        known = sorted(p.stem for p in INVENTORY_DIR.glob("*.txt"))
         raise FileNotFoundError(f"no inventory for sample_list {sample_list!r}; known: {known}")
     return path
 
-# (nick prefix, group, channels); first match wins, so put the more specific prefixes first
+
+def sample_database(config: RunConfig) -> Path:
+    """The KingMaker datasets.json named in the run configuration (cross sections, event counts, generator weights)."""
+    if config.sample_database is None:
+        raise AnalysisError("sample_database (path to a KingMaker datasets.json) is missing in the run configuration")
+    return config.sample_database
+
+
+# (nick prefix, group, channels); first match wins, so put the more specific prefixes first.
+# CROWN writes every data stream into every scope, so a stream is routed to the channels whose trigger it carries.
 GROUP_RULES = (
-    ("SingleMuon_", "data", ("mt",)),
-    ("EGamma_", "data", ("et",)),
+    ("SingleMuon_", "data", ("mt", "em", "mm")),
+    ("EGamma_", "data", ("et", "ee")),
     ("Tau_", "data", ("tt",)),
     ("GluGluToHHTo2B2Tau", "HH2B2Tau", None),
     ("GluGluHToTauTau", "ggH", None),
@@ -50,8 +59,6 @@ GROUP_RULES = (
     ("WZ", "VV", None),
     ("ZZ", "VV", None),
 )
-
-EXPECTED_GROUP_SIZES = Counter({"data": 12, "HH2B2Tau": 1, "DY": 7, "W": 3, "EWK": 7, "ST": 6, "TT": 3, "TTV": 11, "VV": 14, "ggH": 1, "qqH": 2, "ttH": 2, "VH": 10})
 
 
 def group_of(nick: str) -> tuple[str, tuple[str, ...] | None]:

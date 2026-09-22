@@ -2,19 +2,22 @@
 colours, legend labels, stack order and axis labels (ported from Dumbledraw's non_res_hh branch, mathtext)."""
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from shapesmith.model import LnN, Process, Style, WeightVariation
 
-from bbtautau_shapesmith.constants import BTAG_COMPONENTS, CHANNELS, ERA
+from bbtautau_shapesmith.constants import BTAG_COMPONENTS, DILEPTON_CHANNELS, ERA, TAU_CHANNELS
 from bbtautau_shapesmith.processes import SIGNAL
 
 LT = ("et", "mt")
 TT = ("tt",)
 
 
-def weight_variations() -> tuple[WeightVariation, ...]:
+def btag_variations(components: Iterable[str] = BTAG_COMPONENTS) -> tuple[WeightVariation, ...]:
+    """Up/Down shape variations of the UParT b-tag weight, one pair per component."""
     return tuple(
         WeightVariation(f"CMS_btag_{component}_{ERA}{shift}", {"btag": f"btag_weight_upart_{shift.lower()}_{component}"})
-        for component in BTAG_COMPONENTS
+        for component in components
         for shift in ("Up", "Down")
     )
 
@@ -61,9 +64,9 @@ LABELS = {
     "jetFakes": r"jet$\rightarrow\tau_h$", "QCD": "QCD multijet", "EMB": r"$\tau$ embedded",
 }
 GROUP_ORDER = ("rare", "QCD", "jetFakes", "EMB", "VV", "ST", "TT", "Z")
-CHANNEL_LABELS = {"et": r"e$\tau_h$", "mt": r"$\mu\tau_h$", "tt": r"$\tau_h\tau_h$"}
-LEG1 = {"et": "Electron", "mt": "Muon", "tt": r"Leading $\tau_h$"}
-LEG2 = {"et": r"$\tau_h$", "mt": r"$\tau_h$", "tt": r"Trailing $\tau_h$"}
+CHANNEL_LABELS = {"et": r"e$\tau_h$", "mt": r"$\mu\tau_h$", "tt": r"$\tau_h\tau_h$", "em": r"e$\mu$", "mm": r"$\mu\mu$", "ee": "ee"}
+LEG1 = {"et": "Electron", "mt": "Muon", "tt": r"Leading $\tau_h$", "em": "Electron", "mm": "Leading muon", "ee": "Leading electron"}
+LEG2 = {"et": r"$\tau_h$", "mt": r"$\tau_h$", "tt": r"Trailing $\tau_h$", "em": "Muon", "mm": "Trailing muon", "ee": "Trailing electron"}
 
 _COMMON_AXIS_LABELS = {
     "m_vis": r"$m_{vis}$ / GeV", "pt_vis": r"$p_T^{vis}$ / GeV", "mt_tot": r"$m_T^{tot}$ / GeV", "pt_tautau": r"$p_T(\tau\tau)$ / GeV",
@@ -76,23 +79,25 @@ _COMMON_AXIS_LABELS = {
     "bpair_phi_1": r"Leading b-jet $\varphi$", "bpair_phi_2": r"Trailing b-jet $\varphi$", "bpair_btag_value_1": "Leading b-jet UParT score", "bpair_btag_value_2": "Trailing b-jet UParT score",
     "bpair_m_inv": r"$m_{bb}$ / GeV", "bpair_pt_dijet": r"$p_T(bb)$ / GeV", "bpair_deltaR": r"$\Delta R(bb)$",
     "pt_tautaubb": r"$p_T(bb\tau\tau)$ / GeV", "mass_tautaubb": r"$m(bb\tau\tau)$ / GeV", "sum_deltaR_tt_bb": r"$\Delta R(\tau\tau) + \Delta R(bb)$",
-    "iso_2": r"$\tau_h$ isolation", "mass_2": r"$\tau_h$ mass / GeV", "tau_decaymode_1": "Decay mode (leg 1)", "tau_decaymode_2": r"$\tau_h$ decay mode",
-    "phi_1": r"$\varphi$ (leg 1)", "phi_2": r"$\tau_h$ $\varphi$", "mass_1": "Mass (leg 1) / GeV", "q_1": "Charge (leg 1)", "NN_score": "NN output",
+    "mass_2": r"$\tau_h$ mass / GeV", "tau_decaymode_1": "Decay mode (leg 1)", "tau_decaymode_2": r"$\tau_h$ decay mode",
+    "mass_1": "Mass (leg 1) / GeV", "q_1": "Charge (leg 1)", "NN_score": "NN output", "yield": "Events",
 }
 
 
 def axis_labels() -> dict[str, dict[str, str]]:
+    """Axis titles per channel: the common table plus the leg-dependent ones, Z-pair titles in the dilepton channels."""
     labels = {}
-    for channel in CHANNELS:
+    for channel in TAU_CHANNELS + DILEPTON_CHANNELS:
         labels[channel] = {
             **_COMMON_AXIS_LABELS,
-            "pt_1": f"{LEG1[channel]} $p_T$ / GeV",
-            "pt_2": f"{LEG2[channel]} $p_T$ / GeV",
-            "eta_1": rf"{LEG1[channel]} $\eta$",
-            "eta_2": rf"{LEG2[channel]} $\eta$",
-            "iso_1": f"{LEG1[channel]} isolation",
+            "pt_1": f"{LEG1[channel]} $p_T$ / GeV", "pt_2": f"{LEG2[channel]} $p_T$ / GeV",
+            "eta_1": rf"{LEG1[channel]} $\eta$", "eta_2": rf"{LEG2[channel]} $\eta$",
+            "phi_1": rf"{LEG1[channel]} $\varphi$", "phi_2": rf"{LEG2[channel]} $\varphi$",
+            "iso_1": f"{LEG1[channel]} isolation", "iso_2": f"{LEG2[channel]} isolation",
             "mt_1": rf"$m_T$({LEG1[channel]}, $p_T^{{miss}}$) / GeV",
         }
+        if channel in DILEPTON_CHANNELS:
+            labels[channel].update(m_vis=r"$m_{\ell\ell}$ / GeV", pt_vis=r"$p_T^{\ell\ell}$ / GeV")
     return labels
 
 

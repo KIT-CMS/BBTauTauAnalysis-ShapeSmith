@@ -2,13 +2,17 @@
 
 ERA = "2018"
 LUMI_PB = 59830.0
-CHANNELS = ("et", "mt", "tt")
-LT_CHANNELS = ("et", "mt")
+TAU_CHANNELS = ("et", "mt", "tt")
+LT_CHANNELS = ("et", "mt")  # tau channels with a light lepton on leg 1
+DILEPTON_CHANNELS = ("em", "mm", "ee")  # light-dilepton controls: Z+jets in ee/mm, top in em
 
 TAU_VS_JET_WP = "Medium"
 TAU_VS_JET_LOOSE_WP = "VVVLoose"  # lower edge of the anti-isolated region
 TAU_VS_MU_WP = {"mt": "Tight", "et": "VLoose", "tt": "VLoose"}
 TAU_VS_ELE_WP = {"mt": "VVLoose", "et": "Tight", "tt": "VVLoose"}
+
+# b-tag multiplicity bins of the control regions (each combined with >= 2 jets)
+BTAG_BINS = {"btag0": "n_bjets == 0", "btag1": "n_bjets == 1", "btag2": "n_bjets == 2", "btag3p": "n_bjets >= 3"}
 
 # NN output classes in training order: index = friend column predicted_class, datacard bin id = index + 1
 NN_CLASS_NAMES = ("HH2B2Tau", "DY", "ST", "TT", "VV", "jetFakes", "Other")

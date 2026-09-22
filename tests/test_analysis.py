@@ -5,14 +5,14 @@ from shapesmith.skim import required_columns
 from typer.testing import CliRunner
 
 from bbtautau_shapesmith.analysis import build
-from bbtautau_shapesmith.constants import CHANNELS, FF_COLUMN_SET, NN_COLUMNS
-from bbtautau_shapesmith.systematics import lnn, weight_variations
-from bbtautau_shapesmith.processes import processes
-from tests.helpers import REPO, inventory, nicks
+from bbtautau_shapesmith.constants import TAU_CHANNELS, FF_COLUMN_SET, NN_COLUMNS
+from bbtautau_shapesmith.systematics import lnn, btag_variations
+from bbtautau_shapesmith.processes import tau_processes
+from tests.helpers import REPO, branches, nicks
 
 
 def _config(**switches):
-    return RunConfig(analysis="bbtautau_shapesmith.analysis:build", era="2018", channels=list(CHANNELS), switches=switches, ntuples=NtupleConfig(base="/x"), skim_dir="/s", output_dir="/o", sample_database=REPO / "tests" / "fixtures" / "datasets.json")
+    return RunConfig(analysis="bbtautau_shapesmith.analysis:build", era="2018", channels=list(TAU_CHANNELS), switches=switches, ntuples=NtupleConfig(base="/x"), skim_dir="/s", output_dir="/o", sample_database=REPO / "tests" / "fixtures" / "datasets.json")
 
 
 def test_mc_mode_without_nn_friend_validates():
@@ -59,20 +59,20 @@ def test_embedding_needs_samples():
 
 
 @pytest.mark.parametrize("switches", [dict(jet_fakes="mc"), dict(jet_fakes="ff", nn_friend=True)])
-@pytest.mark.parametrize("channel", CHANNELS)
+@pytest.mark.parametrize("channel", TAU_CHANNELS)
 def test_all_required_columns_exist(switches, channel):
     analysis = build(_config(**switches))
-    allowed = inventory(channel) | (NN_COLUMNS if switches.get("nn_friend") else set()) | (FF_COLUMN_SET if switches.get("jet_fakes") == "ff" else set())
+    allowed = branches(channel) | (NN_COLUMNS if switches.get("nn_friend") else set()) | (FF_COLUMN_SET if switches.get("jet_fakes") == "ff" else set())
     assert required_columns(analysis, channel) <= allowed, required_columns(analysis, channel) - allowed
 
 
 def test_systematics():
-    variations = weight_variations()
+    variations = btag_variations()
     assert len(variations) == 80 and variations[0].name == "CMS_btag_as_2018Up" and variations[0].replace_weights == {"btag": "btag_weight_upart_up_as"}
-    entries = lnn(processes("mc", False), "QCD")
+    entries = lnn(tau_processes("mc", False), "QCD")
     names = [e.name for e in entries]
     assert "lumi_13TeV_$ERA" in names and "QCDNorm_$CHANNEL_$ERA" in names and "htt_wjXsec" in names and "QCDscale_HH" in names
-    assert "htt_wjXsec" not in [e.name for e in lnn(processes("ff", False), "jetFakes")]
+    assert "htt_wjXsec" not in [e.name for e in lnn(tau_processes("ff", False), "jetFakes")]
     assert all(e.processes for e in entries)
 
 
@@ -85,13 +85,14 @@ def test_style_covers_all_groups():
         assert variable in analysis.style.axis_labels["mt"]
 
 
-def test_run_config_file_loads_and_validates():
-    config = load_config(REPO / "configs" / "sm2018_binned_v2.yaml")
-    assert config.switches["jet_fakes"] == "mc"
+@pytest.mark.parametrize("filename", ["sm2018_binned_v2.yaml", "sm2018_binned_v4.yaml", "sm2018_binned_v4_dilepton.yaml"])
+def test_run_config_file_loads_and_validates(filename):
+    config = load_config(REPO / "configs" / filename)
+    assert config.switches["sample_list"] == "sm2018_binned_v2"
     if not config.sample_database.exists():
         pytest.skip("sample database checkout ../KingMaker_sample_database not available")
     load_analysis(config)
     from shapesmith.cli import app
 
-    result = CliRunner().invoke(app, ["validate", "-c", str(REPO / "configs" / "sm2018_binned_v2.yaml")])
+    result = CliRunner().invoke(app, ["validate", "-c", str(REPO / "configs" / filename)])
     assert result.exit_code == 0, result.output

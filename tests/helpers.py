@@ -2,11 +2,13 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 INVENTORY = REPO / "inventory"
-DATABASE = REPO / "tests" / "fixtures" / "datasets.json"
+FIXTURES = REPO / "tests" / "fixtures"
+DATABASE = FIXTURES / "datasets.json"
 
 
-def inventory(channel: str) -> set[str]:
-    return {line.strip() for line in (INVENTORY / f"2018_v15_{channel}.txt").read_text().splitlines() if line.strip()}
+def branches(channel: str) -> set[str]:
+    """Branch names of a CROWN sm_config ttbar ntuple of the channel (regenerate with scripts/dump_branches.py)."""
+    return {line.strip() for line in (FIXTURES / f"branches_{channel}.txt").read_text().splitlines() if line.strip()}
 
 
 def nicks(sample_list: str = "sm2018_binned_v2") -> list[str]:
