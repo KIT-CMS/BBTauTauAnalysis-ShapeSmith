@@ -20,7 +20,7 @@ def test_mc_mode_without_nn_friend_validates():
     assert set(analysis.estimator.subtract) == {"ZTT", "TTT", "STT", "VVT", "TTVT", "ZL", "TTL", "STL", "VVL", "TTVL", "ZJ", "TTJ", "STJ", "VVJ", "TTVJ", "W"}
 
 
-@pytest.mark.parametrize("sample_list", ["sm2018_binned_v1", "sm2018_binned_v2"])
+@pytest.mark.parametrize("sample_list", ["sm2018_binned_v1", "sm2018_binned_v2", "sm2018_binned_v3"])
 def test_sample_list_selects_inventory(sample_list):
     analysis = build(_config(sample_list=sample_list))
     analysis.validate()

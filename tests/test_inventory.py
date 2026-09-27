@@ -3,7 +3,7 @@ from tests.helpers import branches, nicks
 
 
 def test_inventory_nicks_are_unique():
-    for sample_list in ("sm2018_binned_v1", "sm2018_binned_v2"):
+    for sample_list in ("sm2018_binned_v1", "sm2018_binned_v2", "sm2018_binned_v3"):
         inventory = nicks(sample_list)
         assert inventory and len(inventory) == len(set(inventory))
 

@@ -57,7 +57,7 @@ The control regions of both Analyses and how to read them: [docs/control_regions
 
 | What | Where |
 |---|---|
-| produced samples (nick + DBS path per production), groups, data-stream routing, normalisation | `inventory/*.txt`, `samples.py` |
+| produced samples (nick + DBS path per production), groups, data-stream routing, per-sample cuts, normalisation | `inventory/*.txt`, `samples.py` |
 | era, luminosity, channel sets, working points, b-tag bins, friend columns, class names | `constants.py` |
 | tau channels: baseline/skim selection, estimation and control regions, MC weights, trigger chains, gen-match splits | `selection.py` |
 | dilepton channels: baseline/skim selection, b-tag bins, same-sign region, MC weights | `dilepton_selection.py` |
@@ -69,6 +69,12 @@ The control regions of both Analyses and how to read them: [docs/control_regions
 Sample nicks changed in the sample database in 2026-08 (campaign suffix); `sm2018_binned_v1`
 carries the old, `sm2018_binned_v2` the new names. The inventories list the DBS path of every
 sample, so either production resolves against the current database.
+
+`sm2018_binned_v3` adds the inclusive DY M-50 amcatnloFXFX sample, of which only the `npartons == 0`
+events are kept (`SAMPLE_CUTS` in `samples.py`): the LHEFilterPtZ bins lack every zero-parton event
+and cover `npartons >= 1`. It needs a production that contains this sample; the v4 run YAMLs keep
+`sm2018_binned_v2`. Only this sample reads `npartons`, so the skims of the other samples stay
+valid when an existing skim directory switches to `sm2018_binned_v3`.
 
 `tests/fixtures/branches_<channel>.txt` list the branches of one ttbar ntuple per channel of the
 `sm2018_binned_v4` production (`scripts/dump_branches.py <root:// URL>`); the tests check every

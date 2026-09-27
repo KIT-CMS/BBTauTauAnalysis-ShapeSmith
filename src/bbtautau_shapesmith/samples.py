@@ -68,6 +68,20 @@ def group_of(nick: str) -> tuple[str, tuple[str, ...] | None]:
     raise KeyError(f"no group rule for sample {nick}")
 
 
+# (nick prefix, cut applied at skim time); first match wins, normalisation stays that of the whole sample.
+# The DY LHEFilterPtZ bins lack every zero-parton event: that part comes from the inclusive sample, the bins cover npartons >= 1.
+SAMPLE_CUTS = (
+    ("DYJetsToLL_M-50_TuneCP5_13TeV-amcatnloFXFX", "npartons == 0"),
+)
+
+
+def cut_of(nick: str) -> str | None:
+    for prefix, cut in SAMPLE_CUTS:
+        if nick.startswith(prefix):
+            return cut
+    return None
+
+
 def samples(database: Path, sample_list: str = DEFAULT_SAMPLE_LIST) -> tuple[Sample, ...]:
     entries = read_inventory(inventory_path(sample_list))
     values = normalisation(database, entries)
@@ -75,5 +89,5 @@ def samples(database: Path, sample_list: str = DEFAULT_SAMPLE_LIST) -> tuple[Sam
     for entry in entries:
         group, channels = group_of(entry.nick)
         row = values[entry.nick]
-        result.append(Sample(entry.nick, group, row["kind"], float(row["xsec"]), int(row["nevents"]), float(row["generator_weight"]), channels))
+        result.append(Sample(entry.nick, group, row["kind"], float(row["xsec"]), int(row["nevents"]), float(row["generator_weight"]), channels, cut=cut_of(entry.nick)))
     return tuple(result)

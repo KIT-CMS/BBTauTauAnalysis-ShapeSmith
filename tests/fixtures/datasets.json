@@ -76,6 +76,17 @@
   "sample_type": "dyjets",
   "xsec": 20490.0
  },
+ "DYJetsToLL_M-50_TuneCP5_13TeV-amcatnloFXFX-pythia8_RunIISummer20UL18NanoAODv15-150X_mc2018_realistic_v1-v1": {
+  "dbs": "/DYJetsToLL_M-50_TuneCP5_13TeV-amcatnloFXFX-pythia8/RunIISummer20UL18NanoAODv15-150X_mc2018_realistic_v1-v1/NANOAODSIM",
+  "era": "2018",
+  "generator_weight": 0.6729628751500812,
+  "instance": "prod/global",
+  "nevents": 196626007,
+  "nfiles": 163,
+  "nick": "DYJetsToLL_M-50_TuneCP5_13TeV-amcatnloFXFX-pythia8_RunIISummer20UL18NanoAODv15-150X_mc2018_realistic_v1-v1",
+  "sample_type": "dyjets",
+  "xsec": 6077.22
+ },
  "EGamma_Run2018A-UL2018_NanoAODv15-v1": {
   "dbs": "/EGamma/Run2018A-UL2018_NanoAODv15-v1/NANOAOD",
   "era": "2018",
