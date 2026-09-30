@@ -65,6 +65,11 @@ def test_v3_adds_the_zero_parton_part_of_the_inclusive_dy_sample():
     assert [s.nick for s in table.values() if s.cut is not None] == [INCLUSIVE_DY]
 
 
+def test_the_inclusive_dy_sample_is_uncut_without_the_ptz_bins():
+    table = {s.nick: s for s in samples(DATABASE, ["sm2018_tau_id_measurement"], ["mt"])["mt"]}
+    assert table[INCLUSIVE_DY].cut is None and not any(nick.startswith("DYJetsToLL_LHEFilterPtZ-") for nick in table)
+
+
 @pytest.mark.parametrize("channel", CHANNELS)
 def test_only_the_inclusive_dy_sample_needs_npartons(channel):
     # The branch fixtures come from a ttbar ntuple, which has no npartons (CROWN writes it for DY, W+jets and EWK samples only),
