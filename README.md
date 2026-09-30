@@ -136,9 +136,9 @@ shapesmith skim    -c configs/ff_sm2018_binned_v4.yaml
 shapesmith measure -c configs/ff_sm2018_binned_v4.yaml [--suggest-binning]   # -> output/.../fake_factors/2018/
 ```
 
-The regions come from `cuts.py`; every difference to jvoss's configuration is listed in the module docstring. The
-binning, fits and bandwidths are `ff_tables.py`, generated once by `scripts/make_ff_tables.py` from TauFakeFactors'
-resolved configuration (do not edit by hand). `scripts/ff_parity.py` is the algorithm parity with TauFakeFactors: it
+The regions are built in `ff_measurement.py` from the analysis selection (`cuts.py`); every difference to jvoss's
+configuration is listed in its docstring. The binning, fits and bandwidths are `ff_tables.py`, generated once by
+`scripts/make_ff_tables.py` from TauFakeFactors' resolved configuration (do not edit by hand). `scripts/ff_parity.py` is the algorithm parity with TauFakeFactors: it
 runs the measurement on jvoss's preselection files with his regions and weights and compares every payload value,
 edge and fitted curve with his payload and his pickled fits, and `--suggest-binning` with his `adjust_binning.py`.
 One explained difference is by decision (U13): the SystMCShiftDown of the corrections is smoothed at the centres of
