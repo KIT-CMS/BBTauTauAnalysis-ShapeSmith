@@ -18,6 +18,7 @@ class TauSwitches(BaseModel):
     embedding: bool = False  # genuine tautau from the embedded samples instead of MC
     nn_friend: bool = False  # NN categories from the NN friend
     control_regions: bool = False  # wider skim plus the named pass/fail control regions (needs jet_fakes: mc)
+    shape_systematics: bool = True  # the embedding and fake-factor shifts (column variations)
 
     @model_validator(mode="after")
     def _controls_need_mc_fakes(self) -> TauSwitches:

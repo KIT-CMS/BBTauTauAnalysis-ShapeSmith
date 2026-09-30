@@ -24,6 +24,32 @@ NN_COLUMNS = frozenset((NN_CLASS_COLUMN, NN_SCORE_COLUMN))
 # fake-factor friend (CROWN fake_factors_friend_config.py): the weight column per leg
 FF_COLUMNS = {"lt": "fake_factor", "tt_1": "fake_factor_1", "tt_2": "fake_factor_2"}
 
+# CROWN shift names of the fake-factor friend without their direction (Up/Down): every Up/Down key of the SM 2018
+# payload (CROWN bbtautau 1570b43, payloads/fake_factors/sm/2018) except the SystBand{High,Low} and per-variable
+# non-closure keys. The tt subleading keys carry "_subleading" after the process or correction name.
+FF_SHIFTS_LT = (
+    "QCDStatShift", "QCDSystBandAsym", "QCDSystMCShift",
+    "QCD_DR_SR_CorrStatShift", "QCD_DR_SR_CorrSystBandAsym", "QCD_DR_SR_CorrSystMCShift",
+    "QCD_non_closure_CorrStatShift", "QCD_non_closure_CorrSystBandAsym", "QCD_non_closure_CorrSystMCShift",
+    "process_fractionsfrac_QCD", "process_fractionsfrac_ttbar_J",
+    "ttbarStatShift", "ttbarSystBandAsym", "ttbarSystMCShift",
+    "ttbar_non_closure_CorrStatShift", "ttbar_non_closure_CorrSystBandAsym", "ttbar_non_closure_CorrSystMCShift",
+)
+FF_SHIFTS_TT = FF_SHIFTS_LT + (
+    "QCD_subleadingStatShift", "QCD_subleadingSystBandAsym", "QCD_subleadingSystMCShift",
+    "QCD_subleading_DR_SR_CorrStatShift", "QCD_subleading_DR_SR_CorrSystBandAsym", "QCD_subleading_DR_SR_CorrSystMCShift",
+    "QCD_subleading_non_closure_CorrStatShift", "QCD_subleading_non_closure_CorrSystBandAsym", "QCD_subleading_non_closure_CorrSystMCShift",
+    "process_fractions_subleadingfrac_QCD", "process_fractions_subleadingfrac_ttbar_J",
+    "ttbar_subleadingStatShift", "ttbar_subleadingSystBandAsym", "ttbar_subleadingSystMCShift",
+    "ttbar_subleading_non_closure_CorrStatShift", "ttbar_subleading_non_closure_CorrSystBandAsym", "ttbar_subleading_non_closure_CorrSystMCShift",
+)
+
+# Embedding tau corrections, one nuisance per measured decay-mode category (DM10 and DM11 are one fit):
+# nuisance token -> CROWN tau ES shift token (embTauEs<token>); the vsJet shifts are embVsJetTauDM<dm>Pt<bin>.
+EMBEDDING_TAU_ES = {"0": "1prong0pizero", "1": "1prong1pizero", "1011": "3prong"}
+# vsJet pT bins; tt has no 20-40 GeV bin because its selection requires both taus above 40 GeV
+EMBEDDING_VS_JET_PT_BINS = {"et": ("20to40", "40toInf"), "mt": ("20to40", "40toInf"), "tt": ("40toInf",)}
+
 # UParT b-tag shape-correction components; columns btag_weight_upart_{up,down}_<component>
 BTAG_COMPONENTS = (
     "as", "correlated", "uncorrelated", "statistic", "ttbar", "pileup", "pdf", "mur", "muf", "isrdef", "fsrdef",

@@ -10,7 +10,7 @@ from bbtautau_shapesmith.processes import EMBEDDED, GENUINE, JET_FAKE, LEPTON_FA
 from bbtautau_shapesmith.samples import sample_database, samples
 from bbtautau_shapesmith.style import style
 from bbtautau_shapesmith.switches import TauSwitches, parse
-from bbtautau_shapesmith.systematics import btag_variations, lnn
+from bbtautau_shapesmith.systematics import btag_variations, embedding_variations, ff_variations, lnn
 from bbtautau_shapesmith.variables import categories, control_variables
 
 ML_VARIABLES = (
@@ -50,6 +50,12 @@ def estimators(processes: tuple[Process, ...], switches: TauSwitches) -> tuple:
     return result
 
 
+def column_variations(name: str, switches: TauSwitches) -> tuple:
+    if not switches.shape_systematics:
+        return ()
+    return (embedding_variations(name) if switches.embedding else ()) + (ff_variations(name) if switches.jet_fakes == "ff" else ())
+
+
 def channel(name: str, switches: TauSwitches, channel_samples: tuple[Sample, ...]) -> Channel:
     table = tau_processes(name, switches.jet_fakes, switches.embedding)
     groups = {p.group for p in table}
@@ -62,7 +68,7 @@ def channel(name: str, switches: TauSwitches, channel_samples: tuple[Sample, ...
         regions=cuts.regions(name, switches.jet_fakes) + (cuts.diagnostic_regions(name) if switches.control_regions else ()),
         categories=categories() if switches.nn_friend else (),
         variables=control_variables(switches.nn_friend),
-        variations=btag_variations(),
+        variations=btag_variations() + column_variations(name, switches),
         estimators=estimators(table, switches),
         keep_columns=("event", "run", "lumi"),
     )

@@ -1,11 +1,12 @@
-"""Systematic uncertainties: b-tag weight variations (shapes), normalisation uncertainties (lnN)."""
+"""Systematic uncertainties: b-tag weight variations, the CROWN shifts of the embedded sample and of the fake-factor
+friend (column variations), normalisation uncertainties (lnN)."""
 from __future__ import annotations
 
 from collections.abc import Iterable
 
-from shapesmith.model import LnN, Process, WeightVariation
+from shapesmith.model import ColumnVariation, LnN, Process, WeightVariation
 
-from bbtautau_shapesmith.constants import BTAG_COMPONENTS, ERA
+from bbtautau_shapesmith.constants import BTAG_COMPONENTS, EMBEDDING_TAU_ES, EMBEDDING_VS_JET_PT_BINS, ERA, FF_SHIFTS_LT, FF_SHIFTS_TT, TAU_VS_ELE_WP
 from bbtautau_shapesmith.processes import EMBEDDED, SIGNAL
 
 LT = ("et", "mt")
@@ -19,6 +20,30 @@ def btag_variations(components: Iterable[str] = BTAG_COMPONENTS) -> tuple[Weight
         for component in components
         for shift in ("Up", "Down")
     )
+
+
+def _shifts(name: str, suffix: str, applies_to: tuple[str, ...]) -> tuple[ColumnVariation, ...]:
+    """The Up/Down pair of one CROWN shift: datacard name `name`Up/Down, branches `c + suffix`Up/Down."""
+    return tuple(ColumnVariation(f"{name}{shift}", f"{suffix}{shift}", applies_to=applies_to) for shift in ("Up", "Down"))
+
+
+def embedding_variations(channel: str) -> tuple[ColumnVariation, ...]:
+    """Tau ES and vsJet ID shifts of the embedded sample, one per measured category. The vsEle working point in the
+    name decorrelates et (Tight) from mt and tt (VVLoose)."""
+    wp = f"vsEle{TAU_VS_ELE_WP[channel]}"
+    result = ()
+    for dm, prongs in EMBEDDING_TAU_ES.items():
+        result += _shifts(f"CMS_scale_t_emb_dm{dm}_{wp}_{ERA}", f"__embTauEs{prongs}", ("embedding",))
+    for dm in EMBEDDING_TAU_ES:
+        for pt in EMBEDDING_VS_JET_PT_BINS[channel]:
+            result += _shifts(f"CMS_eff_t_emb_dm{dm}_pt{pt}_{wp}_{ERA}", f"__embVsJetTauDM{dm}Pt{pt}", ("embedding",))
+    return result
+
+
+def ff_variations(channel: str) -> tuple[ColumnVariation, ...]:
+    """The fake-factor friend shifts, per channel; in tt a key shifts only the fake factor of its leg."""
+    keys = FF_SHIFTS_TT if channel == "tt" else FF_SHIFTS_LT
+    return tuple(variation for key in keys for variation in _shifts(f"CMS_ff_{key}_{channel}_{ERA}", f"__{key}", ("data", "mc", "embedding")))
 
 
 def lnn(processes: tuple[Process, ...], jet_fakes_output: str) -> tuple[LnN, ...]:
