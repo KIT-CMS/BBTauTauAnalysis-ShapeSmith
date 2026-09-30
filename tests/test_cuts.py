@@ -45,9 +45,18 @@ def test_regions_replace_mc_weights_only():
                 assert varied == nominal, (region_name, name)
 
 
+def cut_columns(definition, channel: str) -> dict[str, float]:
+    """1.0 for every column the skim, the baseline and the regions of the channel cut on (all of them branches)."""
+    exprs = [*definition.skim.values(), *definition.cuts.values(), *(expr for r in definition.regions for expr in r.replace_cuts.values())]
+    columns = columns_of(exprs)
+    assert columns <= branches(channel)
+    return dict.fromkeys(columns, 1.0)
+
+
 @pytest.mark.parametrize("channel", TAU_CHANNELS)
 def test_expanded_tau_skim_contains_every_control_region(channel):
     definition = analysis_for("mc", control_regions=True).channel(channel)
+    columns = cut_columns(definition, channel)
     assert definition.cuts == cuts.baseline_cuts(channel)
     # Exercise charges, b-tag bins, tau pass/fail, high mT and lepton isolation.
     rows = []
@@ -56,7 +65,7 @@ def test_expanded_tau_skim_contains_every_control_region(channel):
             for passed in (0, 1):
                 for mt in (20, 80, 90):
                     for iso in (.1, .15, .3, .5):
-                        row = {column: 1. for column in branches(channel)}
+                        row = dict(columns)
                         row.update(q_1=1, q_2=charge, n_bjets=btags, n_jets=max(2, btags),
                                    bpair_pt_2=30 if btags else -999, pt_1=50, pt_2=45, mt_1=mt, iso_1=iso,
                                    extraelec_veto=0, extramuon_veto=0, dilepton_veto=0,
@@ -73,7 +82,7 @@ def test_expanded_tau_skim_contains_every_control_region(channel):
 
 def test_zero_b_control_accepts_missing_bb_pair_and_keeps_pass_fail_disjoint():
     definition = analysis_for("mc", control_regions=True).channel("mt")
-    row = {column: 1. for column in branches("mt")}
+    row = cut_columns(definition, "mt")
     row.update(q_1=1, q_2=-1, n_bjets=0, n_jets=2, bpair_pt_2=-999, pt_1=50, pt_2=45, mt_1=90, iso_1=.1,
                extraelec_veto=0, extramuon_veto=0, dilepton_veto=0)
     frame = pd.DataFrame([row, row | {"id_tau_vsJet_Medium_2": 0}, row | {"mt_1": 80}])
