@@ -7,9 +7,7 @@ region carries normalisation uncertainties only) and filled in the nominal regio
 bug is fixed: CMS_scale_t_dm1 uses the DM1 shift, not the DM0 one.
 
 The vsJet SF: the predecessor's CMS_eff_t_dm{0,1,10,11} shapes equal the nominal (its CROWN shift evaluated the
-nominal SF), and the payload was fitted so; they stay no-ops here. The production carries the components of the POG
-Run-2 v15 SF instead; they are read as their own variations, which no datacard uses until it is decided how they
-enter.
+nominal SF), and the payload was fitted so; they stay no-ops here, and the production has no vsJet SF shifts.
 """
 from __future__ import annotations
 
@@ -32,12 +30,6 @@ JES_SHIFTS = {
     "CMS_scale_j_RelativeJEREC2": "jesUncRelativeJEREC2", "CMS_scale_j_RelativePtEC2": "jesUncRelativePtEC2", "CMS_scale_j_RelativeBal": "jesUncRelativeBal",
     "CMS_scale_j_RelativeSample": "jesUncRelativeSample2018", f"CMS_scale_j_HEMIssue_{ERA_TAG}": "jesUncHEMIssue",
 }
-# the POG vsJet SF components: per decay mode, and correlated across decay modes (provisional names, not in datacards)
-VS_JET_COMPONENTS = {
-    **{f"CMS_eff_t_{component.lower()}_dm{dm}_{ERA_TAG}": f"vsJetTau{component}DM{dm}" for dm in DECAY_MODES for component in ("Stat1", "Stat2", "SystTes")},
-    f"CMS_eff_t_syst_{ERA_TAG}": "vsJetTauSyst2018",
-    "CMS_eff_t_syst_allEras": "vsJetTauSystAllEras",
-}
 
 # (datacard name, CROWN shift without its direction, sample groups or None for every MC group)
 CROWN_SHIFTS = (
@@ -53,7 +45,6 @@ CROWN_SHIFTS = (
     (f"CMS_scale_t_dm11_{ERA_TAG}", "tauEs3prong1pizero", None),
     (f"CMS_scale_fake_m_{ERA_TAG}", "tauMuFakeEs", ("DY",)),
     *((f"CMS_fake_m_WH{wheel}_{ERA_TAG}", f"vsMuWheel{wheel}", None) for wheel in range(1, 6)),
-    *((name, shift, None) for name, shift in VS_JET_COMPONENTS.items()),
 )
 
 # (datacard name, weight name, Up expression, Down expression): the weight's carriers get the variation. The jet fake

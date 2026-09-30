@@ -167,8 +167,7 @@ yet.
   four-vectors), the MET corrected by (1 - s) times the tau pT, mt_1 from that MET.
 - **MC shape uncertainties** (`tau_id_systematics.py`): the predecessor's set with MorphingTauID2017's names, from the
   CROWN shifts `<quantity>__<shift>` of `sm_tau_id_measurement_config` and the jet-fake and top-pT weights; mt only,
-  nominal region only. The vsJet SF families `CMS_eff_t_dm*` stay no-ops as in the predecessor; the production's POG
-  SF components are read as their own variations, unused by the datacards until their treatment is decided.
+  nominal region only. The vsJet SF families `CMS_eff_t_dm*` equal the nominal, as in the predecessor.
 - **CMSSW**: MorphingTauID2017 exists only with jvoss's local changes, versioned in `patches/` (see
   `patches/README.md`).
 
