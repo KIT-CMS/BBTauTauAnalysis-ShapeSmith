@@ -125,6 +125,25 @@ exactly the nicks in `inventory/`; a new inventory adds its entries in the same 
   four combinations. Skims made without the friend or the shifts are incompatible with it: the first such run needs
   `shapesmith skim --force --samples …` for the samples it lists.
 
+## Fake-factor measurement
+
+`configs/ff_sm2018_binned_v4.yaml` runs `bbtautau_shapesmith.ff_measurement:build`, the SM 2018 fake-factor
+measurement in jvoss's TauFakeFactors method (QCD and ttbar fake factors, fractions, the QCD DR->SR correction and the
+non-closures), with its own skim (both charges, the lepton vetoes stored for the ttbar scale regions):
+
+```bash
+shapesmith skim    -c configs/ff_sm2018_binned_v4.yaml
+shapesmith measure -c configs/ff_sm2018_binned_v4.yaml [--suggest-binning]   # -> output/.../fake_factors/2018/
+```
+
+The regions come from `cuts.py`; every difference to jvoss's configuration is listed in the module docstring. The
+binning, fits and bandwidths are `ff_tables.py`, generated once by `scripts/make_ff_tables.py` from TauFakeFactors'
+resolved configuration (do not edit by hand). `scripts/ff_parity.py` is the algorithm parity with TauFakeFactors: it
+runs the measurement on jvoss's preselection files with his regions and weights and compares every payload value,
+edge and fitted curve with his payload and his pickled fits, and `--suggest-binning` with his `adjust_binning.py`.
+A new payload goes into a new dated directory of the CROWN analysis (`payloads/fake_factors/sm/fake-factors-<date>/`)
+and needs a fresh friend tag; `constants.FF_SHIFTS_LT/TT` must follow its keys.
+
 ## Where things are defined
 
 | What | Where |
@@ -139,6 +158,7 @@ exactly the nicks in `inventory/`; a new inventory adds its entries in the same 
 | b-tag weight variations, embedding and fake-factor shifts, lnN table | `systematics.py` |
 | colours, labels, axis titles of all six channels | `style.py` |
 | tau analysis assembly, estimators, ML export | `analysis.py` |
+| fake-factor measurement: regions, processes, legs; its tables | `ff_measurement.py`, `ff_tables.py` |
 | dilepton channels and analysis assembly | `dilepton.py` |
 
 `tests/fixtures/branches_<channel>.txt` list the branches of one ttbar ntuple per channel of the

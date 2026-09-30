@@ -27,6 +27,13 @@ class TauSwitches(BaseModel):
         return self
 
 
+class FakeFactorSwitches(BaseModel):
+    model_config = STRICT
+
+    sample_lists: SampleLists = Field(min_length=1)
+    embedding: bool = False  # genuine taus subtracted as EMB instead of MC (not in the DR->SR steps)
+
+
 class DileptonSwitches(BaseModel):
     model_config = STRICT
 
