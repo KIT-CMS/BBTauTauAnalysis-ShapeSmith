@@ -20,6 +20,7 @@ SPLITS = {
     "ST": {"T": "STT", "L": "STL", "J": "STJ"},
     "VV": {"T": "VVT", "L": "VVL", "J": "VVJ"},
     "TTV": {"T": "TTVT", "L": "TTVL", "J": "TTVJ"},
+    "EWK": {"T": "EWKT", "L": "EWKL", "J": "EWKJ"},
 }
 SINGLE_HIGGS = {"ggH": "ggH125", "qqH": "qqH125", "ttH": "ttH125", "VH": "VH125"}  # group -> process
 PLOT_GROUP = {"DY": "Z", "TT": "TT", "ST": "ST", "VV": "VV", "TTV": "rare", "EWK": "rare", "W": "rare", **dict.fromkeys(SINGLE_HIGGS, "rare")}
@@ -49,7 +50,6 @@ def tau_processes(channel: str, jet_fakes: str, embedding: bool) -> tuple[Proces
         result += [_mc(name, group, mc, {"genmatch": genmatch[part]}) for part, name in names.items() if part in parts]
     if jet_fakes == "mc":
         result.append(_mc("W", "W", mc))
-    result.append(_mc("EWK", "EWK", mc))
     result += [_mc(name, group, mc) for group, name in SINGLE_HIGGS.items()]
     return tuple(result)
 
@@ -57,7 +57,7 @@ def tau_processes(channel: str, jet_fakes: str, embedding: bool) -> tuple[Proces
 def dilepton_processes(channel: str) -> tuple[Process, ...]:
     mc = dilepton_mc_weights(channel)
     result = _data_and_signal(mc)
-    result += [_mc(group, group, mc) for group in (*SPLITS, "W", "EWK")]
+    result += [_mc(group, group, mc) for group in (*SPLITS, "W")]
     result += [_mc(name, group, mc) for group, name in SINGLE_HIGGS.items()]
     return tuple(result)
 
