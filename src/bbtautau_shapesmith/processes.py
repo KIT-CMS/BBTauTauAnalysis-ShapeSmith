@@ -2,7 +2,8 @@
 
 Tau channels: which processes exist depends on the switches jet_fakes (ff|mc) and embedding. Gen-match splits: T =
 genuine di-tau, L = lepton fakes, J = jet -> tau_h fakes. In fake-factor mode the J parts and W are replaced by the
-estimated jetFakes process; with embedding the T parts are replaced by EMB.
+estimated jetFakes process; with embedding the T parts are replaced by EMB, and the genuine ttbar part stays as the
+auxiliary template of the embedding ttbar-contamination variation.
 Light-dilepton channels: every MC group unsplit and no jet-fake estimate (W is plain MC).
 """
 from __future__ import annotations
@@ -48,6 +49,8 @@ def tau_processes(channel: str, jet_fakes: str, embedding: bool) -> tuple[Proces
     parts = ("L",) + (() if embedding else ("T",)) + (("J",) if jet_fakes == "mc" else ())
     for group, names in SPLITS.items():
         result += [_mc(name, group, mc, {"genmatch": genmatch[part]}) for part, name in names.items() if part in parts]
+    if embedding:
+        result.append(_mc(SPLITS["TT"]["T"], "TT", mc, {"genmatch": genmatch["T"]}, role="auxiliary"))
     if jet_fakes == "mc":
         result.append(_mc("W", "W", mc))
     result += [_mc(name, group, mc) for group, name in SINGLE_HIGGS.items()]

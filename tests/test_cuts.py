@@ -7,7 +7,7 @@ from shapesmith.expressions import columns_in, columns_of, mask, product
 
 from bbtautau_shapesmith import cuts, weights
 from bbtautau_shapesmith.constants import FF_COLUMNS, TAU_CHANNELS
-from tests.helpers import EMBEDDING_COLUMNS, branches
+from tests.helpers import branches, embedding_branches
 from tests.test_analysis import analysis_for
 
 
@@ -23,17 +23,19 @@ def test_selection_and_weight_columns_exist(channel):
 
 
 @pytest.mark.parametrize("channel", TAU_CHANNELS)
-def test_embedding_weights_have_their_own_names(channel):
+def test_embedding_weights_follow_the_part_a_contract(channel):
     emb = weights.embedding_weights(channel)
-    assert columns_of(emb.values()) <= branches(channel) | EMBEDDING_COLUMNS
-    assert not set(emb) & set(weights.mc_weights(channel))  # MC weight replacements never reach EMB
+    assert columns_of(emb.values()) <= embedding_branches(channel)
+    assert not set(emb) & set(weights.mc_weights(channel))  # own names: MC weight replacements never reach EMB
+    assert ("iso_wgt_ele_1" in emb.get("emb_iso", "")) == (channel == "et")  # the electron iso SF exists in embedding only
+    assert {"emb_vs_mu", "emb_vs_ele", "emb_tau_id", "emb_trigger"} <= set(emb)
 
 
 def test_regions_replace_mc_weights_only():
-    channel = analysis_for("mc", control_regions=True).channel("mt")
+    channel = analysis_for("mc", embedding=True, control_regions=True).channel("mt")
     for region_name in ("btag1_os_fail", "lepton_antiiso"):
         region = channel.region(region_name)
-        for name in ("TTL", "data"):
+        for name in ("TTL", "EMB", "data"):
             process = channel.process(name)
             nominal = select(channel, process, channel.region("nominal"))[1]
             varied = select(channel, process, region)[1]

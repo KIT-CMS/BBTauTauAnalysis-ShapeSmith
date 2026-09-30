@@ -32,6 +32,10 @@ def sample_database(config: RunConfig) -> Path:
     return config.sample_database
 
 
+# Embedded samples (EmbeddingRun<era>...): the final-state token in the nick decides group and channel.
+EMBEDDING_PREFIX = "EmbeddingRun"
+EMBEDDING_ROUTES = {"_mutau_": ("EMB", ("mt",)), "_eltau_": ("EMB", ("et",)), "_tautau_": ("EMB", ("tt",)), "_muemb_": ("MUEMB", ("mm",))}
+
 # (nick prefix, group, channels); first match wins, so put the more specific prefixes first.
 # CROWN writes every data stream into every scope, so a stream is routed to the channels whose trigger it carries.
 GROUP_RULES = (
@@ -63,6 +67,11 @@ GROUP_RULES = (
 
 def route(nick: str) -> tuple[str, tuple[str, ...] | None]:
     """Group and channels (None: every channel) of a nick."""
+    if nick.startswith(EMBEDDING_PREFIX):
+        for token, group_and_channels in EMBEDDING_ROUTES.items():
+            if token in nick:
+                return group_and_channels
+        raise KeyError(f"embedded sample {nick} has none of the final states {', '.join(EMBEDDING_ROUTES)}")
     for prefix, group, channels in GROUP_RULES:
         if nick.startswith(prefix):
             return group, channels

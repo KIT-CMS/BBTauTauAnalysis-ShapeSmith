@@ -63,9 +63,11 @@ def mc_weights(channel: str) -> dict[str, str]:
 
 
 def embedding_weights(channel: str) -> dict[str, str]:
-    """Weights of the embedded sample (prepared; column names unverified until embedding ntuples exist). The names differ
-    from the MC ones, so that regions replacing MC weights leave the embedded sample unchanged."""
-    scale_factors = {**lepton_weights(channel), "tau_id": tau_id_weight(channel), "trigger": trigger_weight(channel)}
+    """Weights of the embedded sample (Part-A output contract): no pileup or b-tag weight, the embedding ID/iso SFs of the
+    light lepton (et carries an electron iso SF in embedding only). The names differ from the MC ones, so that regions
+    replacing MC weights leave the embedded sample unchanged."""
+    lepton = {"mt": {"id": "id_wgt_mu_1", "iso": "iso_wgt_mu_1"}, "et": {"id": "id_wgt_ele_1", "iso": "iso_wgt_ele_1"}}.get(channel, {})
+    scale_factors = {**lepton, "tau_id": tau_id_weight(channel), **tau_vs_lepton_weights(channel), "trigger": trigger_weight(channel)}
     return {
         "emb_genweight": "emb_genweight",
         "emb_selection": "emb_idsel_wgt_1 * emb_idsel_wgt_2 * emb_triggersel_wgt",

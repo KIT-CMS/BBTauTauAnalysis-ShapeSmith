@@ -6,7 +6,7 @@ from bbtautau_shapesmith.analysis import build as build_tau
 from bbtautau_shapesmith.constants import DILEPTON_CHANNELS, TAU_CHANNELS
 from bbtautau_shapesmith.dilepton import build as build_dilepton
 from bbtautau_shapesmith.samples import route, samples
-from tests.helpers import DATABASE, branches, config, nicks
+from tests.helpers import DATABASE, EMBEDDING_LIST, branches, config, nicks
 
 INCLUSIVE_DY = "DYJetsToLL_M-50_TuneCP5_13TeV-amcatnloFXFX-pythia8_RunIISummer20UL18NanoAODv15-150X_mc2018_realistic_v1-v1"
 CHANNELS = list(TAU_CHANNELS + DILEPTON_CHANNELS)
@@ -24,6 +24,24 @@ def test_data_streams_are_routed_to_the_channels_they_trigger():
     assert route("EGamma_Run2018B-UL2018") == ("data", ("et", "ee"))
     assert route("Tau_Run2018C-UL2018") == ("data", ("tt",))
     assert route("TTTo2L2Nu_TuneCP5_13TeV-powheg-pythia8_RunIISummer20UL18NanoAODv15-150X") == ("TT", None)
+
+
+def test_embedding_nicks_are_routed_by_their_final_state():
+    routes = {nick: route(nick) for nick in nicks(EMBEDDING_LIST)}
+    assert sorted(channels for _, channels in routes.values()) == [("et",)] * 4 + [("mt",)] * 4 + [("tt",)] * 4
+    assert {group for group, _ in routes.values()} == {"EMB"}
+    assert routes["EmbeddingRun2018C_cwinter-embedding_2018UL_mutau_2018C_1772450480-00000000000000000000000000000000"] == ("EMB", ("mt",))
+    assert route("EmbeddingRun2018A_cwinter-embedding_2018UL_muemb_A_1772534952-00000000000000000000000000000000") == ("MUEMB", ("mm",))
+    with pytest.raises(KeyError, match="final states"):
+        route("EmbeddingRun2018A_cwinter-embedding_2018UL_elmu_A_1772534952")
+
+
+def test_embedding_samples_go_to_their_channel_only():
+    by_channel = samples(DATABASE, ["sm2018_binned_v2", EMBEDDING_LIST], CHANNELS)
+    for channel in CHANNELS:
+        embedded = [s for s in by_channel[channel] if s.kind == "embedding"]
+        assert len(embedded) == (4 if channel in TAU_CHANNELS else 0)
+        assert all(s.group == "EMB" and s.norm_weight == 1.0 for s in embedded)
 
 
 def test_a_nick_in_two_sample_lists_raises():

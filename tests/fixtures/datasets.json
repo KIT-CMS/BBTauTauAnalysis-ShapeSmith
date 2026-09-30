@@ -208,6 +208,138 @@
   "sample_type": "electroweak_boson",
   "xsec": 9.778
  },
+ "EmbeddingRun2018A_cwinter-embedding_2018UL_eltau_A_1772534952-00000000000000000000000000000000": {
+  "dbs": "/EmbeddingRun2018A/cwinter-embedding_2018UL_eltau_A_1772534952-00000000000000000000000000000000/USER",
+  "era": "2018",
+  "generator_weight": 1.0,
+  "instance": "prod/phys03",
+  "nevents": 11729068,
+  "nfiles": 12,
+  "nick": "EmbeddingRun2018A_cwinter-embedding_2018UL_eltau_A_1772534952-00000000000000000000000000000000",
+  "sample_type": "embedding",
+  "xsec": 1.0
+ },
+ "EmbeddingRun2018A_cwinter-embedding_2018UL_mutau_A_1772534952-00000000000000000000000000000000": {
+  "dbs": "/EmbeddingRun2018A/cwinter-embedding_2018UL_mutau_A_1772534952-00000000000000000000000000000000/USER",
+  "era": "2018",
+  "generator_weight": 1.0,
+  "instance": "prod/phys03",
+  "nevents": 11733301,
+  "nfiles": 12,
+  "nick": "EmbeddingRun2018A_cwinter-embedding_2018UL_mutau_A_1772534952-00000000000000000000000000000000",
+  "sample_type": "embedding",
+  "xsec": 1.0
+ },
+ "EmbeddingRun2018A_cwinter-embedding_2018UL_tautau_A_1772534952-00000000000000000000000000000000": {
+  "dbs": "/EmbeddingRun2018A/cwinter-embedding_2018UL_tautau_A_1772534952-00000000000000000000000000000000/USER",
+  "era": "2018",
+  "generator_weight": 1.0,
+  "instance": "prod/phys03",
+  "nevents": 10362200,
+  "nfiles": 11,
+  "nick": "EmbeddingRun2018A_cwinter-embedding_2018UL_tautau_A_1772534952-00000000000000000000000000000000",
+  "sample_type": "embedding",
+  "xsec": 1.0
+ },
+ "EmbeddingRun2018B_cwinter-embedding_2018UL_eltau_B_1772534952-00000000000000000000000000000000": {
+  "dbs": "/EmbeddingRun2018B/cwinter-embedding_2018UL_eltau_B_1772534952-00000000000000000000000000000000/USER",
+  "era": "2018",
+  "generator_weight": 1.0,
+  "instance": "prod/phys03",
+  "nevents": 5890564,
+  "nfiles": 12,
+  "nick": "EmbeddingRun2018B_cwinter-embedding_2018UL_eltau_B_1772534952-00000000000000000000000000000000",
+  "sample_type": "embedding",
+  "xsec": 1.0
+ },
+ "EmbeddingRun2018B_cwinter-embedding_2018UL_mutau_B_1772534952-00000000000000000000000000000000": {
+  "dbs": "/EmbeddingRun2018B/cwinter-embedding_2018UL_mutau_B_1772534952-00000000000000000000000000000000/USER",
+  "era": "2018",
+  "generator_weight": 1.0,
+  "instance": "prod/phys03",
+  "nevents": 5888849,
+  "nfiles": 6,
+  "nick": "EmbeddingRun2018B_cwinter-embedding_2018UL_mutau_B_1772534952-00000000000000000000000000000000",
+  "sample_type": "embedding",
+  "xsec": 1.0
+ },
+ "EmbeddingRun2018B_cwinter-embedding_2018UL_tautau_B_1772534952-00000000000000000000000000000000": {
+  "dbs": "/EmbeddingRun2018B/cwinter-embedding_2018UL_tautau_B_1772534952-00000000000000000000000000000000/USER",
+  "era": "2018",
+  "generator_weight": 1.0,
+  "instance": "prod/phys03",
+  "nevents": 5226401,
+  "nfiles": 6,
+  "nick": "EmbeddingRun2018B_cwinter-embedding_2018UL_tautau_B_1772534952-00000000000000000000000000000000",
+  "sample_type": "embedding",
+  "xsec": 1.0
+ },
+ "EmbeddingRun2018C_cwinter-embedding_2018UL_eltau_C_1772534952-00000000000000000000000000000000": {
+  "dbs": "/EmbeddingRun2018C/cwinter-embedding_2018UL_eltau_C_1772534952-00000000000000000000000000000000/USER",
+  "era": "2018",
+  "generator_weight": 1.0,
+  "instance": "prod/phys03",
+  "nevents": 5423087,
+  "nfiles": 6,
+  "nick": "EmbeddingRun2018C_cwinter-embedding_2018UL_eltau_C_1772534952-00000000000000000000000000000000",
+  "sample_type": "embedding",
+  "xsec": 1.0
+ },
+ "EmbeddingRun2018C_cwinter-embedding_2018UL_mutau_2018C_1772450480-00000000000000000000000000000000": {
+  "dbs": "/EmbeddingRun2018C/cwinter-embedding_2018UL_mutau_2018C_1772450480-00000000000000000000000000000000/USER",
+  "era": "2018",
+  "generator_weight": 1.0,
+  "instance": "prod/phys03",
+  "nevents": 5421924,
+  "nfiles": 6,
+  "nick": "EmbeddingRun2018C_cwinter-embedding_2018UL_mutau_2018C_1772450480-00000000000000000000000000000000",
+  "sample_type": "embedding",
+  "xsec": 1.0
+ },
+ "EmbeddingRun2018C_cwinter-embedding_2018UL_tautau_C_1772534952-00000000000000000000000000000000": {
+  "dbs": "/EmbeddingRun2018C/cwinter-embedding_2018UL_tautau_C_1772534952-00000000000000000000000000000000/USER",
+  "era": "2018",
+  "generator_weight": 1.0,
+  "instance": "prod/phys03",
+  "nevents": 4822567,
+  "nfiles": 12,
+  "nick": "EmbeddingRun2018C_cwinter-embedding_2018UL_tautau_C_1772534952-00000000000000000000000000000000",
+  "sample_type": "embedding",
+  "xsec": 1.0
+ },
+ "EmbeddingRun2018D_cwinter-embedding_2018UL_eltau_D_1772534952-00000000000000000000000000000000": {
+  "dbs": "/EmbeddingRun2018D/cwinter-embedding_2018UL_eltau_D_1772534952-00000000000000000000000000000000/USER",
+  "era": "2018",
+  "generator_weight": 1.0,
+  "instance": "prod/phys03",
+  "nevents": 25379139,
+  "nfiles": 57,
+  "nick": "EmbeddingRun2018D_cwinter-embedding_2018UL_eltau_D_1772534952-00000000000000000000000000000000",
+  "sample_type": "embedding",
+  "xsec": 1.0
+ },
+ "EmbeddingRun2018D_cwinter-embedding_2018UL_mutau_D_1772534952-00000000000000000000000000000000": {
+  "dbs": "/EmbeddingRun2018D/cwinter-embedding_2018UL_mutau_D_1772534952-00000000000000000000000000000000/USER",
+  "era": "2018",
+  "generator_weight": 1.0,
+  "instance": "prod/phys03",
+  "nevents": 21362177,
+  "nfiles": 57,
+  "nick": "EmbeddingRun2018D_cwinter-embedding_2018UL_mutau_D_1772534952-00000000000000000000000000000000",
+  "sample_type": "embedding",
+  "xsec": 1.0
+ },
+ "EmbeddingRun2018D_cwinter-embedding_2018UL_tautau_D_1772534952-00000000000000000000000000000000": {
+  "dbs": "/EmbeddingRun2018D/cwinter-embedding_2018UL_tautau_D_1772534952-00000000000000000000000000000000/USER",
+  "era": "2018",
+  "generator_weight": 1.0,
+  "instance": "prod/phys03",
+  "nevents": 22557705,
+  "nfiles": 57,
+  "nick": "EmbeddingRun2018D_cwinter-embedding_2018UL_tautau_D_1772534952-00000000000000000000000000000000",
+  "sample_type": "embedding",
+  "xsec": 1.0
+ },
  "GluGluHToTauTau_M125_TuneCP5_13TeV-powheg-pythia8_RunIISummer20UL18NanoAODv15-150X_mc2018_realistic_v1-v1": {
   "dbs": "/GluGluHToTauTau_M125_TuneCP5_13TeV-powheg-pythia8/RunIISummer20UL18NanoAODv15-150X_mc2018_realistic_v1-v1/NANOAODSIM",
   "era": "2018",

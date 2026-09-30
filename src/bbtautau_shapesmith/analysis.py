@@ -2,11 +2,11 @@
 from __future__ import annotations
 
 from shapesmith.config import RunConfig
-from shapesmith.model import ABCD, Analysis, Channel, DataMinus, MLExportConfig, Process, Sample
+from shapesmith.model import ABCD, Analysis, Channel, DataMinus, MLExportConfig, Process, Sample, TemplateShift
 
 from bbtautau_shapesmith import cuts
 from bbtautau_shapesmith.constants import ERA, LUMI_PB
-from bbtautau_shapesmith.processes import GENUINE, JET_FAKE, LEPTON_FAKE, SIGNAL, backgrounds_in, tau_processes
+from bbtautau_shapesmith.processes import EMBEDDED, GENUINE, JET_FAKE, LEPTON_FAKE, SIGNAL, SPLITS, backgrounds_in, tau_processes
 from bbtautau_shapesmith.samples import sample_database, samples
 from bbtautau_shapesmith.style import style
 from bbtautau_shapesmith.switches import TauSwitches, parse
@@ -18,7 +18,8 @@ ML_VARIABLES = (
     "jpt_1", "jpt_2", "mjj", "pt_dijet", "bpair_pt_1", "bpair_pt_2", "bpair_btag_value_1", "bpair_btag_value_2",
     "bpair_m_inv", "bpair_pt_dijet", "bpair_deltaR", "pt_tautaubb", "mass_tautaubb",
 )
-LABEL_OF_GROUP = {"HH2B2Tau": "is_HH2B2Tau", "DY": "is_DY", "TT": "is_TT", "ST": "is_ST", "VV": "is_VV"}
+# NN training labels; the embedded genuine di-tau events take the place of ZTT in the DY class
+LABEL_OF_GROUP = {"HH2B2Tau": "is_HH2B2Tau", "DY": "is_DY", EMBEDDED: "is_DY", "TT": "is_TT", "ST": "is_ST", "VV": "is_VV"}
 
 
 def label_of(process: Process) -> str:
@@ -37,11 +38,16 @@ def ml_config(processes: tuple[Process, ...], jet_fakes: str) -> MLExportConfig:
 
 
 def estimators(processes: tuple[Process, ...], switches: TauSwitches) -> tuple:
-    """jetFakes = data - (genuine + lepton fakes) in the fake-factor region, or QCD from ABCD with every MC subtracted."""
+    """jetFakes = data - (genuine + lepton fakes) in the fake-factor region, or QCD from ABCD with every MC subtracted;
+    with embedding the ttbar contamination of the embedded sample (+-10 % of genuine ttbar)."""
     genuine_and_lepton_fakes = backgrounds_in(processes, GENUINE) + backgrounds_in(processes, LEPTON_FAKE)
     if switches.jet_fakes == "ff":
-        return (DataMinus("jetFakes", "anti_iso", genuine_and_lepton_fakes),)
-    return (ABCD("QCD", "abcd_anti_iso", "abcd_same_sign", "abcd_same_sign_anti_iso", genuine_and_lepton_fakes + backgrounds_in(processes, JET_FAKE)),)
+        result = (DataMinus("jetFakes", "anti_iso", genuine_and_lepton_fakes),)
+    else:
+        result = (ABCD("QCD", "abcd_anti_iso", "abcd_same_sign", "abcd_same_sign_anti_iso", genuine_and_lepton_fakes + backgrounds_in(processes, JET_FAKE)),)
+    if switches.embedding:
+        result += (TemplateShift(f"CMS_htt_emb_ttbar_{ERA}", EMBEDDED, SPLITS["TT"]["T"], 0.1),)
+    return result
 
 
 def channel(name: str, switches: TauSwitches, channel_samples: tuple[Sample, ...]) -> Channel:
