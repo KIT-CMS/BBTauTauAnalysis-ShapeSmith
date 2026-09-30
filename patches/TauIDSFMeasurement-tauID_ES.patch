@@ -343,7 +343,7 @@ index 7c64a71..c58378f 100644
    cout << "[INFO] Done producing datacards.\n";
  }
 diff --git a/src/HttSystematics_TauIDRun2.cc b/src/HttSystematics_TauIDRun2.cc
-index 959b339..09400a1 100644
+index 959b339..a7f2bf3 100644
 --- a/src/HttSystematics_TauIDRun2.cc
 +++ b/src/HttSystematics_TauIDRun2.cc
 @@ -28,7 +28,7 @@ void AddTauIDRun2Systematics(CombineHarvester &cb, bool jetfakes, bool embedding
@@ -517,178 +517,31 @@ index 959b339..09400a1 100644
  
  //   // Embedded uncorrelated uncertainty
  // // TODO check EMB ES
-@@ -293,66 +295,113 @@ void AddTauIDRun2Systematics(CombineHarvester &cb, bool jetfakes, bool embedding
- 
-   // Regional JES
-     // uncorrelated between eras
-+    // Old syst. pre v15:
-+    // cb.cp()
-+    //     .channel({"et", "mt", "tt", "em"})
-+    //     .process(mc_processes)
-+    //     .AddSyst(cb, "CMS_scale_j_Absolute_$ERA", "shape", SystMap<>::init(1.00));
-+
-+    // cb.cp()
-+    //     .channel({"et", "mt", "tt", "em"})
-+    //     .process(mc_processes)
-+    //     .AddSyst(cb, "CMS_scale_j_BBEC1_$ERA", "shape", SystMap<>::init(1.00));
-+
-+    // cb.cp()
-+    //     .channel({"et", "mt", "tt", "em"})
-+    //     .process(mc_processes)
-+    //     .AddSyst(cb, "CMS_scale_j_EC2_$ERA", "shape", SystMap<>::init(1.00));
-+
-+    // cb.cp()
-+    //     .channel({"et", "mt", "tt", "em"})
-+    //     .process(mc_processes)
-+    //     .AddSyst(cb, "CMS_scale_j_HF_$ERA", "shape", SystMap<>::init(1.00));
-+
-+    // cb.cp()
-+    //     .channel({"et", "mt", "tt", "em"})
-+    //     .process(mc_processes)
-+    //     .AddSyst(cb, "CMS_scale_j_RelativeSample_$ERA", "shape", SystMap<>::init(1.00));
-+    // // correlated between eras
-+    // cb.cp()
-+    //     .channel({"et", "mt", "tt", "em"})
-+    //     .process(mc_processes)
-+    //     .AddSyst(cb, "CMS_scale_j_Absolute", "shape", SystMap<>::init(1.00));
-+
-+    // cb.cp()
-+    //     .channel({"et", "mt", "tt", "em"})
-+    //     .process(mc_processes)
-+    //     .AddSyst(cb, "CMS_scale_j_BBEC1", "shape", SystMap<>::init(1.00));
-+
-+    // cb.cp()
-+    //     .channel({"et", "mt", "tt", "em"})
-+    //     .process(mc_processes)
-+    //     .AddSyst(cb, "CMS_scale_j_EC2", "shape", SystMap<>::init(1.00));
-+
-+    // cb.cp()
-+    //     .channel({"et", "mt", "tt", "em"})
-+    //     .process(mc_processes)
-+    //     .AddSyst(cb, "CMS_scale_j_HF", "shape", SystMap<>::init(1.00));
-+
-+    // cb.cp()
-+    //     .channel({"et", "mt", "tt", "em"})
-+    //     .process(mc_processes)
-+    //     .AddSyst(cb, "CMS_scale_j_FlavorQCD", "shape", SystMap<>::init(1.00));
-+
-+    // cb.cp()
-+    //     .channel({"et", "mt", "tt", "em"})
-+    //     .process(mc_processes)
-+    //     .AddSyst(cb, "CMS_scale_j_RelativeBal", "shape", SystMap<>::init(1.00));
-+
-+
-+    // New v15:
-+    std::vector<std::string> scale_j_systematics = {
-+        "CMS_scale_j_Total",
-+        "CMS_scale_j_SinglePionECAL",
-+        "CMS_scale_j_SinglePionHCAL",
-+        "CMS_scale_j_AbsoluteMPFBias",
-+        "CMS_scale_j_AbsoluteScale",
-+        "CMS_scale_j_Fragmentation",
-+        "CMS_scale_j_PileUpDataMC",
-+        "CMS_scale_j_RelativeFSR",
-+        "CMS_scale_j_PileupPtRef",
-+        "CMS_scale_j_AbsoluteStat",
-+        "CMS_scale_j_TimePtEta",
-+        "CMS_scale_j_RelativeStatFSR",
-+        "CMS_scale_j_FlavorQCD",
-+        "CMS_scale_j_PileupPtEC1",
-+        "CMS_scale_j_PileUpPtBB",
-+        "CMS_scale_j_RelativePtBB",
-+        "CMS_scale_j_RelativeJEREC1",
-+        "CMS_scale_j_RelativePtEC1",
-+        "CMS_scale_j_RelativeStatEC",
-+        "CMS_scale_j_RelativePtHF",
-+        "CMS_scale_j_PileUpPtHF",
-+        "CMS_scale_j_RelativeJERHF",
-+        "CMS_scale_j_RelativeStatHF",
-+        "CMS_scale_j_PileUpPtEC2",
-+        "CMS_scale_j_RelativeJEREC2",
-+        "CMS_scale_j_RelativePtEC2",
-+        "CMS_scale_j_RelativeBal",
-+        "CMS_scale_j_RelativeSample"
-+    };
-+    for (const auto& syst : scale_j_systematics) {
-+        cb.cp()
-+            .channel({"et", "mt", "tt", "em"})
-+            .process(mc_processes)
-+            .AddSyst(cb, syst, "shape", SystMap<>::init(1.00));
-+    }
-+
-+  // JER (not used from v15 on ?)
-+//   cb.cp()
-+//       .channel({"et", "mt", "tt", "em"})
-+//       .process(mc_processes)
-+//       .AddSyst(cb, "CMS_res_j_$ERA", "shape", SystMap<>::init(1.00));
-+  // HEM issue 
-+  if (era_tag == "Run2018") {
-     cb.cp()
-         .channel({"et", "mt", "tt", "em"})
+@@ -348,11 +350,18 @@ void AddTauIDRun2Systematics(CombineHarvester &cb, bool jetfakes, bool embedding
          .process(mc_processes)
--        .AddSyst(cb, "CMS_scale_j_Absolute_$ERA", "shape", SystMap<>::init(1.00));
--
--    cb.cp()
--        .channel({"et", "mt", "tt", "em"})
--        .process(mc_processes)
--        .AddSyst(cb, "CMS_scale_j_BBEC1_$ERA", "shape", SystMap<>::init(1.00));
--
--    cb.cp()
--        .channel({"et", "mt", "tt", "em"})
--        .process(mc_processes)
--        .AddSyst(cb, "CMS_scale_j_EC2_$ERA", "shape", SystMap<>::init(1.00));
--
--    cb.cp()
--        .channel({"et", "mt", "tt", "em"})
--        .process(mc_processes)
--        .AddSyst(cb, "CMS_scale_j_HF_$ERA", "shape", SystMap<>::init(1.00));
--
--    cb.cp()
--        .channel({"et", "mt", "tt", "em"})
--        .process(mc_processes)
--        .AddSyst(cb, "CMS_scale_j_RelativeSample_$ERA", "shape", SystMap<>::init(1.00));
--    // correlated between eras
--    cb.cp()
--        .channel({"et", "mt", "tt", "em"})
--        .process(mc_processes)
--        .AddSyst(cb, "CMS_scale_j_Absolute", "shape", SystMap<>::init(1.00));
--
--    cb.cp()
--        .channel({"et", "mt", "tt", "em"})
--        .process(mc_processes)
--        .AddSyst(cb, "CMS_scale_j_BBEC1", "shape", SystMap<>::init(1.00));
--
--    cb.cp()
--        .channel({"et", "mt", "tt", "em"})
--        .process(mc_processes)
--        .AddSyst(cb, "CMS_scale_j_EC2", "shape", SystMap<>::init(1.00));
--
--    cb.cp()
--        .channel({"et", "mt", "tt", "em"})
--        .process(mc_processes)
--        .AddSyst(cb, "CMS_scale_j_HF", "shape", SystMap<>::init(1.00));
--
--    cb.cp()
--        .channel({"et", "mt", "tt", "em"})
--        .process(mc_processes)
--        .AddSyst(cb, "CMS_scale_j_FlavorQCD", "shape", SystMap<>::init(1.00));
--
--    cb.cp()
--        .channel({"et", "mt", "tt", "em"})
--        .process(mc_processes)
--        .AddSyst(cb, "CMS_scale_j_RelativeBal", "shape", SystMap<>::init(1.00));
--
+         .AddSyst(cb, "CMS_scale_j_RelativeBal", "shape", SystMap<>::init(1.00));
+ 
 -  // JER
 -  cb.cp()
 -      .channel({"et", "mt", "tt", "em"})
 -      .process(mc_processes)
 -      .AddSyst(cb, "CMS_res_j_$ERA", "shape", SystMap<>::init(1.00));
++  // JER (not used from v15 on ?)
++//   cb.cp()
++//       .channel({"et", "mt", "tt", "em"})
++//       .process(mc_processes)
++//       .AddSyst(cb, "CMS_res_j_$ERA", "shape", SystMap<>::init(1.00));
++  // HEM issue
++  if (era_tag == "Run2018") {
++    cb.cp()
++        .channel({"et", "mt", "tt", "em"})
++        .process(mc_processes)
 +        .AddSyst(cb, "CMS_scale_j_HEMIssue_$ERA", "shape", SystMap<>::init(1.00));
 +  }
  
    // ##########################################################################
    // Uncertainty: MET energy scale and Recoil
-@@ -456,7 +505,7 @@ void AddTauIDRun2Systematics(CombineHarvester &cb, bool jetfakes, bool embedding
+@@ -456,7 +465,7 @@ void AddTauIDRun2Systematics(CombineHarvester &cb, bool jetfakes, bool embedding
    cb.cp()
        .channel({"mt"})
        .process({"TTT", "TTL", "TTJ", "TT"})
@@ -697,7 +550,7 @@ index 959b339..09400a1 100644
  
    // ##########################################################################
    // Uncertainty: Electron/muon to tau fakes and ZL energy scale
-@@ -510,7 +559,7 @@ void AddTauIDRun2Systematics(CombineHarvester &cb, bool jetfakes, bool embedding
+@@ -510,7 +519,7 @@ void AddTauIDRun2Systematics(CombineHarvester &cb, bool jetfakes, bool embedding
    cb.cp()
        .channel({"mt"})
        .process({"W", "TTJ", "ZJ", "VVJ"})
@@ -706,7 +559,7 @@ index 959b339..09400a1 100644
  
    // ##########################################################################
    // Uncertainty: Embedded events
-@@ -523,14 +572,14 @@ void AddTauIDRun2Systematics(CombineHarvester &cb, bool jetfakes, bool embedding
+@@ -523,14 +532,14 @@ void AddTauIDRun2Systematics(CombineHarvester &cb, bool jetfakes, bool embedding
    cb.cp()
        .channel({"mt", "mm"})
      //   .process({"EMB", "MUEMB"})

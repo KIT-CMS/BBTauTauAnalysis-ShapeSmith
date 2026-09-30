@@ -3,22 +3,38 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+import uproot
 from shapesmith.config import load_config
 from shapesmith.expressions import evaluate
 from shapesmith.measurements.tau_id_es import check
 from shapesmith.measurements.tau_id_es.grid import CATEGORIES, factor
-from shapesmith.model import AnalysisError, ColumnVariation, DataMinus, TemplateShift
+from shapesmith.estimates import run_estimates
+from shapesmith.histogram import HistKey, Histogram, HistogramSet, is_part, part_of
+from shapesmith.measurements.tau_id_es.synced import shapes_path, write_synced
+from shapesmith.model import AnalysisError, ColumnVariation, DataMinus, TemplateShift, VariationSum, applies
 from shapesmith.validate import validate
 
 from bbtautau_shapesmith.tau_id_binning import M_VIS_EDGES
 from bbtautau_shapesmith.tau_id_measurement import ES_GRID, build, es_variation
-from bbtautau_shapesmith.tau_id_systematics import CROWN_SHIFTS, WEIGHT_SHIFTS
+from bbtautau_shapesmith.tau_id_systematics import SUMMED_SHIFTS, UNUSED_SHIFTS, WEIGHT_SHIFTS, mc_variation_sums
 from tests.helpers import DATABASE, REPO, config
 
 SYNCED = Path("/work/jvoss/smhtt_ul_SFs_v15/output/shapes_synced/SFs_EMB_Run2_04_08_26__full")
 WP_TAGS = {("Medium", "VVLoose"): "M_VVL", ("Medium", "Tight"): "M_T", ("Tight", "VVLoose"): "T_VVL", ("Tight", "Tight"): "T_T"}
 # the predecessor's trigger weight (smhtt_ul config/shapes/process_selection.py, 2018 mt and mm)
 TRIGGER_WEIGHT = "((pt_1 >= 25) & (pt_1 < 28)) * trg_wgt_single_mu24 + (pt_1 > 28) * trg_wgt_single_mu27"
+# the CROWN shifts of sm_tau_id_measurement_config (feat-new-sm-bbtautau-config 6f58e65, generated code) that move a
+# column of the mt channel, for every MC sample type; the recoil shifts exist for DY and W only
+PRODUCED_SHIFTS = (
+    {"CMS_HEM_2018", "CMS_eff_m_trigger_2018", "CMS_pileup_2018", "CMS_res_j_2018", "CMS_scale_e_2018", "CMS_res_e_2018", "CMS_scale_met_unclustered_energy_2018"}
+    | {f"CMS_scale_j_{s}" for s in ("Absolute", "Absolute_2018", "BBEC1", "BBEC1_2018", "EC2", "EC2_2018", "FlavorQCD", "HF", "HF_2018", "RelativeBal", "RelativeSample_2018")}
+    | {f"CMS_fake_t_DeepTau2018v2p5_VSe_DM{dm}_{region}_2018" for dm in (0, 1, 10, 11) for region in ("barrel", "endcap")}
+    | {f"CMS_fake_t_DeepTau2018v2p5_VSmu_wheel{w}_2018" for w in range(1, 6)}
+    | {f"CMS_scale_t_DeepTau2018v2p5_DM{dm}_{gen}_2018" for dm in (0, 1, 10, 11)
+       for gen in ("pt20to40_genTau", "pt40to60_genTau", "pt60toInf_genTau", "genElectron_barrel", "genElectron_endcap")}
+    | {f"CMS_scale_t_DeepTau2018v2p5_genMuon_wheel{w}_2018" for w in range(1, 6)}
+)
+RECOIL_SHIFTS = {"CMS_res_met_RecoilCalibration_2018", "CMS_scale_met_RecoilCalibration_2018"}
 
 
 def analysis_for(**switches):
@@ -80,8 +96,9 @@ def test_processes_weights_and_estimates():
         "puweight": "puweight", "id": "id_wgt_mu_1", "iso": "iso_wgt_mu_1", "tau_id": "((gen_match_2 == 5) * id_wgt_tau_vsJet_Tight_2 + (gen_match_2 != 5))",
         "vs_mu": "id_wgt_tau_vsMu_Tight_2", "vs_ele": "id_wgt_tau_vsEle_VVLoose_2", "trigger": TRIGGER_WEIGHT, "top_pt": "topPtReweightWeight", "jet_fake": "1.0"}
     assert channel.process("ZL").selection.cuts == {"genmatch": "(~((gen_match_1 == 4) & (gen_match_2 == 5)) & ~(gen_match_2 == 6))"}
-    qcd, contamination = channel.estimators
+    qcd, *sums, contamination = channel.estimators
     assert qcd == DataMinus("QCD", "same_sign", ("EMB", "ZL", "ZJ", "TTL", "TTJ", "STL", "STJ", "VVL", "VVJ", "W"), clip_negative=True)
+    assert tuple(sums) == mc_variation_sums()
     assert contamination == TemplateShift("CMS_emb_ttbar_contamination_Run2018", "EMB", "TTT", 0.1)
     mm = analysis_for().channel("mm")
     assert mm.process("MUEMB").selection.cuts == {"genmatch": "(gen_match_1 == 2) & (gen_match_2 == 2)"}
@@ -151,24 +168,62 @@ def test_es_grid_is_embedding_only_nominal_only():
     assert not analysis_for().channel("mm").variations
 
 
-def test_mc_systematics_are_the_predecessor_set():
-    # the shape uncertainties HttSystematics_TauIDRun2.cc declares for mt with embedding, plus CMS_PileUp of the synced shapes
-    expected = {f"CMS_scale_j_{s}" for s in ("Total", "SinglePionECAL", "SinglePionHCAL", "AbsoluteMPFBias", "AbsoluteScale", "Fragmentation", "PileUpDataMC",
-                                            "RelativeFSR", "PileupPtRef", "AbsoluteStat", "TimePtEta", "RelativeStatFSR", "FlavorQCD", "PileupPtEC1", "PileUpPtBB",
-                                            "RelativePtBB", "RelativeJEREC1", "RelativePtEC1", "RelativeStatEC", "RelativePtHF", "PileUpPtHF", "RelativeJERHF",
-                                            "RelativeStatHF", "PileUpPtEC2", "RelativeJEREC2", "RelativePtEC2", "RelativeBal", "RelativeSample", "HEMIssue_Run2018")}
+def test_mc_systematics_are_the_predecessor_families():
+    # the shape uncertainties the patched HttSystematics_TauIDRun2.cc declares for mt with embedding (the regrouped JES
+    # and HEM), plus CMS_PileUp of the synced shapes
+    expected = {f"CMS_scale_j_{s}_Run2018" for s in ("Absolute", "BBEC1", "EC2", "HF", "RelativeSample", "HEMIssue")}
+    expected |= {f"CMS_scale_j_{s}" for s in ("Absolute", "BBEC1", "EC2", "HF", "FlavorQCD", "RelativeBal")}
     expected |= {f"CMS_{name}_Run2018" for name in ("eff_m_trigger", "scale_met_unclustered_energy", "scale_met", "res_met", "scale_fake_m", "fake_j")}
     expected |= {f"CMS_{kind}_t_dm{dm}_Run2018" for kind in ("scale", "eff") for dm in (0, 1, 10, 11)} | {f"CMS_fake_m_WH{w}_Run2018" for w in range(1, 6)}
     expected |= {"CMS_htt_ttbarShape", "CMS_PileUp"}
+    summed = {f"CMS_scale_t_dm{dm}_Run2018" for dm in (0, 1, 10, 11)} | {"CMS_scale_fake_m_Run2018"}
     channel = analysis_for(vsjet_wp="Medium").channel("mt")
-    names = {v.name for v in channel.variations if not (isinstance(v, ColumnVariation) and v.derived)}
-    assert names == {f"{name}{d}" for name in expected for d in ("Up", "Down")}
-    shifts = {name: shift for name, shift, _ in CROWN_SHIFTS}
-    assert shifts["CMS_scale_t_dm1_Run2018"] == "tauEs1prong1pizero"  # the predecessor used the DM0 shift
+    sums = {e.name: e.parts for e in channel.estimators if isinstance(e, VariationSum)}
+    assert set(sums) == summed
+    assert sums["CMS_scale_t_dm1_Run2018"] == ("pt20to40", "pt40to60", "pt60toInf") and sums["CMS_scale_fake_m_Run2018"] == tuple(f"wheel{w}" for w in range(1, 6))
+    assert set(SUMMED_SHIFTS["CMS_scale_t_dm1_Run2018"].values()) == {f"CMS_scale_t_DeepTau2018v2p5_DM1_{pt}_genTau_2018" for pt in sums["CMS_scale_t_dm1_Run2018"]}  # the predecessor used the DM0 shift
+    direct = {v.name for v in channel.variations if not (isinstance(v, ColumnVariation) and v.derived) and not is_part(v.name)}
+    assert direct == {f"{name}{d}" for name in (expected - summed) | set(UNUSED_SHIFTS) for d in ("Up", "Down")}
+    parts = {v.name for v in channel.variations if is_part(v.name)}
+    assert parts == {f"{name}{d}%{part}" for name, family in sums.items() for part in family for d in ("Up", "Down")}
     no_op = next(v for v in channel.variations if v.name == "CMS_eff_t_dm1_Run2018Up")  # as the predecessor's: equal to the nominal
     assert no_op.replace_weights == {"tau_id": channel.process("TTL").selection.weights["tau_id"]}
     assert {name for name, *_ in WEIGHT_SHIFTS} == {"CMS_fake_j_Run2018", "CMS_htt_ttbarShape"}
-    assert not {v.name for v in analysis_for(shape_systematics=False).channel("mt").variations} - {f"es{shift:+d}" for shift in ES_GRID}
+    without = analysis_for(shape_systematics=False).channel("mt")
+    assert not {v.name for v in without.variations} - {f"es{shift:+d}" for shift in ES_GRID}
+    assert not [e for e in without.estimators if isinstance(e, VariationSum)]
+
+
+def test_every_produced_shift_is_declared():
+    # the skim fails on a shifted branch of a read column that no variation declares, and on a declared one without branch
+    channel = analysis_for().channel("mt")
+    for group in ("DY", "W", "TT", "ST", "VV"):
+        suffixes = {v.suffix for v in channel.variations if isinstance(v, ColumnVariation) and v.suffix and applies(v, "mc", group)}
+        shifts = PRODUCED_SHIFTS | (RECOIL_SHIFTS if group in ("DY", "W") else set())
+        assert suffixes == {f"__{shift}{d}" for shift in shifts for d in ("Up", "Down")}, group
+    assert not [v for v in channel.variations if isinstance(v, ColumnVariation) and v.suffix and applies(v, "embedding", "EMB")]
+
+
+def test_summed_families_reach_the_shapes_file(tmp_path):
+    analysis = analysis_for()
+    hset, edges = HistogramSet(), list(M_VIS_EDGES["Tight", "VVLoose"]["DM0"])
+    n = len(edges) - 1
+
+    def hist(value):
+        return Histogram(edges, np.full(n, value), np.full(n, 0.1))
+
+    key = HistKey("mt", "DM0", "ZL", "nominal", "Nominal", "m_vis")
+    hset[key] = hist(10.0)
+    for d, sign in (("Up", 1.0), ("Down", -1.0)):
+        for part, delta in zip(("pt20to40", "pt40to60", "pt60toInf"), (1.0, 0.5, 0.25)):
+            hset[HistKey("mt", "DM0", "ZL", "nominal", part_of(f"CMS_scale_t_dm0_Run2018{d}", part), "m_vis")] = hist(10.0 + sign * delta)
+    run_estimates(hset, analysis, ["mt"])
+    write_synced(hset, analysis, tmp_path)
+    with uproot.open(shapes_path(tmp_path, "mt", "2018")) as f:
+        names = f.keys(recursive=True, cycle=False)
+        assert f["mt_DM0/ZL_CMS_scale_t_dm0_Run2018Up"].values().tolist() == [11.75] * n
+        assert f["mt_DM0/ZL_CMS_scale_t_dm0_Run2018Down"].values().tolist() == [8.25] * n
+        assert not [name for name in names if "%" in name]
 
 
 def test_the_run_configuration_builds():

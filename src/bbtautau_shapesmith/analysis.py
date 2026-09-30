@@ -10,7 +10,7 @@ from bbtautau_shapesmith.processes import EMBEDDED, GENUINE, JET_FAKE, LEPTON_FA
 from bbtautau_shapesmith.samples import sample_database, samples
 from bbtautau_shapesmith.style import style
 from bbtautau_shapesmith.switches import TauSwitches, parse
-from bbtautau_shapesmith.systematics import btag_variations, embedding_variations, ff_variations, lnn
+from bbtautau_shapesmith.systematics import btag_variations, embedding_variation_sums, embedding_variations, ff_variations, lnn
 from bbtautau_shapesmith.variables import categories, control_variables
 
 ML_VARIABLES = (
@@ -37,14 +37,17 @@ def ml_config(processes: tuple[Process, ...], jet_fakes: str) -> MLExportConfig:
     return MLExportConfig(variables=ML_VARIABLES, processes=tuple(labels), label_of=labels, region_of=region_of)
 
 
-def estimators(processes: tuple[Process, ...], switches: TauSwitches) -> tuple:
+def estimators(name: str, processes: tuple[Process, ...], switches: TauSwitches) -> tuple:
     """jetFakes = data - (genuine + lepton fakes) in the fake-factor region, or QCD from ABCD with every MC subtracted;
-    with embedding the ttbar contamination of the embedded sample (+-10 % of genuine ttbar)."""
+    with embedding the sums of the embedding shifts of DM10 and DM11 (after jetFakes, which carries them too) and the
+    ttbar contamination of the embedded sample (+-10 % of genuine ttbar)."""
     genuine_and_lepton_fakes = backgrounds_in(processes, GENUINE) + backgrounds_in(processes, LEPTON_FAKE)
     if switches.jet_fakes == "ff":
         result = (DataMinus("jetFakes", "anti_iso", genuine_and_lepton_fakes),)
     else:
         result = (ABCD("QCD", "abcd_anti_iso", "abcd_same_sign", "abcd_same_sign_anti_iso", genuine_and_lepton_fakes + backgrounds_in(processes, JET_FAKE)),)
+    if switches.embedding and switches.shape_systematics:
+        result += embedding_variation_sums(name)
     if switches.embedding:
         result += (TemplateShift(f"CMS_htt_emb_ttbar_{ERA}", EMBEDDED, SPLITS["TT"]["T"], 0.1),)
     return result
@@ -69,7 +72,7 @@ def channel(name: str, switches: TauSwitches, channel_samples: tuple[Sample, ...
         categories=categories() if switches.nn_friend else (),
         variables=control_variables(switches.nn_friend),
         variations=btag_variations() + column_variations(name, switches),
-        estimators=estimators(table, switches),
+        estimators=estimators(name, table, switches),
         keep_columns=("event", "run", "lumi"),
     )
 

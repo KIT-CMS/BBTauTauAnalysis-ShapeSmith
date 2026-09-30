@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from shapesmith.model import ColumnVariation, LnN, Process, WeightVariation
+from shapesmith.histogram import part_of
+from shapesmith.model import ColumnVariation, LnN, Process, VariationSum, WeightVariation
 
-from bbtautau_shapesmith.constants import BTAG_COMPONENTS, EMBEDDING_TAU_ES, EMBEDDING_VS_JET_PT_BINS, ERA, FF_SHIFTS_LT, FF_SHIFTS_TT, LT_CHANNELS, TAU_VS_ELE_WP
+from bbtautau_shapesmith.constants import BTAG_COMPONENTS, EMBEDDING_TAU_DECAY_MODES, EMBEDDING_VS_JET_PT_BINS, ERA, FF_SHIFTS_LT, FF_SHIFTS_TT, LT_CHANNELS, TAU_VS_ELE_WP
 from bbtautau_shapesmith.processes import EMBEDDED, SIGNAL
 
 
@@ -24,17 +25,42 @@ def _shifts(name: str, suffix: str, applies_to: tuple[str, ...]) -> tuple[Column
     return tuple(ColumnVariation(f"{name}{shift}", f"{suffix}{shift}", applies_to=applies_to) for shift in ("Up", "Down"))
 
 
-def embedding_variations(channel: str) -> tuple[ColumnVariation, ...]:
-    """Tau ES and vsJet ID shifts of the embedded sample, one per measured category. The vsEle working point in the
-    name decorrelates et (Tight) from mt and tt (VVLoose)."""
+def _embedding_nuisances(channel: str) -> list[tuple[str, dict[int, str]]]:
+    """(datacard name, decay mode -> CROWN shift) of the embedding tau corrections, one per measured category. The
+    vsEle working point in the name decorrelates et (Tight) from mt and tt (VVLoose)."""
     wp = f"vsEle{TAU_VS_ELE_WP[channel]}"
-    result = ()
-    for dm, prongs in EMBEDDING_TAU_ES.items():
-        result += _shifts(f"CMS_scale_t_emb_dm{dm}_{wp}_{ERA}", f"__embTauEs{prongs}", ("embedding",))
-    for dm in EMBEDDING_TAU_ES:
+    result = []
+    for token, decay_modes in EMBEDDING_TAU_DECAY_MODES.items():
+        shifts = {dm: f"CMS_scale_t_emb_DeepTau2018v2p5_DM{dm}_{ERA}" for dm in decay_modes}
+        result.append((f"CMS_scale_t_emb_dm{token}_{wp}_{ERA}", shifts))
+    for token, decay_modes in EMBEDDING_TAU_DECAY_MODES.items():
         for pt in EMBEDDING_VS_JET_PT_BINS[channel]:
-            result += _shifts(f"CMS_eff_t_emb_dm{dm}_pt{pt}_{wp}_{ERA}", f"__embVsJetTauDM{dm}Pt{pt}", ("embedding",))
+            shifts = {dm: f"CMS_eff_t_emb_DeepTau2018v2p5_VSjet_DM{dm}_pt{pt}_{ERA}" for dm in decay_modes}
+            result.append((f"CMS_eff_t_emb_dm{token}_pt{pt}_{wp}_{ERA}", shifts))
     return result
+
+
+def embedding_variations(channel: str) -> tuple[ColumnVariation, ...]:
+    """Tau ES and vsJet ID shifts of the embedded sample. A nuisance of one decay mode reads its CROWN shift; one of
+    two decay modes reads each as a part of the sum of embedding_variation_sums."""
+    result = ()
+    for name, shifts in _embedding_nuisances(channel):
+        if len(shifts) == 1:
+            (shift,) = shifts.values()
+            result += _shifts(name, f"__{shift}", ("embedding",))
+            continue
+        result += tuple(
+            ColumnVariation(part_of(f"{name}{d}", f"dm{dm}"), f"__{shift}{d}", applies_to=("embedding",))
+            for dm, shift in shifts.items()
+            for d in ("Up", "Down")
+        )
+    return result
+
+
+def embedding_variation_sums(channel: str) -> tuple[VariationSum, ...]:
+    """The nuisances of two decay modes (DM10 and DM11), each the sum of its per-decay-mode CROWN shifts: exact in et
+    and mt (one tau per event), to first order in tt."""
+    return tuple(VariationSum(name, tuple(f"dm{dm}" for dm in shifts)) for name, shifts in _embedding_nuisances(channel) if len(shifts) > 1)
 
 
 def ff_variations(channel: str) -> tuple[ColumnVariation, ...]:

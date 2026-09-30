@@ -1,9 +1,10 @@
 import pytest
 from shapesmith.events import select
-from shapesmith.model import ColumnVariation, WeightVariation
+from shapesmith.histogram import part_of
+from shapesmith.model import ColumnVariation, VariationSum, WeightVariation
 
 from bbtautau_shapesmith.constants import FF_SHIFTS_LT, FF_SHIFTS_TT
-from bbtautau_shapesmith.systematics import embedding_variations, ff_variations
+from bbtautau_shapesmith.systematics import embedding_variation_sums, embedding_variations, ff_variations
 from bbtautau_shapesmith.weights import fake_factor_weight
 from tests.test_analysis import COMBINATIONS, analysis_for
 
@@ -27,16 +28,30 @@ def test_shape_systematics_off_declares_no_column_variation(jet_fakes, embedding
     assert not any(column_variations(channel) for channel in analysis.channels.values())
 
 
-@pytest.mark.parametrize("channel,count", [("et", 18), ("mt", 18), ("tt", 12)])
+@pytest.mark.parametrize("channel,count", [("et", 24), ("mt", 24), ("tt", 16)])
 def test_embedding_variations(channel, count):
     variations = embedding_variations(channel)
     assert len(variations) == count and all(v.applies_to == ("embedding",) and v.regions is None for v in variations)
     wp = "vsEleTight" if channel == "et" else "vsEleVVLoose"
     names = {v.name: v.suffix for v in variations}
-    assert names[f"CMS_scale_t_emb_dm1011_{wp}_2018Up"] == "__embTauEs3prongUp"
-    assert names[f"CMS_scale_t_emb_dm0_{wp}_2018Down"] == "__embTauEs1prong0pizeroDown"
-    assert names[f"CMS_eff_t_emb_dm1_pt40toInf_{wp}_2018Up"] == "__embVsJetTauDM1Pt40toInfUp"
-    assert (f"CMS_eff_t_emb_dm1011_pt20to40_{wp}_2018Down" in names) == (channel != "tt")  # tt: both taus above 40 GeV
+    assert names[f"CMS_scale_t_emb_dm0_{wp}_2018Down"] == "__CMS_scale_t_emb_DeepTau2018v2p5_DM0_2018Down"
+    assert names[f"CMS_eff_t_emb_dm1_pt40toInf_{wp}_2018Up"] == "__CMS_eff_t_emb_DeepTau2018v2p5_VSjet_DM1_pt40toInf_2018Up"
+    # DM10 and DM11 are the parts of one nuisance
+    assert f"CMS_scale_t_emb_dm1011_{wp}_2018Up" not in names
+    assert names[part_of(f"CMS_scale_t_emb_dm1011_{wp}_2018Up", "dm10")] == "__CMS_scale_t_emb_DeepTau2018v2p5_DM10_2018Up"
+    assert names[part_of(f"CMS_scale_t_emb_dm1011_{wp}_2018Down", "dm11")] == "__CMS_scale_t_emb_DeepTau2018v2p5_DM11_2018Down"
+    part = part_of(f"CMS_eff_t_emb_dm1011_pt20to40_{wp}_2018Down", "dm11")
+    assert (part in names) == (channel != "tt")  # tt: both taus above 40 GeV
+
+
+@pytest.mark.parametrize("channel", ["et", "mt", "tt"])
+def test_embedding_variation_sums_join_dm10_and_dm11(channel):
+    wp = "vsEleTight" if channel == "et" else "vsEleVVLoose"
+    pt_bins = ("40toInf",) if channel == "tt" else ("20to40", "40toInf")
+    expected = (VariationSum(f"CMS_scale_t_emb_dm1011_{wp}_2018", ("dm10", "dm11")),) + tuple(
+        VariationSum(f"CMS_eff_t_emb_dm1011_pt{pt}_{wp}_2018", ("dm10", "dm11")) for pt in pt_bins
+    )
+    assert embedding_variation_sums(channel) == expected
 
 
 @pytest.mark.parametrize("channel,keys", [("et", FF_SHIFTS_LT), ("mt", FF_SHIFTS_LT), ("tt", FF_SHIFTS_TT)])

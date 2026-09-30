@@ -5,6 +5,7 @@ from shapesmith.validate import validate
 
 from bbtautau_shapesmith.analysis import build
 from bbtautau_shapesmith.constants import FF_COLUMNS, NN_COLUMNS, TAU_CHANNELS
+from bbtautau_shapesmith.systematics import embedding_variation_sums
 from tests.helpers import EMBEDDING_LIST, branches, config, embedding_branches
 
 COMBINATIONS = [(jet_fakes, embedding) for jet_fakes in ("mc", "ff") for embedding in (False, True)]
@@ -56,7 +57,9 @@ def test_estimators(jet_fakes, embedding):
     else:
         assert first == ABCD("QCD", "abcd_anti_iso", "abcd_same_sign", "abcd_same_sign_anti_iso",
                              genuine + lepton_fakes + ("ZJ", "TTJ", "STJ", "VVJ", "TTVJ", "EWKJ", "W"))
-    assert rest == ([TemplateShift("CMS_htt_emb_ttbar_2018", "EMB", "TTT", 0.1)] if embedding else [])
+    sums = list(embedding_variation_sums("tt")) if embedding else []
+    assert rest == sums + ([TemplateShift("CMS_htt_emb_ttbar_2018", "EMB", "TTT", 0.1)] if embedding else [])
+    assert all(e not in analysis_for(jet_fakes, embedding, shape_systematics=False).channel("tt").estimators for e in sums)
 
 
 @pytest.mark.parametrize("jet_fakes,embedding", COMBINATIONS)

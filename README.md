@@ -113,14 +113,17 @@ exactly the nicks in `inventory/`; a new inventory adds its entries in the same 
 - **Shifts** (`systematics.py`, only with `shape_systematics: true`). The analysis declares every CROWN shift it
   reads. For a sample kind with declared shifts the skim fails on a declared shift without a shifted branch and on an
   undeclared `c__X` branch of a needed column (main n-tuple or friend):
-  - embedding (only with `embedding: true`): `CMS_scale_t_emb_dm{0,1,1011}_<wp>_2018` (branches `__embTauEs{1prong0pizero,1prong1pizero,3prong}`)
-    and `CMS_eff_t_emb_dm{0,1,1011}_pt{20to40,40toInf}_<wp>_2018` (`__embVsJetTauDM{0,1,1011}Pt{20to40,40toInf}`),
-    `wp` = `vsEleTight` in et, `vsEleVVLoose` in mt and tt; tt has no pt20to40 shifts. 9 pairs in et and mt, 6 in tt.
+  - embedding (only with `embedding: true`): `CMS_scale_t_emb_dm{0,1,1011}_<wp>_2018` (branches
+    `__CMS_scale_t_emb_DeepTau2018v2p5_DM<dm>_2018`) and `CMS_eff_t_emb_dm{0,1,1011}_pt{20to40,40toInf}_<wp>_2018`
+    (`__CMS_eff_t_emb_DeepTau2018v2p5_VSjet_DM<dm>_pt<bin>_2018`), `wp` = `vsEleTight` in et, `vsEleVVLoose` in mt and
+    tt; tt has no pt20to40 shifts. 9 nuisances in et and mt, 6 in tt. DM10 and DM11 are one fitted category, which
+    CROWN shifts per decay mode: the `dm1011` nuisances are `VariationSum`s of the DM10 and DM11 shifts (read as the
+    parts `<name>Up%dm10`, ...), exact in et and mt, to first order in tt, where both taus can be 3-prong.
   - fake factors (only with `jet_fakes: ff`): `CMS_ff_<key>_<channel>_2018` with branch suffix `__<key>`, for the
     17 keys of `FF_SHIFTS_LT` (et, mt) and the 34 of `FF_SHIFTS_TT` (tt, both legs), on data, MC and embedding.
     They follow the SM 2018 payload; a new payload with other keys fails the skim until the lists follow it.
   - `jetFakes` is built for every shift found on data or a subtracted process in `anti_iso`, so the embedding shifts
-    reach it too.
+    reach it too; the sums run after it.
 - **One skim for all switches.** A skim made with `embedding: true, jet_fakes: ff` (FF friend configured) serves all
   four combinations. Skims made without the friend or the shifts are incompatible with it: the first such run needs
   `shapesmith skim --force --samples …` for the samples it lists.
@@ -169,11 +172,15 @@ yet.
 - **ES grid**: `es-200` ... `es+200` (0.2 % steps, units of 0.1 %), template column variations of the embedded sample
   in the nominal region, derived from the nominal columns: the tau four-momentum scaled (pt_2, mass_2, m_vis from the
   four-vectors), the MET corrected by (1 - s) times the tau pT, mt_1 from that MET.
-- **MC shape uncertainties** (`tau_id_systematics.py`): the predecessor's set with MorphingTauID2017's names, from the
-  CROWN shifts `<quantity>__<shift>` of `sm_tau_id_measurement_config` and the jet-fake and top-pT weights; mt only,
-  nominal region only. The vsJet SF families `CMS_eff_t_dm*` equal the nominal, as in the predecessor.
-- **CMSSW**: MorphingTauID2017 exists only with jvoss's local changes, versioned in `patches/` (see
-  `patches/README.md`).
+- **MC shape uncertainties** (`tau_id_systematics.py`): the predecessor's families with MorphingTauID2017's names, from
+  the CROWN shifts `<quantity>__<shift>` of `sm_tau_id_measurement_config` (variations package) and the jet-fake and
+  top-pT weights; mt only, nominal region only. `CMS_scale_t_dm*` (three pT bins each) and `CMS_scale_fake_m` (five
+  wheels) are VariationSums of the finer CROWN shifts; the jet energy scale is the regrouped set plus HEM. Produced
+  shifts without a shape in MorphingTauID2017 (vsEle SF, electron -> tau ES, JER, electron ES) are filled under their
+  CROWN name and ignored by the datacards. The vsJet SF families `CMS_eff_t_dm*` equal the nominal, as in the
+  predecessor.
+- **CMSSW**: MorphingTauID2017 exists only with jvoss's local changes plus the regrouped JES declaration, versioned in
+  `patches/`; it needs an own area built with the patch (see `patches/README.md`).
 
 ## Where things are defined
 
