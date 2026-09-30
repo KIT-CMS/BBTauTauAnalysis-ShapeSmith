@@ -8,13 +8,13 @@ The two Analyses use the same `sm2018_binned_v4` CROWN ntuples and separate outp
 | Two light leptons | `em` = eμ, `mm` = μμ, `ee` = ee | [sm2018_binned_v4_dilepton.yaml](../configs/sm2018_binned_v4_dilepton.yaml) |
 
 OS means opposite-sign (`q_1 * q_2 < 0`), SS means same-sign (`q_1 * q_2 > 0`).
-The selections below follow [selection.py](../src/bbtautau_shapesmith/selection.py) and
-[dilepton_selection.py](../src/bbtautau_shapesmith/dilepton_selection.py).
+The selections below follow [cuts.py](../src/bbtautau_shapesmith/cuts.py) and
+[dilepton.py](../src/bbtautau_shapesmith/dilepton.py).
 
 ## What does `control_regions: true` mean?
 
 It is a boolean under `switches` in the **tau** run configuration. It is already enabled in
-`configs/sm2018_binned_v4.yaml`; the default in [analysis.py](../src/bbtautau_shapesmith/analysis.py)
+`configs/sm2018_binned_v4.yaml`; the default in [switches.py](../src/bbtautau_shapesmith/switches.py)
 is `false` if the switch is omitted. The relevant entries are:
 
 ```yaml
@@ -40,7 +40,7 @@ the jet requirement preserves nominal events because `n_jets` and `n_bjets` can 
 pT thresholds. Triggers, tau anti-electron/muon requirements and lepton vetoes remain in the skim.
 
 The switch requires `jet_fakes: mc`; combining it with `jet_fakes: ff` is rejected. The dilepton
-Analysis always defines its control regions and accepts only `sample_list` under `switches`;
+Analysis always defines its control regions and accepts only `sample_lists` under `switches`;
 do not add `control_regions` to its YAML.
 
 The YAML switch and the command-line options have different jobs:
@@ -60,8 +60,8 @@ Analysis has no estimator and therefore defaults to nominal only.
 The v4 CROWN production already retains the events needed here; no separate CROWN production
 is needed. If the tau Parquet skim was made with `control_regions: false`, rebuild it using
 `shapesmith skim -c configs/sm2018_binned_v4.yaml --force`. Changing the YAML cannot recover
-events discarded by an earlier skim. If `control_shapes.root` already exists, also use
-`hist --force` to fill the requested regions; otherwise the existing file is simply loaded.
+events discarded by an earlier skim. `hist` always fills the requested regions and keeps the other
+histograms of an existing `control_shapes.root`.
 
 ## Channels with hadronic taus: `et`, `mt`, `tt`
 
@@ -122,15 +122,16 @@ Unlisted baseline cuts remain unchanged.
 | `lepton_antiiso_ss` | SS | Pass | Nominal: ≥1 b-tag, `bpair_pt_2 > 0` | <70 GeV | 0.15 ≤ `iso_1` < 0.5 | Same-sign light-lepton isolation sideband |
 
 The additional diagnostic regions are raw data/MC comparisons with **no data-driven QCD or
-jetFakes estimate**. Their tau-fail selections apply the passing tau-ID scale factor only to
+jetFakes estimate**. In MC their tau-fail selections apply the passing tau-ID scale factor only to
 passing genuine-tau legs; failed genuine taus stay uncorrected. The muon anti-isolation
-sidebands do not use the muon isolation scale factor.
+sidebands do not use the MC muon isolation scale factor. The embedded sample keeps its own weights
+in both (its iso-binned muon SF covers the sideband).
 
 Including nominal and the four existing same-sign/ABCD names, `--regions all` selects
 **25 region names in each of et/mt and 21 in tt** for the supplied MC-fakes configuration.
 
 ```bash
-# Requires a skim made with control_regions: true; add --force to refill an existing histogram file.
+# Requires a skim made with control_regions: true; an existing histogram file keeps its other histograms.
 shapesmith hist -c configs/sm2018_binned_v4.yaml --control --regions all --skip-systematics
 shapesmith plot -c configs/sm2018_binned_v4.yaml --control --channels et,mt --region w_highmt_pass --variables mt_1,met,pt_2,n_bjets
 shapesmith plot -c configs/sm2018_binned_v4.yaml --control --channels et,mt --region w_highmt_fail --variables mt_1,met,pt_2
@@ -181,7 +182,6 @@ its top-pT weight. Only the correlated/uncorrelated b-tag variations are booked;
 ```bash
 # Skim the dilepton channels once; their channel directories are separate from et/mt/tt.
 shapesmith skim -c configs/sm2018_binned_v4_dilepton.yaml
-# Add --force if the histogram file already exists.
 shapesmith hist -c configs/sm2018_binned_v4_dilepton.yaml --control --regions all --skip-systematics
 shapesmith plot -c configs/sm2018_binned_v4_dilepton.yaml --control --channels em --region btag2 --variables yield,pt_1,pt_2,met,n_bjets
 shapesmith plot -c configs/sm2018_binned_v4_dilepton.yaml --control --channels mm,ee --region nominal --variables yield,m_vis,pt_vis,n_jets
