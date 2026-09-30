@@ -205,7 +205,7 @@ def build(config: RunConfig) -> Analysis:
         name="tau_id_es_embedding_2018",
         era=ERA,
         lumi_pb=LUMI_PB,
-        signal=SIGNAL,
+        signal=None,  # the fitted EMB is a background here; MorphingTauID2017 makes it the signal of its datacards
         channels={"mt": mt_channel(switches, by_channel["mt"]), "mm": mm_channel(by_channel["mm"])},
         measurement=TauIdEsMeasurement(switches.vsjet_wp, switches.vsele_wp, ES_GRID),
     )
