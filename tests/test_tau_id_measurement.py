@@ -160,11 +160,14 @@ def test_mc_systematics_are_the_predecessor_set():
     expected |= {f"CMS_{name}_Run2018" for name in ("eff_m_trigger", "scale_met_unclustered_energy", "scale_met", "res_met", "scale_fake_m", "fake_j")}
     expected |= {f"CMS_{kind}_t_dm{dm}_Run2018" for kind in ("scale", "eff") for dm in (0, 1, 10, 11)} | {f"CMS_fake_m_WH{w}_Run2018" for w in range(1, 6)}
     expected |= {"CMS_htt_ttbarShape", "CMS_PileUp"}
-    channel = analysis_for().channel("mt")
+    components = {f"CMS_eff_t_{c}_dm{dm}_Run2018" for c in ("stat1", "stat2", "systtes") for dm in (0, 1, 10, 11)} | {"CMS_eff_t_syst_Run2018", "CMS_eff_t_syst_allEras"}
+    channel = analysis_for(vsjet_wp="Medium").channel("mt")
     names = {v.name for v in channel.variations if not (isinstance(v, ColumnVariation) and v.derived)}
-    assert names == {f"{name}{d}" for name in expected for d in ("Up", "Down")}
+    assert names == {f"{name}{d}" for name in expected | components for d in ("Up", "Down")}
     shifts = {name: shift for name, shift, _ in CROWN_SHIFTS}
-    assert shifts["CMS_scale_t_dm1_Run2018"] == "tauEs1prong1pizero" and shifts["CMS_eff_t_dm1_Run2018"] == "vsJetTauDM1"  # the predecessor used DM0
+    assert shifts["CMS_scale_t_dm1_Run2018"] == "tauEs1prong1pizero"  # the predecessor used the DM0 shift
+    no_op = next(v for v in channel.variations if v.name == "CMS_eff_t_dm1_Run2018Up")  # as the predecessor's: equal to the nominal
+    assert no_op.replace_weights == {"tau_id": channel.process("TTL").selection.weights["tau_id"]}
     assert {name for name, *_ in WEIGHT_SHIFTS} == {"CMS_fake_j_Run2018", "CMS_htt_ttbarShape"}
     assert not {v.name for v in analysis_for(shape_systematics=False).channel("mt").variations} - {f"es{shift:+d}" for shift in ES_GRID}
 

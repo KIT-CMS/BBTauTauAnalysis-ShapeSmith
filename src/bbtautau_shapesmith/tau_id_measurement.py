@@ -181,7 +181,7 @@ def mt_channel(switches: TauIdSwitches, channel_samples: tuple[Sample, ...]) -> 
     return _channel(
         "mt", mt_cuts(switches.vsjet_wp, switches.vsele_wp), processes, channel_samples, working_point_regions(),
         categories=categories(switches.vsjet_wp, switches.vsele_wp),
-        variations=tuple(es_variation(shift) for shift in ES_GRID) + (mc_variations() if switches.shape_systematics else ()),
+        variations=tuple(es_variation(shift) for shift in ES_GRID) + (mc_variations(mc_weights(switches.vsjet_wp, switches.vsele_wp)["tau_id"]) if switches.shape_systematics else ()),
         estimators=(DataMinus("QCD", "same_sign", subtract, clip_negative=True), TemplateShift(f"CMS_emb_ttbar_contamination_{ERA_TAG}", SIGNAL, "TTT", 0.1)),
     )
 
