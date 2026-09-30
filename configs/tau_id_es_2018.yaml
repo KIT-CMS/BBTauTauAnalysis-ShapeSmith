@@ -10,6 +10,7 @@
 #   for jet in Medium Tight; do for ele in VVLoose Tight; do
 #     shapesmith measure -c configs/tau_id_es_2018.yaml -s switches.vsjet_wp=$jet -s switches.vsele_wp=$ele; done; done
 #   shapesmith measure -c configs/tau_id_es_2018.yaml --merge
+# The m_vis edges follow from the data of each run: <output_dir>/tau_id_es/2018/<vsjet>_<vsele>/binning.json.
 # combine.cmssw_dir: a CMSSW_14_1_0_pre4 with CombineHarvester and TauIDSFMeasurement tauID_ES plus
 # patches/TauIDSFMeasurement-tauID_ES.patch (not built yet; jvoss's area declares other JES sources, see patches/README.md).
 analysis: bbtautau_shapesmith.tau_id_measurement:build

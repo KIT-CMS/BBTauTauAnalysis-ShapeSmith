@@ -159,8 +159,11 @@ yet.
 
 - **Selection** as smhtt_ul `config/shapes` (special `TauID_ES`, 2018) with bbtautau column names: mt tag and probe
   with `mt_1 < 65`, `IsoMu24 || IsoMu27` and pT > 25 / 20 GeV, the nine categories DM0, DM1, DM1011 (pT >= 20 GeV) and
-  their [20, 40) and [40, 200] GeV bins; the mm control region 70-110 GeV in one bin. m_vis bins per working-point
-  combination and category from the predecessor's shapes (`tau_id_binning.py`).
+  their [20, 40) and [40, 200] GeV bins; the mm control region 70-110 GeV in one bin. The m_vis bins of the mt
+  categories are ten bins with equal data counts in 30-160 GeV, as smhtt_ul `gof/build_binning.py`
+  (`tau_id_binning.py`): ShapeSmith computes them from the OS data of the working-point combination in each category
+  whenever it fills, and records them in `binning.json` next to `shapes.root`
+  (`<output_dir>/tau_id_es/2018/<vsjet>_<vsele>/`).
 - **Processes.** mt: EMB (genmatch 4/5; no tau ID, vsEle, vsMu or ES correction), ZL, ZJ, TTL, TTJ, STL, STJ, VVL, VVJ,
   W and QCD = same-sign data minus all of them (negative bins clipped); TTT is the auxiliary template of
   `CMS_emb_ttbar_contamination_Run2018`. mm: MUEMB (genmatch 2/2, muon SFs of both legs), W, TTL, VVL and QCD =
