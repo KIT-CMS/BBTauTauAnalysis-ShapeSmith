@@ -1,0 +1,725 @@
+diff --git a/bin/MorphingTauID2017.cpp b/bin/MorphingTauID2017.cpp
+index 7c64a71..c58378f 100644
+--- a/bin/MorphingTauID2017.cpp
++++ b/bin/MorphingTauID2017.cpp
+@@ -8,7 +8,7 @@
+ #include "CombineHarvester/CombineTools/interface/Process.h"
+ #include "CombineHarvester/CombineTools/interface/Systematics.h"
+ #include "CombineHarvester/CombineTools/interface/Utilities.h"
+-#include "CombineHarvester/SMRun2Legacy/interface/BinomialBinByBin.h"
++#include "CombineHarvester/TauIDSFMeasurement/interface/BinomialBinByBin.h"
+ #include "CombineHarvester/TauIDSFMeasurement/interface/HttSystematics_TauIDRun2.h"
+ #include "CombineHarvester/CombinePdfs/interface/CMSHistFuncFactory.h"
+ #include "RooRealVar.h"
+@@ -28,7 +28,7 @@
+ #include <utility>
+ #include <vector>
+ #include <iomanip> // Add this header for std::setprecision
+-
++#include <fstream>
+ using namespace std;
+ using boost::starts_with;
+ namespace po = boost::program_options;
+@@ -59,6 +59,9 @@ int main(int argc, char **argv) {
+   bool verbose = false;
+   string categories = "pt_binned"; // "pt_binned", "ptdm_binned"
+   string era = "2018";                  // 2016 or 2017
++  float tes_precision = 0.1; // in percent, used for the step size of the TES variations
++  float es_max = 8.0;
++  float es_min = -8.0;
+   po::variables_map vm;
+   po::options_description config("configuration");
+   config.add_options()("base_path",
+@@ -87,7 +90,10 @@ int main(int argc, char **argv) {
+       po::value<bool>(&binomial_bbb)->default_value(binomial_bbb))(
+       "use_control_region",
+       po::value<bool>(&use_control_region)->default_value(use_control_region))(
+-      "era", po::value<string>(&era)->default_value(era));
++      "era", po::value<string>(&era)->default_value(era))(
++      "tes_precision", po::value<float>(&tes_precision)->default_value(tes_precision))(
++      "es_max", po::value<float>(&es_max)->default_value(es_max))(
++      "es_min", po::value<float>(&es_min)->default_value(es_min));
+   po::store(po::command_line_parser(argc, argv).options(config).run(), vm);
+   po::notify(vm);
+ 
+@@ -139,8 +145,9 @@ int main(int argc, char **argv) {
+   bkg_procs["mt"] = bkgs;
+   bkg_procs["mm"] = bkgs_mm;
+ 
++
+   vector<string> es_shifts;
+-  for (float i = -4.0; i <= 4.0; i += 0.1) {
++  for (float i = es_min; i <= es_max; i += tes_precision) {
+     if (i > -0.005 && i < 0.005) continue; // skip 0.0
+     // there seems to be no easier way for C++11 to do this conversion to strings
+     std::ostringstream stream;
+@@ -148,25 +155,73 @@ int main(int argc, char **argv) {
+     es_shifts.push_back(stream.str());
+   }
+   
++  std::cout << "[DEBUG] categories variable: " << categories << std::endl;
+   TString es_var_name("");
+   if (categories == "DM0") {
+     es_var_name = "ES_DM0";
+   } else if (categories == "DM1"){
+      es_var_name = "ES_DM1";
+-  } else if (categories == "DM10_11"){
+-      es_var_name = "ES_DM10_11";
+-
++  } else if (categories == "DM10"){
++    es_var_name = "ES_DM10";
++  } else if (categories == "DM11"){
++    es_var_name = "ES_DM11";
++  } else if (categories == "DM1011"){
++      es_var_name = "ES_DM1011";
++  } else if (categories == "DM0_PT20_40"){
++    es_var_name = "ES_DM0_PT20_40";
++  } else if (categories == "DM1_PT20_40"){
++      es_var_name = "ES_DM1_PT20_40";
++  } else if (categories == "DM10_PT20_40"){
++    es_var_name = "ES_DM10_PT20_40";
++  } else if (categories == "DM11_PT20_40"){
++    es_var_name = "ES_DM11_PT20_40";
++  } else if (categories == "DM1011_PT20_40"){
++    es_var_name = "ES_DM1011_PT20_40";
++  } else if (categories == "DM0_PT40_200"){
++    es_var_name = "ES_DM0_PT40_200";
++  } else if (categories == "DM1_PT40_200"){
++      es_var_name = "ES_DM1_PT40_200";
++  } else if (categories == "DM10_PT40_200"){
++    es_var_name = "ES_DM10_PT40_200";
++  } else if (categories == "DM11_PT40_200"){
++    es_var_name = "ES_DM11_PT40_200";
++  } else if (categories == "DM1011_PT40_200"){
++    es_var_name = "ES_DM1011_PT40_200";
+   } else{
+     throw std::runtime_error("Given categorization is not known.");
+   }
+ 
+   // Define MSSM model-independent mass parameter MH
+-  RooRealVar ES_DM0(es_var_name, es_var_name, 0.1, -4.0, 4.0);
+-  ES_DM0.setConstant(true);
+-  RooRealVar ES_DM1(es_var_name, es_var_name, 0.1, -4.0, 4.0);
+-  ES_DM1.setConstant(true);
+-  RooRealVar ES_DM10_11(es_var_name, es_var_name, 0.1, -4.0, 4.0);
+-  ES_DM10_11.setConstant(true);
++  RooRealVar ES_DM0(es_var_name, es_var_name, tes_precision, es_min, es_max);
++  // ES_DM0.setConstant(true);
++  RooRealVar ES_DM1(es_var_name, es_var_name, tes_precision, es_min, es_max);
++  // ES_DM1.setConstant(true);
++  RooRealVar ES_DM10(es_var_name, es_var_name, tes_precision, es_min, es_max);
++  // ES_DM10.setConstant(true);
++  RooRealVar ES_DM11(es_var_name, es_var_name, tes_precision, es_min, es_max);
++  // ES_DM11.setConstant(true);
++  RooRealVar ES_DM1011(es_var_name, es_var_name, tes_precision, es_min, es_max);
++  // ES_DM1011.setConstant(true);
++  RooRealVar ES_DM0_PT20_40(es_var_name, es_var_name, tes_precision, es_min, es_max);
++  // ES_DM0_PT20_40.setConstant(true);
++  RooRealVar ES_DM1_PT20_40(es_var_name, es_var_name, tes_precision, es_min, es_max);
++  // ES_DM1_PT20_40.setConstant(true);
++  RooRealVar ES_DM10_PT20_40(es_var_name, es_var_name, tes_precision, es_min, es_max);
++  // ES_DM10_PT20_40.setConstant(true);
++  RooRealVar ES_DM11_PT20_40(es_var_name, es_var_name, tes_precision, es_min, es_max);
++  // ES_DM11_PT20_40.setConstant(true);
++  RooRealVar ES_DM1011_PT20_40(es_var_name, es_var_name, tes_precision, es_min, es_max);
++  // ES_DM1011_PT20_40.setConstant(true);
++  RooRealVar ES_DM0_PT40_200(es_var_name, es_var_name, tes_precision, es_min, es_max);
++  // ES_DM0_PT40_200.setConstant(true);
++  RooRealVar ES_DM1_PT40_200(es_var_name, es_var_name, tes_precision, es_min, es_max);
++  // ES_DM1_PT40_200.setConstant(true);
++  RooRealVar ES_DM10_PT40_200(es_var_name, es_var_name, tes_precision, es_min, es_max);
++  // ES_DM10_PT40_200.setConstant(true);
++  RooRealVar ES_DM11_PT40_200(es_var_name, es_var_name, tes_precision, es_min, es_max);
++  // ES_DM11_PT40_200.setConstant(true);
++  RooRealVar ES_DM1011_PT40_200(es_var_name, es_var_name, tes_precision, es_min, es_max);
++  // ES_DM1011_PT40_200.setConstant(true);
+ 
+   // std::cout << "Successfully executed" << std::endl;
+   map<string, Categories> cats;
+@@ -175,9 +230,13 @@ int main(int argc, char **argv) {
+   vector<string> mm_sig_procs;
+   if (categories == "all") {
+     cats["mt"] = {
+-         {1, "mt_Pt20to25"}, {2, "mt_Pt25to30"}, {3, "mt_Pt30to35"},
+-         {4, "mt_Pt35to40"}, {5, "mt_PtGt40"},   {6, "mt_Inclusive"},
+-         {7, "mt_DM0"},      {8, "mt_DM1"},      {9, "mt_DM10_11"},
++         {1, "mt_Pt20to25"},        {2, "mt_Pt25to30"},       {3, "mt_Pt30to35"},
++         {4, "mt_Pt35to40"},        {5, "mt_PtGt40"},         {6, "mt_Inclusive"},
++         {7, "mt_DM0"},             {8, "mt_DM1"},            {9, "mt_DM1011"},
++         {10, "mt_DM10"},           {11, "mt_DM11"},          {12, "mt_DM0_PT20_40"},
++         {13, "mt_DM1_PT20_40"},    {14, "mt_DM1011_PT20_40"},{15, "mt_DM10_PT20_40"},
++         {16, "mt_DM11_PT20_40"},   {17, "mt_DM0_PT40_200"},  {18, "mt_DM1_PT40_200"},
++         {19, "mt_DM1011_PT40_200"},{20, "mt_DM10_PT40_200"}, {21, "mt_DM11_PT40_200"},
+     }; // sig_procs here?
+   } else if (categories == "Pt20to25"){
+     cats["mt"] = {
+@@ -219,11 +278,71 @@ int main(int argc, char **argv) {
+       {8, "mt_DM1"}
+     };
+     sig_procs = {"EMB_DM1"};
+-  } else if (categories == "DM10_11"){
++  } else if (categories == "DM1011"){
++    cats["mt"] = {
++      {9, "mt_DM1011"}
++    };
++    sig_procs = {"EMB_DM1011"};
++  } else if (categories == "DM10"){
++    cats["mt"] = {
++      {10, "mt_DM10"}
++    };
++    sig_procs = {"EMB_DM10"};
++  } else if (categories == "DM11"){
++    cats["mt"] = {
++      {11, "mt_DM11"}
++    };
++    sig_procs = {"EMB_DM11"};
++  } else if (categories == "DM0_PT20_40"){
++    cats["mt"] = {
++      {12, "mt_DM0_PT20_40"}
++    };
++    sig_procs = {"EMB_DM0_PT20_40"};
++  } else if (categories == "DM1_PT20_40"){
++    cats["mt"] = {
++      {13, "mt_DM1_PT20_40"}
++    };
++    sig_procs = {"EMB_DM1_PT20_40"};
++  } else if (categories == "DM1011_PT20_40"){
++    cats["mt"] = {
++      {14, "mt_DM1011_PT20_40"}
++    };
++    sig_procs = {"EMB_DM1011_PT20_40"};
++  } else if (categories == "DM10_PT20_40"){
++    cats["mt"] = {
++      {15, "mt_DM10_PT20_40"}
++    };
++    sig_procs = {"EMB_DM10_PT20_40"};
++  } else if (categories == "DM11_PT20_40"){
++    cats["mt"] = {
++      {16, "mt_DM11_PT20_40"}
++    };
++    sig_procs = {"EMB_DM11_PT20_40"};
++  } else if (categories == "DM0_PT40_200"){
++    cats["mt"] = {
++      {17, "mt_DM0_PT40_200"}
++    };
++    sig_procs = {"EMB_DM0_PT40_200"};
++  } else if (categories == "DM1_PT40_200"){
++    cats["mt"] = {
++      {18, "mt_DM1_PT40_200"}
++    };
++    sig_procs = {"EMB_DM1_PT40_200"};
++  } else if (categories == "DM1011_PT40_200"){
++    cats["mt"] = {
++      {19, "mt_DM1011_PT40_200"}
++    };
++    sig_procs = {"EMB_DM1011_PT40_200"};
++  } else if (categories == "DM10_PT40_200"){
++    cats["mt"] = {
++      {20, "mt_DM10_PT40_200"}
++    };
++    sig_procs = {"EMB_DM10_PT40_200"};
++  } else if (categories == "DM11_PT40_200"){
+     cats["mt"] = {
+-      {9, "mt_DM10_11"}
++      {21, "mt_DM11_PT40_200"}
+     };
+-    sig_procs = {"EMB_DM10_11"};
++    sig_procs = {"EMB_DM11_PT40_200"};
+   } else {
+     throw std::runtime_error("Given categorization is not known.");
+   }
+@@ -259,11 +378,16 @@ int main(int argc, char **argv) {
+ 
+   // Extract shapes from input ROOT files
+   for (string chn : chns) {
++    if (chn == "mm") {
+     cb.cp().channel({chn}).backgrounds().ExtractShapes(
+         input_dir[chn] + "htt_" + chn + ".inputs-sm-" + era_tag + postfix +
+             ".root",
+         "$BIN/$PROCESS", "$BIN/$PROCESS_$SYSTEMATIC");
+-    if (chn == "mt") {
++    } else if (chn == "mt") {
++      cb.cp().channel({chn}).backgrounds().ExtractShapes(
++        input_dir[chn] + "htt_" + chn + ".inputs-sm-" + era_tag + postfix +
++            ".root",
++        "$BIN/$PROCESS", "$BIN/$PROCESS_$SYSTEMATIC");
+       cb.cp()
+       .channel({chn})
+       // .bin_id({static_cast<int>(i)})
+@@ -512,13 +636,37 @@ int main(int argc, char **argv) {
+   std::map<std::string, std::string> process_norm_map = {
+     {"EMB_DM0", "norm"},
+     {"EMB_DM1", "norm"},
+-    {"EMB_DM10_11", "norm"}
++    {"EMB_DM1011", "norm"},
++    {"EMB_DM10", "norm"},
++    {"EMB_DM11", "norm"},
++    {"EMB_DM0_PT20_40", "norm"},
++    {"EMB_DM1_PT20_40", "norm"},
++    {"EMB_DM1011_PT20_40", "norm"},
++    {"EMB_DM10_PT20_40", "norm"},
++    {"EMB_DM11_PT20_40", "norm"},
++    {"EMB_DM0_PT40_200", "norm"},
++    {"EMB_DM1_PT40_200", "norm"},
++    {"EMB_DM1011_PT40_200", "norm"},
++    {"EMB_DM10_PT40_200", "norm"},
++    {"EMB_DM11_PT40_200", "norm"}
+   };
+ 
+   std::map<std::string, RooAbsReal *> mass_var  = {
+     {"EMB_DM0", &ES_DM0},
+     {"EMB_DM1", &ES_DM1},
+-    {"EMB_DM10_11", &ES_DM10_11}
++    {"EMB_DM1011", &ES_DM1011},
++    {"EMB_DM10", &ES_DM10},
++    {"EMB_DM11", &ES_DM11},
++    {"EMB_DM0_PT20_40", &ES_DM0_PT20_40},
++    {"EMB_DM1_PT20_40", &ES_DM1_PT20_40},
++    {"EMB_DM1011_PT20_40", &ES_DM1011_PT20_40},
++    {"EMB_DM10_PT20_40", &ES_DM10_PT20_40},
++    {"EMB_DM11_PT20_40", &ES_DM11_PT20_40},
++    {"EMB_DM0_PT40_200", &ES_DM0_PT40_200},
++    {"EMB_DM1_PT40_200", &ES_DM1_PT40_200},
++    {"EMB_DM1011_PT40_200", &ES_DM1011_PT40_200},
++    {"EMB_DM10_PT40_200", &ES_DM10_PT40_200},
++    {"EMB_DM11_PT40_200", &ES_DM11_PT40_200}
+   };
+ 
+   // Setup morphed mssm signals for bsm analyses
+@@ -528,8 +676,32 @@ int main(int argc, char **argv) {
+     ws.import(ES_DM0);
+   } else if (categories == "DM1"){
+     ws.import(ES_DM1);
+-  } else if (categories == "DM10_11"){
+-    ws.import(ES_DM10_11);
++  } else if (categories == "DM1011"){
++    ws.import(ES_DM1011);
++  } else if (categories == "DM10"){
++    ws.import(ES_DM10);
++  } else if (categories == "DM11"){
++    ws.import(ES_DM11);
++  } else if (categories == "DM0_PT20_40"){
++    ws.import(ES_DM0_PT20_40);
++  } else if (categories == "DM1_PT20_40"){
++    ws.import(ES_DM1_PT20_40);
++  } else if (categories == "DM1011_PT20_40"){
++    ws.import(ES_DM1011_PT20_40);
++  } else if (categories == "DM10_PT20_40"){
++    ws.import(ES_DM10_PT20_40);
++  } else if (categories == "DM11_PT20_40"){
++    ws.import(ES_DM11_PT20_40);
++  } else if (categories == "DM0_PT40_200"){
++    ws.import(ES_DM0_PT40_200);
++  } else if (categories == "DM1_PT40_200"){
++    ws.import(ES_DM1_PT40_200);
++  } else if (categories == "DM1011_PT40_200"){
++    ws.import(ES_DM1011_PT40_200);
++  } else if (categories == "DM10_PT40_200"){
++    ws.import(ES_DM10_PT40_200);
++  } else if (categories == "DM11_PT40_200"){
++    ws.import(ES_DM11_PT40_200);
+   } else{
+     throw std::runtime_error("Given categorization is not known.");
+   }
+@@ -594,7 +766,19 @@ int main(int argc, char **argv) {
+   }
+ 
+   // if (verbose)
+-  cb.PrintAll();
++  // Redirect cb.PrintAll() output to a log file with a specified location.
++  // You can modify the logfile_path variable to change the location.
++  std::string logfile_path = "/work/jvoss/ntuples/smhtt_ul_SFs_v15/log/cb_PrintAll.log";
++  std::ofstream logfile(logfile_path);
++  if (logfile.is_open()) {
++    std::streambuf* orig_buf = std::cout.rdbuf();
++    std::cout.rdbuf(logfile.rdbuf());
++    cb.PrintAll();
++    std::cout.rdbuf(orig_buf);
++    std::cout << "[INFO] cb.PrintAll() written to " << logfile_path << "\n";
++  } else {
++    std::cerr << "[ERROR] Could not open log file for writing: " << logfile_path << "\n";
++  }
+ 
+   cout << "[INFO] Done producing datacards.\n";
+ }
+diff --git a/src/HttSystematics_TauIDRun2.cc b/src/HttSystematics_TauIDRun2.cc
+index 959b339..09400a1 100644
+--- a/src/HttSystematics_TauIDRun2.cc
++++ b/src/HttSystematics_TauIDRun2.cc
+@@ -28,7 +28,7 @@ void AddTauIDRun2Systematics(CombineHarvester &cb, bool jetfakes, bool embedding
+   // Signal processes
+   if (embedding){
+     //   std::vector<std::string> signals = {"EMB"};
+-      std::vector<std::string> signals = {"EMB_Pt20to25", "EMB_Pt25to30", "EMB_Pt30to35", "EMB_Pt35to40", "EMB_PtGt40", "EMB_DM0" , "EMB_DM1", "EMB_DM10_11", "EMB_Inclusive" };
++      std::vector<std::string> signals = {"EMB_Pt20to25", "EMB_Pt25to30", "EMB_Pt30to35", "EMB_Pt35to40", "EMB_PtGt40", "EMB_DM0" , "EMB_DM1", "EMB_DM1011", "EMB_DM10", "EMB_DM11", "EMB_Inclusive", "EMB_DM0_PT20_40" , "EMB_DM1_PT20_40", "EMB_DM1011_PT20_40", "EMB_DM10_PT20_40", "EMB_DM11_PT20_40", "EMB_DM0_PT40_200" , "EMB_DM1_PT40_200", "EMB_DM1011_PT40_200", "EMB_DM10_PT40_200", "EMB_DM11_PT40_200"};
+ 
+       mc_processes =
+                   {"TTL", "TTJ", "W", "ZJ", "ZL", "VVL", "VVJ", "STL", "STJ"};
+@@ -54,32 +54,32 @@ void AddTauIDRun2Systematics(CombineHarvester &cb, bool jetfakes, bool embedding
+   float lumi_unc_corr = 1.0;
+   float lumi_unc_1718 = 1.0;
+   if (era_tag == "Run2016preVFP") {
+-      lumi_unc = 1.010;
+-      lumi_unc_corr = 1.006;
++      lumi_unc = 1.012;
++    //   lumi_unc_corr = 1.006;
+   } else if (era_tag == "Run2016postVFP") {
+-      lumi_unc = 1.010;
+-      lumi_unc_corr = 1.006;
++      lumi_unc = 1.012;
++    //   lumi_unc_corr = 1.006;
+   } else if (era_tag == "Run2017") {
+-      lumi_unc = 1.020;
+-      lumi_unc_corr = 1.009;
+-      lumi_unc_1718 = 1.006;
++      lumi_unc = 1.0082;
++    //   lumi_unc_corr = 1.009;
++    //   lumi_unc_1718 = 1.006;
+   } else if (era_tag == "Run2018") {
+-      lumi_unc = 1.015;
+-      lumi_unc_corr = 1.020;
+-      lumi_unc_1718 = 1.002;
++      lumi_unc = 1.0084;
++    //   lumi_unc_corr = 1.020;
++    //   lumi_unc_1718 = 1.002;
+   }
+   cb.cp()
+       .channel({"et", "mt", "tt", "em", "mm"})
+       .process(mc_processes)
+       .AddSyst(cb, "lumi_13TeV_$ERA", "lnN", SystMap<>::init(lumi_unc));
+-  cb.cp()
+-      .channel({"et", "mt", "tt", "em", "mm"})
+-      .process(mc_processes)
+-      .AddSyst(cb, "lumi_13TeV_correlated", "lnN", SystMap<>::init(lumi_unc_corr));
+-  cb.cp()
+-      .channel({"et", "mt", "tt", "em", "mm"})
+-      .process(mc_processes)
+-      .AddSyst(cb, "lumi_13TeV_1718", "lnN", SystMap<>::init(lumi_unc_1718));
++//   cb.cp()
++//       .channel({"et", "mt", "tt", "em", "mm"})
++//       .process(mc_processes)
++//       .AddSyst(cb, "lumi_13TeV_correlated", "lnN", SystMap<>::init(lumi_unc_corr));
++//   cb.cp()
++//       .channel({"et", "mt", "tt", "em", "mm"})
++//       .process(mc_processes)
++//       .AddSyst(cb, "lumi_13TeV_1718", "lnN", SystMap<>::init(lumi_unc_1718));
+ 
+   // ##########################################################################
+   // Uncertainty: Prefiring
+@@ -107,13 +107,19 @@ void AddTauIDRun2Systematics(CombineHarvester &cb, bool jetfakes, bool embedding
+       .channel({"mt"})
+       .process(mc_processes)
+       .AddSyst(cb, "CMS_eff_m_trigger_$ERA", "shape", SystMap<>::init(1.00));
++    // .AddSyst(cb, "CMS_eff_m_trigger_$ERA", "lnN", SystMap<>::init(1.02));
+ 
++  // Custom shape systematic: +-10% on the nominal yield of signal(emb) or 1% on TES, etc. .
++//   cb.cp()
++//       .channel({"mt"})
++//       .process({"EMB_DM0" , "EMB_DM1", "EMB_DM1011", "EMB_DM0_PT20_40" , "EMB_DM1_PT20_40", "EMB_DM1011_PT20_40", "EMB_DM10_PT20_40", "EMB_DM11_PT20_40", "EMB_DM0_PT40_200" , "EMB_DM1_PT40_200", "EMB_DM1011_PT40_200", "EMB_DM10_PT40_200", "EMB_DM11_PT40_200"})
++//       .AddSyst(cb, "Custom_simple_shift", "shape", SystMap<>::init(1.00));
+   // 100% uncorrelated for embedded
+   cb.cp()
+       .channel({"mt", "mm"})
+     //   .process({"EMB", "MUEMB"})
+     //   .process({"EMB", "MUEMB"})
+-      .process({"EMB_Pt20to25", "EMB_Pt25to30", "EMB_Pt30to35", "EMB_Pt35to40", "EMB_PtGt40", "EMB_DM0" , "EMB_DM1", "EMB_DM10_11", "EMB_Inclusive", "MUEMB"})
++      .process({"EMB_Pt20to25", "EMB_Pt25to30", "EMB_Pt30to35", "EMB_Pt35to40", "EMB_PtGt40", "EMB_DM0" , "EMB_DM1", "EMB_DM1011", "EMB_Inclusive", "MUEMB", "EMB_DM0_PT20_40" , "EMB_DM1_PT20_40", "EMB_DM1011_PT20_40", "EMB_DM10_PT20_40", "EMB_DM11_PT20_40", "EMB_DM0_PT40_200" , "EMB_DM1_PT40_200", "EMB_DM1011_PT40_200", "EMB_DM10_PT40_200", "EMB_DM11_PT40_200"})
+     //   .AddSyst(cb, "CMS_eff_trigger_emb_mt_$ERA", "shape", SystMap<>::init(1.00));
+     .AddSyst(cb, "CMS_eff_m_trigger_emb_$ERA", "lnN", SystMap<>::init(1.02));
+ 
+@@ -121,12 +127,12 @@ void AddTauIDRun2Systematics(CombineHarvester &cb, bool jetfakes, bool embedding
+   //  Muon ID 
+   cb.cp()
+       .channel({"mt"})
+-      .process({"EMB_Pt20to25", "EMB_Pt25to30", "EMB_Pt30to35", "EMB_Pt35to40", "EMB_PtGt40", "EMB_DM0", "EMB_DM1", "EMB_DM10_11", "EMB_Inclusive", "MUEMB"})
++      .process({"EMB_Pt20to25", "EMB_Pt25to30", "EMB_Pt30to35", "EMB_Pt35to40", "EMB_PtGt40", "EMB_DM0", "EMB_DM1", "EMB_DM1011", "EMB_Inclusive", "MUEMB", "EMB_DM0_PT20_40" , "EMB_DM1_PT20_40", "EMB_DM1011_PT20_40", "EMB_DM10_PT20_40", "EMB_DM11_PT20_40", "EMB_DM0_PT40_200" , "EMB_DM1_PT40_200", "EMB_DM1011_PT40_200", "EMB_DM10_PT40_200", "EMB_DM11_PT40_200"})
+       .AddSyst(cb, "CMS_eff_m_id_emb", "lnN", SystMap<>::init(1.02));
+ 
+   cb.cp()
+       .channel({"mm"})
+-      .process({"EMB_Pt20to25", "EMB_Pt25to30", "EMB_Pt30to35", "EMB_Pt35to40", "EMB_PtGt40", "EMB_DM0", "EMB_DM1", "EMB_DM10_11", "EMB_Inclusive", "MUEMB"})
++      .process({"EMB_Pt20to25", "EMB_Pt25to30", "EMB_Pt30to35", "EMB_Pt35to40", "EMB_PtGt40", "EMB_DM0", "EMB_DM1", "EMB_DM1011", "EMB_Inclusive", "MUEMB", "EMB_DM0_PT20_40" , "EMB_DM1_PT20_40", "EMB_DM1011_PT20_40", "EMB_DM10_PT20_40", "EMB_DM11_PT20_40", "EMB_DM0_PT40_200" , "EMB_DM1_PT40_200", "EMB_DM1011_PT40_200", "EMB_DM10_PT40_200", "EMB_DM11_PT40_200"})
+       .AddSyst(cb, "CMS_eff_m_id_emb", "lnN", SystMap<>::init(1.04));
+   cb.cp()
+       .channel({"mt"})
+@@ -140,12 +146,12 @@ void AddTauIDRun2Systematics(CombineHarvester &cb, bool jetfakes, bool embedding
+   //  Muon Iso
+   cb.cp()
+       .channel({"mt"})
+-      .process({"EMB_Pt20to25", "EMB_Pt25to30", "EMB_Pt30to35", "EMB_Pt35to40", "EMB_PtGt40", "EMB_DM0", "EMB_DM1", "EMB_DM10_11", "EMB_Inclusive", "MUEMB"})
++      .process({"EMB_Pt20to25", "EMB_Pt25to30", "EMB_Pt30to35", "EMB_Pt35to40", "EMB_PtGt40", "EMB_DM0", "EMB_DM1", "EMB_DM1011", "EMB_Inclusive", "MUEMB", "EMB_DM0_PT20_40" , "EMB_DM1_PT20_40", "EMB_DM1011_PT20_40", "EMB_DM10_PT20_40", "EMB_DM11_PT20_40", "EMB_DM0_PT40_200" , "EMB_DM1_PT40_200", "EMB_DM1011_PT40_200", "EMB_DM10_PT40_200", "EMB_DM11_PT40_200"})
+       .AddSyst(cb, "CMS_eff_m_iso_emb", "lnN", SystMap<>::init(1.02));
+ 
+   cb.cp()
+       .channel({"mm"})
+-      .process({"EMB_Pt20to25", "EMB_Pt25to30", "EMB_Pt30to35", "EMB_Pt35to40", "EMB_PtGt40", "EMB_DM0", "EMB_DM1", "EMB_DM10_11", "EMB_Inclusive", "MUEMB"})
++      .process({"EMB_Pt20to25", "EMB_Pt25to30", "EMB_Pt30to35", "EMB_Pt35to40", "EMB_PtGt40", "EMB_DM0", "EMB_DM1", "EMB_DM1011", "EMB_Inclusive", "MUEMB", "EMB_DM0_PT20_40" , "EMB_DM1_PT20_40", "EMB_DM1011_PT20_40", "EMB_DM10_PT20_40", "EMB_DM11_PT20_40", "EMB_DM0_PT40_200" , "EMB_DM1_PT40_200", "EMB_DM1011_PT40_200", "EMB_DM10_PT40_200", "EMB_DM11_PT40_200"})
+       .AddSyst(cb, "CMS_eff_m_iso_emb", "lnN", SystMap<>::init(1.04));
+   cb.cp()
+       .channel({"mt"})
+@@ -157,13 +163,6 @@ void AddTauIDRun2Systematics(CombineHarvester &cb, bool jetfakes, bool embedding
+       .AddSyst(cb, "CMS_eff_m_iso", "lnN", SystMap<>::init(1.04));
+ 
+ 
+-// cb.cp()
+-//     .channel({"mt"})
+-//     .process({"EMB_Pt20to25", "EMB_Pt25to30", "EMB_Pt30to35", "EMB_Pt35to40", "EMB_PtGt40", "EMB_DM0" , "EMB_DM1", "EMB_DM10_11", "EMB_Inclusive", "MUEMB"})
+-//     .AddSyst(cb, "CMS_eff_m_emb", "lnN", SystMap<>::init(0.98));
+-
+-
+-
+   // ##########################################################################
+   // Uncertainty: b-tag and mistag efficiency
+   // References:
+@@ -191,6 +190,9 @@ void AddTauIDRun2Systematics(CombineHarvester &cb, bool jetfakes, bool embedding
+ 
+   // TauID first
+   std::string tauIDptbins[5] = {"30-35", "35-40", "40-500", "500-1000", "1000-Inf"};
++  std::string tauIDdmbins[4] = {"dm0", "dm1", "dm10", "dm11"};
++//   std::string tauIDdmptbins[12] = {"dm0", "dm1", "dm10", "dm11", "dm0_20-40", "dm1_20-40", "dm10_20-40", "dm11_20-40", "dm0_40-200", "dm1_40-200", "dm10_40-200", "dm11_40-200"};
++
+   // 3% in Tau ID SF with different anti-l fake WP
+   cb.cp()
+       .channel({"mt"})
+@@ -199,7 +201,7 @@ void AddTauIDRun2Systematics(CombineHarvester &cb, bool jetfakes, bool embedding
+   
+   // Tau ID: et and mt with 1 real tau
+       
+-  for (auto tauIDbin : tauIDptbins){ //first part correlated between channels for IDvsJets
++  for (auto tauIDbin : tauIDdmbins){ //first part correlated between channels for IDvsJets
+     cb.cp()
+         .channel({"mt"})
+         .process({"ZTT", "TTT", "TTL", "VVT", "VVL", "STT", "STL"})
+@@ -212,22 +214,22 @@ void AddTauIDRun2Systematics(CombineHarvester &cb, bool jetfakes, bool embedding
+       .channel({"mt"})
+       .process({{"ZTT", "TTT", "TTL", "VVT", "VVL", "STT", "STL"}})
+       // .process({{"ZTT", "TTT", "TTL", "VVT", "VVL", "jetFakes", "QCD"}}) // TODO: Check if this should be propagated to QCD
+-      .AddSyst(cb, "CMS_scale_t_1prong_$ERA", "shape", SystMap<>::init(1.00));
++      .AddSyst(cb, "CMS_scale_t_dm0_$ERA", "shape", SystMap<>::init(1.00));
+ 
+   cb.cp()
+       .channel({"mt"})
+       .process({"ZTT", "TTT", "TTL", "VVT", "VVL", "STT", "STL"})
+-      .AddSyst(cb, "CMS_scale_t_1prong1pizero_$ERA", "shape", SystMap<>::init(1.00));
++      .AddSyst(cb, "CMS_scale_t_dm1_$ERA", "shape", SystMap<>::init(1.00));
+ 
+   cb.cp()
+       .channel({"mt"})
+       .process({"ZTT", "TTT", "TTL", "VVT", "VVL", "STT", "STL"})
+-      .AddSyst(cb, "CMS_scale_t_3prong_$ERA", "shape", SystMap<>::init(1.00));
++      .AddSyst(cb, "CMS_scale_t_dm10_$ERA", "shape", SystMap<>::init(1.00));
+ 
+   cb.cp()
+       .channel({"mt"})
+       .process({"ZTT", "TTT", "TTL", "VVT", "VVL", "STT", "STL"})
+-      .AddSyst(cb, "CMS_scale_t_3prong1pizero_$ERA", "shape", SystMap<>::init(1.00));
++      .AddSyst(cb, "CMS_scale_t_dm11_$ERA", "shape", SystMap<>::init(1.00));
+ 
+ //   // Embedded uncorrelated uncertainty
+ // // TODO check EMB ES
+@@ -293,66 +295,113 @@ void AddTauIDRun2Systematics(CombineHarvester &cb, bool jetfakes, bool embedding
+ 
+   // Regional JES
+     // uncorrelated between eras
++    // Old syst. pre v15:
++    // cb.cp()
++    //     .channel({"et", "mt", "tt", "em"})
++    //     .process(mc_processes)
++    //     .AddSyst(cb, "CMS_scale_j_Absolute_$ERA", "shape", SystMap<>::init(1.00));
++
++    // cb.cp()
++    //     .channel({"et", "mt", "tt", "em"})
++    //     .process(mc_processes)
++    //     .AddSyst(cb, "CMS_scale_j_BBEC1_$ERA", "shape", SystMap<>::init(1.00));
++
++    // cb.cp()
++    //     .channel({"et", "mt", "tt", "em"})
++    //     .process(mc_processes)
++    //     .AddSyst(cb, "CMS_scale_j_EC2_$ERA", "shape", SystMap<>::init(1.00));
++
++    // cb.cp()
++    //     .channel({"et", "mt", "tt", "em"})
++    //     .process(mc_processes)
++    //     .AddSyst(cb, "CMS_scale_j_HF_$ERA", "shape", SystMap<>::init(1.00));
++
++    // cb.cp()
++    //     .channel({"et", "mt", "tt", "em"})
++    //     .process(mc_processes)
++    //     .AddSyst(cb, "CMS_scale_j_RelativeSample_$ERA", "shape", SystMap<>::init(1.00));
++    // // correlated between eras
++    // cb.cp()
++    //     .channel({"et", "mt", "tt", "em"})
++    //     .process(mc_processes)
++    //     .AddSyst(cb, "CMS_scale_j_Absolute", "shape", SystMap<>::init(1.00));
++
++    // cb.cp()
++    //     .channel({"et", "mt", "tt", "em"})
++    //     .process(mc_processes)
++    //     .AddSyst(cb, "CMS_scale_j_BBEC1", "shape", SystMap<>::init(1.00));
++
++    // cb.cp()
++    //     .channel({"et", "mt", "tt", "em"})
++    //     .process(mc_processes)
++    //     .AddSyst(cb, "CMS_scale_j_EC2", "shape", SystMap<>::init(1.00));
++
++    // cb.cp()
++    //     .channel({"et", "mt", "tt", "em"})
++    //     .process(mc_processes)
++    //     .AddSyst(cb, "CMS_scale_j_HF", "shape", SystMap<>::init(1.00));
++
++    // cb.cp()
++    //     .channel({"et", "mt", "tt", "em"})
++    //     .process(mc_processes)
++    //     .AddSyst(cb, "CMS_scale_j_FlavorQCD", "shape", SystMap<>::init(1.00));
++
++    // cb.cp()
++    //     .channel({"et", "mt", "tt", "em"})
++    //     .process(mc_processes)
++    //     .AddSyst(cb, "CMS_scale_j_RelativeBal", "shape", SystMap<>::init(1.00));
++
++
++    // New v15:
++    std::vector<std::string> scale_j_systematics = {
++        "CMS_scale_j_Total",
++        "CMS_scale_j_SinglePionECAL",
++        "CMS_scale_j_SinglePionHCAL",
++        "CMS_scale_j_AbsoluteMPFBias",
++        "CMS_scale_j_AbsoluteScale",
++        "CMS_scale_j_Fragmentation",
++        "CMS_scale_j_PileUpDataMC",
++        "CMS_scale_j_RelativeFSR",
++        "CMS_scale_j_PileupPtRef",
++        "CMS_scale_j_AbsoluteStat",
++        "CMS_scale_j_TimePtEta",
++        "CMS_scale_j_RelativeStatFSR",
++        "CMS_scale_j_FlavorQCD",
++        "CMS_scale_j_PileupPtEC1",
++        "CMS_scale_j_PileUpPtBB",
++        "CMS_scale_j_RelativePtBB",
++        "CMS_scale_j_RelativeJEREC1",
++        "CMS_scale_j_RelativePtEC1",
++        "CMS_scale_j_RelativeStatEC",
++        "CMS_scale_j_RelativePtHF",
++        "CMS_scale_j_PileUpPtHF",
++        "CMS_scale_j_RelativeJERHF",
++        "CMS_scale_j_RelativeStatHF",
++        "CMS_scale_j_PileUpPtEC2",
++        "CMS_scale_j_RelativeJEREC2",
++        "CMS_scale_j_RelativePtEC2",
++        "CMS_scale_j_RelativeBal",
++        "CMS_scale_j_RelativeSample"
++    };
++    for (const auto& syst : scale_j_systematics) {
++        cb.cp()
++            .channel({"et", "mt", "tt", "em"})
++            .process(mc_processes)
++            .AddSyst(cb, syst, "shape", SystMap<>::init(1.00));
++    }
++
++  // JER (not used from v15 on ?)
++//   cb.cp()
++//       .channel({"et", "mt", "tt", "em"})
++//       .process(mc_processes)
++//       .AddSyst(cb, "CMS_res_j_$ERA", "shape", SystMap<>::init(1.00));
++  // HEM issue 
++  if (era_tag == "Run2018") {
+     cb.cp()
+         .channel({"et", "mt", "tt", "em"})
+         .process(mc_processes)
+-        .AddSyst(cb, "CMS_scale_j_Absolute_$ERA", "shape", SystMap<>::init(1.00));
+-
+-    cb.cp()
+-        .channel({"et", "mt", "tt", "em"})
+-        .process(mc_processes)
+-        .AddSyst(cb, "CMS_scale_j_BBEC1_$ERA", "shape", SystMap<>::init(1.00));
+-
+-    cb.cp()
+-        .channel({"et", "mt", "tt", "em"})
+-        .process(mc_processes)
+-        .AddSyst(cb, "CMS_scale_j_EC2_$ERA", "shape", SystMap<>::init(1.00));
+-
+-    cb.cp()
+-        .channel({"et", "mt", "tt", "em"})
+-        .process(mc_processes)
+-        .AddSyst(cb, "CMS_scale_j_HF_$ERA", "shape", SystMap<>::init(1.00));
+-
+-    cb.cp()
+-        .channel({"et", "mt", "tt", "em"})
+-        .process(mc_processes)
+-        .AddSyst(cb, "CMS_scale_j_RelativeSample_$ERA", "shape", SystMap<>::init(1.00));
+-    // correlated between eras
+-    cb.cp()
+-        .channel({"et", "mt", "tt", "em"})
+-        .process(mc_processes)
+-        .AddSyst(cb, "CMS_scale_j_Absolute", "shape", SystMap<>::init(1.00));
+-
+-    cb.cp()
+-        .channel({"et", "mt", "tt", "em"})
+-        .process(mc_processes)
+-        .AddSyst(cb, "CMS_scale_j_BBEC1", "shape", SystMap<>::init(1.00));
+-
+-    cb.cp()
+-        .channel({"et", "mt", "tt", "em"})
+-        .process(mc_processes)
+-        .AddSyst(cb, "CMS_scale_j_EC2", "shape", SystMap<>::init(1.00));
+-
+-    cb.cp()
+-        .channel({"et", "mt", "tt", "em"})
+-        .process(mc_processes)
+-        .AddSyst(cb, "CMS_scale_j_HF", "shape", SystMap<>::init(1.00));
+-
+-    cb.cp()
+-        .channel({"et", "mt", "tt", "em"})
+-        .process(mc_processes)
+-        .AddSyst(cb, "CMS_scale_j_FlavorQCD", "shape", SystMap<>::init(1.00));
+-
+-    cb.cp()
+-        .channel({"et", "mt", "tt", "em"})
+-        .process(mc_processes)
+-        .AddSyst(cb, "CMS_scale_j_RelativeBal", "shape", SystMap<>::init(1.00));
+-
+-  // JER
+-  cb.cp()
+-      .channel({"et", "mt", "tt", "em"})
+-      .process(mc_processes)
+-      .AddSyst(cb, "CMS_res_j_$ERA", "shape", SystMap<>::init(1.00));
++        .AddSyst(cb, "CMS_scale_j_HEMIssue_$ERA", "shape", SystMap<>::init(1.00));
++  }
+ 
+   // ##########################################################################
+   // Uncertainty: MET energy scale and Recoil
+@@ -456,7 +505,7 @@ void AddTauIDRun2Systematics(CombineHarvester &cb, bool jetfakes, bool embedding
+   cb.cp()
+       .channel({"mt"})
+       .process({"TTT", "TTL", "TTJ", "TT"})
+-      .AddSyst(cb, "CMS_top_pt_reweighting", "shape", SystMap<>::init(1.00));
++      .AddSyst(cb, "CMS_htt_ttbarShape", "shape", SystMap<>::init(1.00));
+ 
+   // ##########################################################################
+   // Uncertainty: Electron/muon to tau fakes and ZL energy scale
+@@ -510,7 +559,7 @@ void AddTauIDRun2Systematics(CombineHarvester &cb, bool jetfakes, bool embedding
+   cb.cp()
+       .channel({"mt"})
+       .process({"W", "TTJ", "ZJ", "VVJ"})
+-      .AddSyst(cb, "CMS_htt_fake_j_$ERA", "shape", SystMap<>::init(1.00));
++      .AddSyst(cb, "CMS_fake_j_$ERA", "shape", SystMap<>::init(1.00));
+ 
+   // ##########################################################################
+   // Uncertainty: Embedded events
+@@ -523,14 +572,14 @@ void AddTauIDRun2Systematics(CombineHarvester &cb, bool jetfakes, bool embedding
+   cb.cp()
+       .channel({"mt", "mm"})
+     //   .process({"EMB", "MUEMB"})
+-      .process({"EMB_Pt20to25", "EMB_Pt25to30", "EMB_Pt30to35", "EMB_Pt35to40", "EMB_PtGt40", "EMB_DM0" , "EMB_DM1", "EMB_DM10_11", "EMB_Inclusive", "MUEMB"})
++      .process({"EMB_Pt20to25", "EMB_Pt25to30", "EMB_Pt30to35", "EMB_Pt35to40", "EMB_PtGt40", "EMB_DM0" , "EMB_DM1", "EMB_DM1011", "EMB_Inclusive", "MUEMB", "EMB_DM0_PT20_40" , "EMB_DM1_PT20_40", "EMB_DM1011_PT20_40", "EMB_DM10_PT20_40", "EMB_DM11_PT20_40", "EMB_DM0_PT40_200" , "EMB_DM1_PT40_200", "EMB_DM1011_PT40_200", "EMB_DM10_PT40_200", "EMB_DM11_PT40_200"})
+       .AddSyst(cb, "CMS_eff_m_emb_selection_trigger_$ERA", "lnN", SystMap<>::init(1.04));
+ 
+   // TTbar contamination in embedded events: 10% shape uncertainty of assumed ttbar->tautau event shape  // this should be included to input ntuples
+   cb.cp()
+     .channel({"mt"})
+     // .process({"EMB"})
+-    .process({"EMB_Pt20to25", "EMB_Pt25to30", "EMB_Pt30to35", "EMB_Pt35to40", "EMB_PtGt40", "EMB_DM0" , "EMB_DM1", "EMB_DM10_11", "EMB_Inclusive", "MUEMB"})
++    .process({"EMB_Pt20to25", "EMB_Pt25to30", "EMB_Pt30to35", "EMB_Pt35to40", "EMB_PtGt40", "EMB_DM0" , "EMB_DM1", "EMB_DM1011", "EMB_Inclusive", "MUEMB", "EMB_DM0_PT20_40" , "EMB_DM1_PT20_40", "EMB_DM1011_PT20_40", "EMB_DM10_PT20_40", "EMB_DM11_PT20_40", "EMB_DM0_PT40_200" , "EMB_DM1_PT40_200", "EMB_DM1011_PT40_200", "EMB_DM10_PT40_200", "EMB_DM11_PT40_200"})
+     .AddSyst(cb, "CMS_emb_ttbar_contamination_$ERA", "shape", SystMap<>::init(1.00));
+ 
+ //   cb.cp()

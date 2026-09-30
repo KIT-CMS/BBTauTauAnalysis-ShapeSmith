@@ -1,71 +1,106 @@
 import pytest
-from shapesmith.config import NtupleConfig, RunConfig
-from shapesmith.model import AnalysisError
-from shapesmith.skim import required_columns
+from shapesmith.model import ABCD, AnalysisError, DataMinus, TemplateShift
+from shapesmith.skim import needed_columns
+from shapesmith.validate import validate
 
 from bbtautau_shapesmith.analysis import build
-from bbtautau_shapesmith.constants import TAU_CHANNELS, FF_COLUMN_SET, NN_COLUMNS
-from tests.helpers import REPO, branches, nicks
+from bbtautau_shapesmith.constants import FF_COLUMNS, NN_COLUMNS, TAU_CHANNELS
+from tests.helpers import EMBEDDING_LIST, branches, config, embedding_branches
+
+COMBINATIONS = [(jet_fakes, embedding) for jet_fakes in ("mc", "ff") for embedding in (False, True)]
+T_PARTS = {"ZTT", "TTT", "STT", "VVT", "TTVT", "EWKT"}
+L_PARTS = {"ZL", "TTL", "STL", "VVL", "TTVL", "EWKL"}
+J_PARTS = {"ZJ", "TTJ", "STJ", "VVJ", "TTVJ", "EWKJ"}
+SINGLE_HIGGS = {"ggH125", "qqH125", "ttH125", "VH125"}
 
 
-def _config(**switches):
-    return RunConfig(analysis="bbtautau_shapesmith.analysis:build", era="2018", channels=list(TAU_CHANNELS), switches=switches, ntuples=NtupleConfig(base="/x"), skim_dir="/s", output_dir="/o", sample_database=REPO / "tests" / "fixtures" / "datasets.json")
+def analysis_for(jet_fakes="mc", embedding=False, **switches):
+    sample_lists = ["sm2018_binned_v3", EMBEDDING_LIST] if embedding else ["sm2018_binned_v3"]
+    analysis = build(config(jet_fakes=jet_fakes, embedding=embedding, sample_lists=sample_lists, **switches))
+    validate(analysis)
+    return analysis
 
 
-def test_mc_mode_without_nn_friend_validates():
-    analysis = build(_config(jet_fakes="mc"))
-    analysis.validate()
-    assert analysis.categories == () and analysis.estimator.name == "abcd" and analysis.estimator.output == "QCD"
-    assert "ZJ" in analysis.backgrounds() and "W" in analysis.backgrounds() and "QCD" in analysis.backgrounds()
-    assert set(analysis.estimator.subtract) == {"ZTT", "TTT", "STT", "VVT", "TTVT", "ZL", "TTL", "STL", "VVL", "TTVL", "ZJ", "TTJ", "STJ", "VVJ", "TTVJ", "W"}
+@pytest.mark.parametrize("jet_fakes,embedding", COMBINATIONS)
+@pytest.mark.parametrize("nn_friend", [False, True])
+def test_every_switch_combination_builds_and_validates(jet_fakes, embedding, nn_friend):
+    analysis = analysis_for(jet_fakes, embedding, nn_friend=nn_friend)
+    for channel in analysis.channels.values():
+        assert bool(channel.categories) == nn_friend
 
 
-@pytest.mark.parametrize("sample_list", ["sm2018_binned_v1", "sm2018_binned_v2", "sm2018_binned_v3"])
-def test_sample_list_selects_inventory(sample_list):
-    analysis = build(_config(sample_list=sample_list))
-    analysis.validate()
-    assert {sample.nick for sample in analysis.samples} == set(nicks(sample_list))
+@pytest.mark.parametrize("jet_fakes,embedding", COMBINATIONS)
+def test_process_table(jet_fakes, embedding):
+    channel = analysis_for(jet_fakes, embedding).channel("mt")
+    roles = {p.name: p.role for p in channel.processes}
+    backgrounds = {name for name, role in roles.items() if role == "background"}
+    genuine = {"EMB"} if embedding else T_PARTS
+    jet_fakes_mc = J_PARTS | {"W"} if jet_fakes == "mc" else set()
+    assert backgrounds == genuine | L_PARTS | jet_fakes_mc | SINGLE_HIGGS
+    assert roles["data"] == "data" and roles["HH2B2Tau"] == "signal"
+    assert ("TTT" in roles and roles["TTT"] == "auxiliary") == embedding  # the template of the ttbar contamination
+    output = "jetFakes" if jet_fakes == "ff" else "QCD"
+    assert set(channel.backgrounds()) == backgrounds | {output}
+    top = {p.name for p in channel.processes if "top_pt" in p.selection.weights}
+    assert top == {"TTT", "TTL", "TTJ"} & set(roles)  # only ttbar ntuples carry topPtReweightWeight
 
 
-def test_missing_sample_list_is_reported():
-    with pytest.raises(FileNotFoundError, match="missing_sample_list"):
-        build(_config(sample_list="missing_sample_list"))
+@pytest.mark.parametrize("jet_fakes,embedding", COMBINATIONS)
+def test_estimators(jet_fakes, embedding):
+    channel = analysis_for(jet_fakes, embedding).channel("tt")
+    first, *rest = channel.estimators
+    genuine = ("EMB",) if embedding else ("ZTT", "TTT", "STT", "VVT", "TTVT", "EWKT")
+    lepton_fakes = ("ZL", "TTL", "STL", "VVL", "TTVL", "EWKL")
+    if jet_fakes == "ff":
+        assert first == DataMinus("jetFakes", "anti_iso", genuine + lepton_fakes)
+    else:
+        assert first == ABCD("QCD", "abcd_anti_iso", "abcd_same_sign", "abcd_same_sign_anti_iso",
+                             genuine + lepton_fakes + ("ZJ", "TTJ", "STJ", "VVJ", "TTVJ", "EWKJ", "W"))
+    assert rest == ([TemplateShift("CMS_htt_emb_ttbar_2018", "EMB", "TTT", 0.1)] if embedding else [])
 
 
-@pytest.mark.parametrize("switches", [
-    {"production": "sm2018_binned_v1"},
-    {"production": "sm2018_binned_v1", "sample_list": "sm2018_binned_v2"},
-])
-def test_renamed_switch_is_reported_instead_of_using_default_samples(switches):
-    with pytest.raises(AnalysisError, match=r"production.*sample_list"):
-        build(_config(**switches))
-
-
-def test_ff_mode_with_nn_friend_validates():
-    analysis = build(_config(jet_fakes="ff", nn_friend=True))
-    analysis.validate()
-    assert analysis.categories and analysis.estimator.name == "fake_factors" and analysis.estimator.output == "jetFakes"
-    assert set(analysis.estimator.subtract) == {"ZTT", "TTT", "STT", "VVT", "TTVT", "ZL", "TTL", "STL", "VVL", "TTVL"}
-    assert analysis.ml.region_of == {"jetFakes": "anti_iso"} and "jetFakes" in analysis.ml.processes
-
-
-def test_embedding_needs_samples():
-    with pytest.raises(AnalysisError, match="EMB"):
-        build(_config(embedding=True)).validate()
-
-
-@pytest.mark.parametrize("switches", [dict(jet_fakes="mc"), dict(jet_fakes="ff", nn_friend=True)])
+@pytest.mark.parametrize("jet_fakes,embedding", COMBINATIONS)
 @pytest.mark.parametrize("channel", TAU_CHANNELS)
-def test_all_required_columns_exist(switches, channel):
-    analysis = build(_config(**switches))
-    allowed = branches(channel) | (NN_COLUMNS if switches.get("nn_friend") else set()) | (FF_COLUMN_SET if switches.get("jet_fakes") == "ff" else set())
-    assert required_columns(analysis, channel) <= allowed, required_columns(analysis, channel) - allowed
+def test_all_needed_columns_exist(jet_fakes, embedding, channel):
+    definition = analysis_for(jet_fakes, embedding, nn_friend=True).channel(channel)
+    friends = NN_COLUMNS | (set(FF_COLUMNS.values()) if jet_fakes == "ff" else set())
+    for sample in definition.samples:
+        available = embedding_branches(channel) if sample.kind == "embedding" else branches(channel) | {"npartons"}
+        missing = needed_columns(definition, sample) - available - friends
+        assert not missing, (sample.nick, missing)
+
+
+def test_ml_export_labels():
+    ml = analysis_for("ff", embedding=True).ml
+    assert "TTT" not in ml.processes and "data" not in ml.processes
+    assert ml.label_of["EMB"] == "is_DY" and ml.label_of["jetFakes"] == "is_jetFakes" and ml.region_of == {"jetFakes": "anti_iso"}
+    labels = analysis_for("mc").ml.label_of
+    assert labels["EWKJ"] == labels["W"] == "is_jetFakes" and labels["EWKT"] == "is_Other" and labels["ZTT"] == "is_DY"
+
+
+@pytest.mark.parametrize("switches,match", [
+    ({"sample_list": "sm2018_binned_v2"}, "sample_list"),
+    ({"production": "sm2018_binned_v1"}, "production"),
+    ({"embedding": "yes"}, "embedding"),
+    ({"jet_fakes": "data"}, "jet_fakes"),
+    ({"sample_lists": []}, "sample_lists"),
+    ({"control_regions": True, "jet_fakes": "ff"}, "control_regions requires jet_fakes: mc"),
+])
+def test_invalid_switches_are_reported(switches, match):
+    with pytest.raises(AnalysisError, match=match):
+        build(config(**switches))
+
+
+def test_embedding_needs_the_embedding_sample_list():
+    with pytest.raises(AnalysisError, match="EMB"):
+        validate(build(config(embedding=True)))
 
 
 def test_style_covers_all_groups():
-    analysis = build(_config(jet_fakes="mc"))
-    groups = {p.plot_group for p in analysis.processes if p.kind not in ("data", "signal")} | {"QCD", "jetFakes", "EMB", analysis.signal}
+    analysis = analysis_for("mc", embedding=True)
+    channel = analysis.channel("mt")
+    groups = {channel.process(name).plot_group for name in channel.backgrounds() if name != "QCD"} | {"QCD", "jetFakes", "EMB", analysis.signal}
     assert groups <= set(analysis.style.colors)
     assert set(analysis.style.group_order) >= groups - {analysis.signal}
-    for variable in analysis.control_variables:
+    for variable in channel.variables:
         assert variable in analysis.style.axis_labels["mt"]

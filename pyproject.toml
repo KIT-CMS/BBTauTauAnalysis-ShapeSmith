@@ -7,7 +7,7 @@ name = "bbtautau-shapesmith"
 version = "0.1.0"
 description = "Non-resonant HH->bbtautau analysis (2018 UL, NanoAODv15) on top of ShapeSmith"
 requires-python = ">=3.11"
-dependencies = ["shapesmith", "numpy>=1.26", "pyyaml>=6"]
+dependencies = ["shapesmith", "numpy>=2.0", "pydantic>=2", "pyyaml>=6"]
 
 [project.optional-dependencies]
 test = ["pytest>=8"]

@@ -1,11 +1,31 @@
+import json
+
+import pytest
+from shapesmith.samples import normalisation, read_sample_list
+
 from bbtautau_shapesmith.constants import BTAG_COMPONENTS, DILEPTON_CHANNELS, TAU_CHANNELS
-from tests.helpers import branches, nicks
+from tests.helpers import DATABASE, EMBEDDING_LIST, INVENTORY, branches
+
+INVENTORIES = sorted(INVENTORY.glob("*.txt"))
 
 
-def test_inventory_nicks_are_unique():
-    for sample_list in ("sm2018_binned_v1", "sm2018_binned_v2", "sm2018_binned_v3"):
-        inventory = nicks(sample_list)
-        assert inventory and len(inventory) == len(set(inventory))
+@pytest.mark.parametrize("path", INVENTORIES, ids=[p.stem for p in INVENTORIES])
+def test_inventory_resolves_by_nick(path):
+    nicks = read_sample_list(path)
+    assert nicks and set(normalisation(DATABASE, nicks)) == set(nicks)
+
+
+def test_fixture_database_holds_exactly_the_inventory_nicks():
+    assert set(json.loads(DATABASE.read_text())) == {nick for path in INVENTORIES for nick in read_sample_list(path)}
+
+
+def test_embedding_inventory_follows_the_sample_list_rule():
+    # every 2018 embedding nick with a tau final state, sorted, one per line (byte-identical to CROWN sm_2018_embedding.txt)
+    database = json.loads(DATABASE.read_text())
+    expected = sorted(nick for nick, entry in database.items() if entry["sample_type"] == "embedding" and str(entry["era"]) == "2018"
+                      and any(token in nick for token in ("_eltau_", "_mutau_", "_tautau_")))
+    assert len(expected) == 12
+    assert (INVENTORY / f"{EMBEDDING_LIST}.txt").read_text() == "".join(f"{nick}\n" for nick in expected)
 
 
 def test_btag_components_exist_in_every_channel():

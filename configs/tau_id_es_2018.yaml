@@ -1,0 +1,27 @@
+# Tau-ID scale factor and energy scale of the embedded taus, 2018 (tau_id_measurement.py), on the production of CROWN
+# sm_tau_id_measurement_config (sample list sm_2018_tau_id_measurement.txt, scopes mt and mm, all shifts).
+# Switches (types and defaults in switches.py):
+#   sample_lists:      the inventory of the production
+#   vsjet_wp:          Medium | Tight, the measured DeepTau vsJet working point
+#   vsele_wp:          VVLoose | Tight, the DeepTau vsEle working point it is measured with
+#   shape_systematics: true (default) declares the MC shape uncertainties
+# One skim serves all four working-point combinations:
+#   shapesmith skim -c configs/tau_id_es_2018.yaml
+#   for jet in Medium Tight; do for ele in VVLoose Tight; do
+#     shapesmith measure -c configs/tau_id_es_2018.yaml -s switches.vsjet_wp=$jet -s switches.vsele_wp=$ele; done; done
+#   shapesmith measure -c configs/tau_id_es_2018.yaml --merge
+# combine.cmssw_dir: a CMSSW_14_1_0_pre4 with CombineHarvester and TauIDSFMeasurement tauID_ES plus
+# patches/TauIDSFMeasurement-tauID_ES.patch (jvoss's area is used read-only; see patches/README.md).
+analysis: bbtautau_shapesmith.tau_id_measurement:build
+era: "2018"
+channels: [mt, mm]
+switches: {sample_lists: [sm2018_tau_id_measurement], vsjet_wp: Tight, vsele_wp: VVLoose}
+sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
+ntuples:
+  server: root://cmsdcache-kit-disk.gridka.de
+  base: /store/user/sdaigler/CROWN/ntuples/tau_id_es_2018/CROWNRun         # the production does not exist yet
+  friends: []
+skim_dir: /ceph/sdaigler/shapesmith/tau_id_es_2018
+output_dir: ../output/tau_id_es_2018                                        # relative to this file -> <repo>/output/...
+workers: 9                                                                  # also the categories fitted in parallel
+combine: {cmssw_dir: /work/jvoss/smhtt_ul_SFs_v15/CMSSW_14_1_0_pre4, scram_arch: el9_amd64_gcc12}
