@@ -1,27 +1,27 @@
-"""Sample table: group and channel assignment by nick prefix, normalisation from the KingMaker database.
+"""Sample table: the nicks of the production's sample lists, their group and channels by nick, the normalisation
+from the KingMaker database.
 
-The database renames nicks now and then (the 2018 v15 nicks gained a campaign suffix in 2026-08) while the
-CROWN output keeps the production-time nick, so the inventory carries the DBS path of every sample and
-shapesmith resolves the database entry by nick first and by DBS path second.
+`inventory/<name>.txt` is an unchanged copy of a KingMaker sample list: one nick per line, looked up by nick in the
+sample database (kind from its sample_type, cross section, event count, generator weight).
 """
 from __future__ import annotations
 
+from collections import Counter
 from pathlib import Path
 
 from shapesmith.config import RunConfig
 from shapesmith.model import AnalysisError, Sample
-from shapesmith.samples import normalisation, read_inventory
+from shapesmith.samples import normalisation, read_sample_list
 
 INVENTORY_DIR = Path(__file__).resolve().parents[2] / "inventory"
-DEFAULT_SAMPLE_LIST = "sm2018_binned_v2"
 
 
-def inventory_path(sample_list: str = DEFAULT_SAMPLE_LIST) -> Path:
-    """`inventory/<sample_list>.txt`: one `<nick> <dbs>` line per sample to process."""
+def inventory_path(sample_list: str) -> Path:
+    """`inventory/<sample_list>.txt`, the verbatim KingMaker sample list."""
     path = INVENTORY_DIR / f"{sample_list}.txt"
     if not path.exists():
         known = sorted(p.stem for p in INVENTORY_DIR.glob("*.txt"))
-        raise FileNotFoundError(f"no inventory for sample_list {sample_list!r}; known: {known}")
+        raise FileNotFoundError(f"no inventory for sample list {sample_list!r}; known: {known}")
     return path
 
 
@@ -61,7 +61,8 @@ GROUP_RULES = (
 )
 
 
-def group_of(nick: str) -> tuple[str, tuple[str, ...] | None]:
+def route(nick: str) -> tuple[str, tuple[str, ...] | None]:
+    """Group and channels (None: every channel) of a nick."""
     for prefix, group, channels in GROUP_RULES:
         if nick.startswith(prefix):
             return group, channels
@@ -82,12 +83,19 @@ def cut_of(nick: str) -> str | None:
     return None
 
 
-def samples(database: Path, sample_list: str = DEFAULT_SAMPLE_LIST) -> tuple[Sample, ...]:
-    entries = read_inventory(inventory_path(sample_list))
-    values = normalisation(database, entries)
-    result = []
-    for entry in entries:
-        group, channels = group_of(entry.nick)
-        row = values[entry.nick]
-        result.append(Sample(entry.nick, group, row["kind"], float(row["xsec"]), int(row["nevents"]), float(row["generator_weight"]), channels, cut=cut_of(entry.nick)))
-    return tuple(result)
+def samples(database: Path, sample_lists: list[str], channels: list[str]) -> dict[str, tuple[Sample, ...]]:
+    """The samples of every channel, in sample-list order; a nick listed twice raises."""
+    nicks = [nick for name in sample_lists for nick in read_sample_list(inventory_path(name))]
+    repeated = sorted(nick for nick, count in Counter(nicks).items() if count > 1)
+    if repeated:
+        raise AnalysisError(f"nicks in more than one of the sample lists {sample_lists}:\n" + "\n".join(repeated))
+    values = normalisation(database, nicks)
+    result = {channel: [] for channel in channels}
+    for nick in nicks:
+        group, routed = route(nick)
+        row = values[nick]
+        sample = Sample(nick, group, row["kind"], float(row["xsec"]), int(row["nevents"]), float(row["generator_weight"]), cut=cut_of(nick))
+        for channel in channels:
+            if routed is None or channel in routed:
+                result[channel].append(sample)
+    return {channel: tuple(chosen) for channel, chosen in result.items()}

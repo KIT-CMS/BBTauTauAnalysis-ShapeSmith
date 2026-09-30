@@ -4,6 +4,7 @@ ERA = "2018"
 LUMI_PB = 59830.0
 TAU_CHANNELS = ("et", "mt", "tt")
 LT_CHANNELS = ("et", "mt")  # tau channels with a light lepton on leg 1
+TAU_LEGS = {"et": (2,), "mt": (2,), "tt": (1, 2)}  # the hadronic tau legs
 DILEPTON_CHANNELS = ("em", "mm", "ee")  # light-dilepton controls: Z+jets in ee/mm, top in em
 
 TAU_VS_JET_WP = "Medium"
@@ -20,12 +21,8 @@ NN_CLASS_COLUMN = "predicted_class"
 NN_SCORE_COLUMN = "predicted_max_value"
 NN_COLUMNS = frozenset((NN_CLASS_COLUMN, NN_SCORE_COLUMN))
 
-# fake-factor friend (CROWN fake_factors_friend_config.py); verify against the first produced friend file
+# fake-factor friend (CROWN fake_factors_friend_config.py): the weight column per leg
 FF_COLUMNS = {"lt": "fake_factor", "tt_1": "fake_factor_1", "tt_2": "fake_factor_2"}
-FF_COLUMN_SET = frozenset(FF_COLUMNS.values())
-
-# embedding ntuple columns (unverified until 2018 v15 embedding ntuples exist)
-EMBEDDING_COLUMNS = frozenset(("emb_genweight", "emb_idsel_wgt_1", "emb_idsel_wgt_2", "emb_triggersel_wgt"))
 
 # UParT b-tag shape-correction components; columns btag_weight_upart_{up,down}_<component>
 BTAG_COMPONENTS = (
