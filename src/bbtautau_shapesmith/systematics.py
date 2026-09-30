@@ -6,11 +6,8 @@ from collections.abc import Iterable
 
 from shapesmith.model import ColumnVariation, LnN, Process, WeightVariation
 
-from bbtautau_shapesmith.constants import BTAG_COMPONENTS, EMBEDDING_TAU_ES, EMBEDDING_VS_JET_PT_BINS, ERA, FF_SHIFTS_LT, FF_SHIFTS_TT, TAU_VS_ELE_WP
+from bbtautau_shapesmith.constants import BTAG_COMPONENTS, EMBEDDING_TAU_ES, EMBEDDING_VS_JET_PT_BINS, ERA, FF_SHIFTS_LT, FF_SHIFTS_TT, LT_CHANNELS, TAU_VS_ELE_WP
 from bbtautau_shapesmith.processes import EMBEDDED, SIGNAL
-
-LT = ("et", "mt")
-TT = ("tt",)
 
 
 def btag_variations(components: Iterable[str] = BTAG_COMPONENTS) -> tuple[WeightVariation, ...]:
@@ -56,10 +53,10 @@ def lnn(processes: tuple[Process, ...], jet_fakes_output: str) -> tuple[LnN, ...
         LnN("lumi_13TeV_$ERA", mc, 1.025),
         LnN("eff_e", mc, 1.02, channels=("et",)),
         LnN("eff_m", mc, 1.02, channels=("mt",)),
-        LnN("eff_t_vsLep_$CHANNEL_$ERA", mc, 1.01, channels=LT),
-        LnN("eff_t_vsLep_$CHANNEL_$ERA", mc, 1.0201, channels=TT),
-        LnN("eff_t_vsJet_$CHANNEL_$ERA", mc, 1.02, channels=LT),
-        LnN("eff_t_vsJet_$CHANNEL_$ERA", mc, 1.0404, channels=TT),
+        LnN("eff_t_vsLep_$CHANNEL_$ERA", mc, 1.01, channels=LT_CHANNELS),
+        LnN("eff_t_vsLep_$CHANNEL_$ERA", mc, 1.0201, channels=("tt",)),
+        LnN("eff_t_vsJet_$CHANNEL_$ERA", mc, 1.02, channels=LT_CHANNELS),
+        LnN("eff_t_vsJet_$CHANNEL_$ERA", mc, 1.0404, channels=("tt",)),
         LnN("htt_zjXsec", group("DY"), 1.02),
         LnN("htt_tjXsec", group("TT"), 1.06),
         LnN("htt_stXsec", group("ST"), 1.05),
@@ -73,7 +70,7 @@ def lnn(processes: tuple[Process, ...], jet_fakes_output: str) -> tuple[LnN, ...
         LnN("QCDscale_VH", group("VH"), (0.970, 1.038)), LnN("pdf_VH", group("VH"), 1.017), LnN("alphaS_VH", group("VH"), 1.009),
         LnN("QCDscale_HH", (SIGNAL,), (0.95, 1.022)), LnN("PDF_alphas_HH", (SIGNAL,), 1.03), LnN("mtop_HH", (SIGNAL,), 1.026),
         LnN("BR_h_bb", (SIGNAL,), (0.9873, 1.0125)), LnN("BR_h_tautau", (SIGNAL,), 1.0165),
-        LnN(f"{jet_fakes_output}Norm_$CHANNEL_$ERA", (jet_fakes_output,), 1.108, channels=LT),
-        LnN(f"{jet_fakes_output}Norm_$CHANNEL_$ERA", (jet_fakes_output,), 1.216, channels=TT),
+        LnN(f"{jet_fakes_output}Norm_$CHANNEL_$ERA", (jet_fakes_output,), 1.108, channels=LT_CHANNELS),
+        LnN(f"{jet_fakes_output}Norm_$CHANNEL_$ERA", (jet_fakes_output,), 1.216, channels=("tt",)),
     ]
     return tuple(e for e in entries if e.processes)
