@@ -8,14 +8,20 @@ uncommitted local changes. Without them the options `--tes_precision`, `--es_min
 and DM*_PT20_40 / DM*_PT40_200, and the 2018 luminosity uncertainty 1.0084 do not exist. The patch is
 `git diff` of `bin/MorphingTauID2017.cpp` and `src/HttSystematics_TauIDRun2.cc` in
 `/work/jvoss/smhtt_ul_SFs_v15/CMSSW_14_1_0_pre4/src/CombineHarvester/TauIDSFMeasurement` (2026-09-30, unchanged since the
-build of 2026-07-05), sha256 `b5fad3bf76b4465d4d49c912ffa9801a50b98730e0fa988d32290fa39cda0ca5`.
+build of 2026-07-05; sha256 of that diff `b5fad3bf76b4465d4d49c912ffa9801a50b98730e0fa988d32290fa39cda0ca5`) with one
+change: `HttSystematics_TauIDRun2.cc` declares the regrouped jet energy scale sources of the unpatched branch
+(`CMS_scale_j_{Absolute,BBEC1,EC2,HF,RelativeSample}_$ERA`, `CMS_scale_j_{Absolute,BBEC1,EC2,HF,FlavorQCD,RelativeBal}`)
+instead of jvoss's 28 individual sources, since the CROWN variations package produces the regrouped set; JER stays
+commented out and HEM declared, as in jvoss's. The patch has sha256
+`7f10cedf5e96e288d284f377cb2673f49692604255b3f5cbe2b46f888905a3d3`.
 
-Until an own area exists, `combine.cmssw_dir` points to jvoss's built area, used read-only (all outputs are written below
-the measurement's output directory). `MorphingTauID2017` writes its `cb.PrintAll()` log to the hard-coded path
+jvoss's built area declares the 28 individual sources, which the shapes do not have, so the measurement needs an own
+area built with this patch; `combine.cmssw_dir` points to it (`/work/sdaigler/tau_id_es/CMSSW_14_1_0_pre4`, not built
+yet). `MorphingTauID2017` writes its `cb.PrintAll()` log to the hard-coded path
 `/work/jvoss/ntuples/smhtt_ul_SFs_v15/log/cb_PrintAll.log`; that directory does not exist, so the binary prints
 "Could not open log file" and carries on.
 
-An own area, as jvoss's (HTTPS clones; SSH is not needed):
+The own area, as jvoss's (HTTPS clones; SSH is not needed):
 
 ```bash
 export SCRAM_ARCH=el9_amd64_gcc12

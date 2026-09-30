@@ -11,7 +11,7 @@
 #     shapesmith measure -c configs/tau_id_es_2018.yaml -s switches.vsjet_wp=$jet -s switches.vsele_wp=$ele; done; done
 #   shapesmith measure -c configs/tau_id_es_2018.yaml --merge
 # combine.cmssw_dir: a CMSSW_14_1_0_pre4 with CombineHarvester and TauIDSFMeasurement tauID_ES plus
-# patches/TauIDSFMeasurement-tauID_ES.patch (jvoss's area is used read-only; see patches/README.md).
+# patches/TauIDSFMeasurement-tauID_ES.patch (not built yet; jvoss's area declares other JES sources, see patches/README.md).
 analysis: bbtautau_shapesmith.tau_id_measurement:build
 era: "2018"
 channels: [mt, mm]
@@ -24,4 +24,4 @@ ntuples:
 skim_dir: /ceph/sdaigler/shapesmith/tau_id_es_2018
 output_dir: ../output/tau_id_es_2018                                        # relative to this file -> <repo>/output/...
 workers: 9                                                                  # also the categories fitted in parallel
-combine: {cmssw_dir: /work/jvoss/smhtt_ul_SFs_v15/CMSSW_14_1_0_pre4, scram_arch: el9_amd64_gcc12}
+combine: {cmssw_dir: /work/sdaigler/tau_id_es/CMSSW_14_1_0_pre4, scram_arch: el9_amd64_gcc12}

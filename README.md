@@ -172,11 +172,15 @@ yet.
 - **ES grid**: `es-200` ... `es+200` (0.2 % steps, units of 0.1 %), template column variations of the embedded sample
   in the nominal region, derived from the nominal columns: the tau four-momentum scaled (pt_2, mass_2, m_vis from the
   four-vectors), the MET corrected by (1 - s) times the tau pT, mt_1 from that MET.
-- **MC shape uncertainties** (`tau_id_systematics.py`): the predecessor's set with MorphingTauID2017's names, from the
-  CROWN shifts `<quantity>__<shift>` of `sm_tau_id_measurement_config` and the jet-fake and top-pT weights; mt only,
-  nominal region only. The vsJet SF families `CMS_eff_t_dm*` equal the nominal, as in the predecessor.
-- **CMSSW**: MorphingTauID2017 exists only with jvoss's local changes, versioned in `patches/` (see
-  `patches/README.md`).
+- **MC shape uncertainties** (`tau_id_systematics.py`): the predecessor's families with MorphingTauID2017's names, from
+  the CROWN shifts `<quantity>__<shift>` of `sm_tau_id_measurement_config` (variations package) and the jet-fake and
+  top-pT weights; mt only, nominal region only. `CMS_scale_t_dm*` (three pT bins each) and `CMS_scale_fake_m` (five
+  wheels) are VariationSums of the finer CROWN shifts; the jet energy scale is the regrouped set plus HEM. Produced
+  shifts without a shape in MorphingTauID2017 (vsEle SF, electron -> tau ES, JER, electron ES) are filled under their
+  CROWN name and ignored by the datacards. The vsJet SF families `CMS_eff_t_dm*` equal the nominal, as in the
+  predecessor.
+- **CMSSW**: MorphingTauID2017 exists only with jvoss's local changes plus the regrouped JES declaration, versioned in
+  `patches/`; it needs an own area built with the patch (see `patches/README.md`).
 
 ## Where things are defined
 

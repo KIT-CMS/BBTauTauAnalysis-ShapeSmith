@@ -25,7 +25,7 @@ from bbtautau_shapesmith.cuts import SAME_SIGN
 from bbtautau_shapesmith.samples import sample_database, samples
 from bbtautau_shapesmith.switches import TauIdSwitches, parse
 from bbtautau_shapesmith.tau_id_binning import CONTROL_REGION_EDGES, M_VIS_EDGES
-from bbtautau_shapesmith.tau_id_systematics import ERA_TAG, mc_variations
+from bbtautau_shapesmith.tau_id_systematics import ERA_TAG, mc_variation_sums, mc_variations
 from bbtautau_shapesmith.weights import TOP_PT
 
 ES_GRID = grid(-200, 200, 2)  # +-20 % in steps of 0.2 %, as the predecessor's 2018 measurement
@@ -187,7 +187,11 @@ def mt_channel(switches: TauIdSwitches, channel_samples: tuple[Sample, ...]) -> 
         "mt", mt_cuts(switches.vsjet_wp, switches.vsele_wp), processes, channel_samples, working_point_regions(),
         categories=categories(switches.vsjet_wp, switches.vsele_wp),
         variations=tuple(es_variation(shift) for shift in ES_GRID) + (mc_variations(mc_weights(switches.vsjet_wp, switches.vsele_wp)["tau_id"]) if switches.shape_systematics else ()),
-        estimators=(DataMinus("QCD", "same_sign", subtract, clip_negative=True), TemplateShift(f"CMS_emb_ttbar_contamination_{ERA_TAG}", SIGNAL, "TTT", 0.1)),
+        estimators=(
+            DataMinus("QCD", "same_sign", subtract, clip_negative=True),
+            *(mc_variation_sums() if switches.shape_systematics else ()),
+            TemplateShift(f"CMS_emb_ttbar_contamination_{ERA_TAG}", SIGNAL, "TTT", 0.1),
+        ),
     )
 
 
