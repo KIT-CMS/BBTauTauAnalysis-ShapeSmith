@@ -138,13 +138,14 @@ shapesmith measure -c configs/ff_sm2018_binned_v4.yaml [--suggest-binning]   # -
 
 The regions are built in `ff_measurement.py` from the analysis selection (`cuts.py`); every difference to jvoss's
 configuration is listed in its docstring. The binning, fits and bandwidths are `ff_tables.py`, generated once by
-`scripts/make_ff_tables.py` from TauFakeFactors' resolved configuration (do not edit by hand). `scripts/ff_parity.py` is the algorithm parity with TauFakeFactors: it
-runs the measurement on jvoss's preselection files with his regions and weights and compares every payload value,
-edge and fitted curve with his payload and his pickled fits, and `--suggest-binning` with his `adjust_binning.py`.
-One explained difference is by decision (U13): the SystMCShiftDown of the corrections is smoothed at the centres of
-mass; TauFakeFactors smooths it at the bin centres because of a deepcopy bug, which the parity reproduces separately.
-A new payload goes into a new dated directory of the CROWN analysis (`payloads/fake_factors/sm/fake-factors-<date>/`)
-and needs a fresh friend tag; `constants.FF_SHIFTS_LT/TT` must follow its keys.
+`scripts/make_ff_tables.py` from TauFakeFactors' resolved configuration (do not edit by hand). `scripts/ff_parity.py`
+is the algorithm parity with TauFakeFactors: it runs the measurement on jvoss's preselection files with his regions
+and weights and compares every payload value, edge and fitted curve with his payload and his pickled fits, and
+`--suggest-binning` with his `adjust_binning.py`. One explained difference is by decision (U13): the SystMCShiftDown
+of the corrections is smoothed at the centres of mass; TauFakeFactors smooths it at the bin centres because of a
+deepcopy bug, which the parity reproduces separately. A new payload goes into a new dated directory of the CROWN
+analysis (`payloads/fake_factors/sm/fake-factors-<date>/`) and needs a fresh friend tag; `constants.FF_SHIFTS_LT/TT`
+must follow its keys.
 
 ## Tau-ID and ES measurement of the embedded taus
 
