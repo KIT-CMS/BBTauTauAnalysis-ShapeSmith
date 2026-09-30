@@ -21,18 +21,20 @@ from shapesmith.measurements.tau_id_es.grid import CATEGORIES, CONTROL_CATEGORY,
 from shapesmith.model import Analysis, Category, Channel, ColumnVariation, DataMinus, Process, Region, Sample, Selection, TemplateShift, Variable
 
 from bbtautau_shapesmith.constants import ERA, LUMI_PB
+from bbtautau_shapesmith.cuts import SAME_SIGN
 from bbtautau_shapesmith.samples import sample_database, samples
 from bbtautau_shapesmith.switches import TauIdSwitches, parse
 from bbtautau_shapesmith.tau_id_binning import CONTROL_REGION_EDGES, M_VIS_EDGES
 from bbtautau_shapesmith.tau_id_systematics import ERA_TAG, mc_variations
+from bbtautau_shapesmith.weights import TOP_PT
 
 ES_GRID = grid(-200, 200, 2)  # +-20 % in steps of 0.2 %, as the predecessor's 2018 measurement
 VS_MU_WP = "Tight"
 MEASURED_WPS = {"vsjet": ("Medium", "Tight"), "vsele": ("VVLoose", "Tight")}
 MUON_EMBEDDED = "MUEMB"
 TRIGGER = "((trg_single_mu27 > 0.5) | (trg_single_mu24 > 0.5))"
+# the predecessor's (smhtt_ul config/shapes/process_selection.py), with its gap at pt_1 == 28 exactly
 TRIGGER_WEIGHT = "((pt_1 >= 25) & (pt_1 < 28)) * trg_wgt_single_mu24 + (pt_1 > 28) * trg_wgt_single_mu27"
-SAME_SIGN = "((q_1 * q_2) > 0)"
 
 DECAY_MODE_CUTS = {"DM0": "(tau_decaymode_2 == 0)", "DM1": "(tau_decaymode_2 == 1)", "DM1011": "((tau_decaymode_2 == 10) | (tau_decaymode_2 == 11))"}
 PT_CUTS = {"": "(pt_2 >= 20)", "_PT20_40": "(pt_2 >= 20) & (pt_2 < 40)", "_PT40_200": "(pt_2 >= 40) & (pt_2 <= 200)"}
@@ -137,7 +139,7 @@ def embedding_weights(channel: str) -> dict[str, str]:
 
 
 def _mc(name: str, group: str, weights: dict[str, str], cut: str | None = None, role: str = "background", jet_fake: bool = False) -> Process:
-    extra = {"top_pt": "topPtReweightWeight"} if group == "TT" else {}
+    extra = dict(TOP_PT) if group == "TT" else {}
     if jet_fake:
         extra["jet_fake"] = "1.0"  # replaced by the CMS_fake_j variation
     return Process(name, group, role, group, Selection(cuts={"genmatch": cut} if cut else {}, weights={**weights, **extra}))
