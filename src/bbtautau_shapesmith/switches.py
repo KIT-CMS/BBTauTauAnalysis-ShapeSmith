@@ -33,6 +33,15 @@ class DileptonSwitches(BaseModel):
     sample_lists: SampleLists = Field(min_length=1)
 
 
+class TauIdSwitches(BaseModel):
+    model_config = STRICT
+
+    sample_lists: SampleLists = Field(min_length=1)
+    vsjet_wp: Literal["Medium", "Tight"] = "Tight"  # the measured DeepTau vsJet working point
+    vsele_wp: Literal["VVLoose", "Tight"] = "VVLoose"  # the DeepTau vsEle working point it is measured with
+    shape_systematics: bool = True  # the MC shape uncertainties (CROWN shifts and weight variations)
+
+
 def parse(model: type[BaseModel], switches: dict) -> BaseModel:
     try:
         return model.model_validate(switches)

@@ -125,6 +125,33 @@ exactly the nicks in `inventory/`; a new inventory adds its entries in the same 
   four combinations. Skims made without the friend or the shifts are incompatible with it: the first such run needs
   `shapesmith skim --force --samples …` for the samples it lists.
 
+## Tau-ID and ES measurement of the embedded taus
+
+`tau_id_measurement.py` (`configs/tau_id_es_2018.yaml`) is a third Analysis: the successor of smhtt_ul
+`tauID_SFs_dev`, run by the core measurement `shapesmith.measurements.tau_id_es`. It needs the production of CROWN
+`sm_tau_id_measurement_config` (list `sm2018_tau_id_measurement`, scopes mt and mm, all shifts), which does not exist
+yet.
+
+- **Selection** as smhtt_ul `config/shapes` (special `TauID_ES`, 2018) with bbtautau column names: mt tag and probe
+  with `mt_1 < 65`, `IsoMu24 || IsoMu27` and pT > 25 / 20 GeV, the nine categories DM0, DM1, DM1011 (pT >= 20 GeV) and
+  their [20, 40) and [40, 200] GeV bins; the mm control region 70-110 GeV in one bin. m_vis bins per working-point
+  combination and category from the predecessor's shapes (`tau_id_binning.py`).
+- **Processes.** mt: EMB (genmatch 4/5; no tau ID, vsEle, vsMu or ES correction), ZL, ZJ, TTL, TTJ, STL, STJ, VVL, VVJ,
+  W and QCD = same-sign data minus all of them (negative bins clipped); TTT is the auxiliary template of
+  `CMS_emb_ttbar_contamination_Run2018`. mm: MUEMB (genmatch 2/2, muon SFs of both legs), W, TTL, VVL and QCD =
+  same-sign data minus MUEMB and W. MC and embedding weights are the predecessor's: KIT muon ID/iso SFs, the trigger
+  weight `mu24` for 25 <= pT < 28 GeV and `mu27` above 28 GeV.
+- **Switches** `vsjet_wp` (Medium, Tight) and `vsele_wp` (VVLoose, Tight). The skim takes the loosest of them, and the
+  four combinations are regions `wp_<vsjet>_<vsele>`, so one skim serves all four runs.
+- **ES grid**: `es-200` ... `es+200` (0.2 % steps, units of 0.1 %), template column variations of the embedded sample
+  in the nominal region, derived from the nominal columns: the tau four-momentum scaled (pt_2, mass_2, m_vis from the
+  four-vectors), the MET corrected by (1 - s) times the tau pT, mt_1 from that MET.
+- **MC shape uncertainties** (`tau_id_systematics.py`): the predecessor's set with MorphingTauID2017's names, from the
+  CROWN shifts `<quantity>__<shift>` of the production (the shift names are to be matched with the CROWN measurement
+  configuration) and the jet-fake and top-pT weights; mt only, nominal region only.
+- **CMSSW**: MorphingTauID2017 exists only with jvoss's local changes, versioned in `patches/` (see
+  `patches/README.md`).
+
 ## Where things are defined
 
 | What | Where |
@@ -140,6 +167,7 @@ exactly the nicks in `inventory/`; a new inventory adds its entries in the same 
 | colours, labels, axis titles of all six channels | `style.py` |
 | tau analysis assembly, estimators, ML export | `analysis.py` |
 | dilepton channels and analysis assembly | `dilepton.py` |
+| tau-ID/ES measurement: selection, processes, ES grid, assembly; its m_vis bins; its MC shape uncertainties | `tau_id_measurement.py`, `tau_id_binning.py`, `tau_id_systematics.py` |
 
 `tests/fixtures/branches_<channel>.txt` list the branches of one ttbar ntuple per channel of the
 `sm2018_binned_v4` production (`scripts/dump_branches.py <root:// URL>`); the tests check every
