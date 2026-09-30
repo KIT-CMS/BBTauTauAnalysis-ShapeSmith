@@ -19,4 +19,5 @@ skim_dir: /ceph/sdaigler/shapesmith/sm2018_binned_v2
 output_dir: ../output/sm2018_binned_v2_mc          # relative to this file -> <repo>/output/...
 ml_dir: /ceph/sdaigler/shapesmith_ml/sm2018_binned_v2
 workers: 16
+log_level: INFO                                    # DEBUG | INFO | WARNING | ERROR; console and <output_dir>/logs/<command>_<time>.log
 combine: {cmssw_dir: /work/sdaigler/smhtt_ul/CMSSW_14_1_9, scram_arch: el9_amd64_gcc12}

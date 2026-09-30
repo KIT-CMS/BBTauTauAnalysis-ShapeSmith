@@ -6,6 +6,7 @@ sample database (kind from its sample_type, cross section, event count, generato
 """
 from __future__ import annotations
 
+import logging
 from collections import Counter
 from pathlib import Path
 
@@ -14,6 +15,8 @@ from shapesmith.model import AnalysisError, Sample
 from shapesmith.samples import normalisation, read_sample_list
 
 INVENTORY_DIR = Path(__file__).resolve().parents[2] / "inventory"
+
+logger = logging.getLogger(__name__)
 
 
 def inventory_path(sample_list: str) -> Path:
@@ -100,12 +103,16 @@ def samples(database: Path, sample_lists: list[str], channels: list[str]) -> dic
     repeated = sorted(nick for nick, count in Counter(nicks).items() if count > 1)
     if repeated:
         raise AnalysisError(f"nicks in more than one of the sample lists {sample_lists}:\n" + "\n".join(repeated))
+    logger.info(f"{len(nicks)} nicks from the sample lists {', '.join(sample_lists)}, normalisation from {database}")
     values = normalisation(database, nicks)
     result = {channel: [] for channel in channels}
     for nick in nicks:
         group, routed = route(nick)
         row = values[nick]
         sample = Sample(nick, group, row["kind"], float(row["xsec"]), int(row["nevents"]), float(row["generator_weight"]), cut=cut_of(nick, nicks))
+        logger.debug(f"{nick}: group {group}, {row['kind']}, channels {', '.join(routed) if routed else 'all'}, xsec {sample.xsec:g} pb, {sample.nevents} events, generator weight {sample.generator_weight:g}")
+        if sample.cut is not None:
+            logger.info(f"{nick}: skim-time cut {sample.cut}")
         for channel in channels:
             if routed is None or channel in routed:
                 result[channel].append(sample)

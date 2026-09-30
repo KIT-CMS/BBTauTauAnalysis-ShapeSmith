@@ -25,4 +25,5 @@ ntuples:
 skim_dir: /ceph/sdaigler/shapesmith/tau_id_es_2018
 output_dir: ../output/tau_id_es_2018                                        # relative to this file -> <repo>/output/...
 workers: 9                                                                  # also the categories fitted in parallel
+log_level: INFO                                                             # DEBUG | INFO | WARNING | ERROR; console and <output_dir>/logs/<command>_<time>.log
 combine: {cmssw_dir: /work/sdaigler/tau_id_es/CMSSW_14_1_0_pre4, scram_arch: el9_amd64_gcc12}
