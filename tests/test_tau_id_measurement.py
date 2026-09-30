@@ -1,11 +1,13 @@
-from pathlib import Path
+import json
 
 import numpy as np
 import pandas as pd
 import pytest
 import uproot
+from shapesmith.binning import equal_data_edges
 from shapesmith.config import load_config
-from shapesmith.expressions import evaluate
+from shapesmith.expressions import evaluate, mask
+from shapesmith.fill import run_hist
 from shapesmith.measurements.tau_id_es import check
 from shapesmith.measurements.tau_id_es.grid import CATEGORIES, factor
 from shapesmith.estimates import run_estimates
@@ -14,13 +16,13 @@ from shapesmith.measurements.tau_id_es.synced import shapes_path, write_synced
 from shapesmith.model import AnalysisError, ColumnVariation, DataMinus, TemplateShift, VariationSum, applies
 from shapesmith.validate import validate
 
-from bbtautau_shapesmith.tau_id_binning import M_VIS_EDGES
+from bbtautau_shapesmith.tau_id_binning import M_VIS_BINNING
 from bbtautau_shapesmith.tau_id_measurement import ES_GRID, build, es_variation
 from bbtautau_shapesmith.tau_id_systematics import SUMMED_SHIFTS, UNUSED_SHIFTS, WEIGHT_SHIFTS, mc_variation_sums
 from tests.helpers import DATABASE, REPO, config
+from tests.test_controls import only, write_rows
 
-SYNCED = Path("/work/jvoss/smhtt_ul_SFs_v15/output/shapes_synced/SFs_EMB_Run2_04_08_26__full")
-WP_TAGS = {("Medium", "VVLoose"): "M_VVL", ("Medium", "Tight"): "M_T", ("Tight", "VVLoose"): "T_VVL", ("Tight", "Tight"): "T_T"}
+WPS = (("Medium", "VVLoose"), ("Medium", "Tight"), ("Tight", "VVLoose"), ("Tight", "Tight"))
 # the predecessor's trigger weight (smhtt_ul config/shapes/process_selection.py, 2018 mt and mm)
 TRIGGER_WEIGHT = "((pt_1 >= 25) & (pt_1 < 28)) * trg_wgt_single_mu24 + (pt_1 > 28) * trg_wgt_single_mu27"
 # the CROWN shifts of sm_tau_id_measurement_config (feat-new-sm-bbtautau-config 6f58e65, generated code) that move a
@@ -80,7 +82,7 @@ def test_categories_are_the_predecessors():
     assert cuts["DM0"] == "(tau_decaymode_2 == 0) & (pt_2 >= 20)"
     assert cuts["DM1_PT20_40"] == "(tau_decaymode_2 == 1) & (pt_2 >= 20) & (pt_2 < 40)"
     assert cuts["DM1011_PT40_200"] == "((tau_decaymode_2 == 10) | (tau_decaymode_2 == 11)) & (pt_2 >= 40) & (pt_2 <= 200)"
-    assert all(c.variable.edges == M_VIS_EDGES["Tight", "VVLoose"][c.name] for c in channel.categories)
+    assert all(c.variable.edges == M_VIS_BINNING for c in channel.categories)
 
 
 def test_processes_weights_and_estimates():
@@ -107,14 +109,14 @@ def test_processes_weights_and_estimates():
 
 
 def test_working_point_switches():
-    for vsjet, vsele in WP_TAGS:
+    for vsjet, vsele in WPS:
         analysis = analysis_for(vsjet_wp=vsjet, vsele_wp=vsele)
         channel = analysis.channel("mt")
         assert channel.cuts["tau_iso"] == f"(id_tau_vsJet_{vsjet}_2 > 0.5)" and channel.cuts["against_electron"] == f"(id_tau_vsEle_{vsele}_2 > 0.5)"
         assert (analysis.measurement.vsjet_wp, analysis.measurement.vsele_wp) == (vsjet, vsele)
         check(analysis, analysis.measurement)
         assert channel.skim["tau_iso"] == "(id_tau_vsJet_Medium_2 > 0.5)" and channel.skim["against_electron"] == "(id_tau_vsEle_VVLoose_2 > 0.5)"
-    skims = {tuple(sorted(analysis_for(vsjet_wp=j, vsele_wp=e).channel("mt").skim.items())) for j, e in WP_TAGS}
+    skims = {tuple(sorted(analysis_for(vsjet_wp=j, vsele_wp=e).channel("mt").skim.items())) for j, e in WPS}
     assert len(skims) == 1  # one skim serves every combination
     with pytest.raises(AnalysisError, match="vsjet_wp"):
         analysis_for(vsjet_wp="Loose")
@@ -206,7 +208,7 @@ def test_every_produced_shift_is_declared():
 
 def test_summed_families_reach_the_shapes_file(tmp_path):
     analysis = analysis_for()
-    hset, edges = HistogramSet(), list(M_VIS_EDGES["Tight", "VVLoose"]["DM0"])
+    hset, edges = HistogramSet(), [30.0, 60.0, 90.0, 160.0]
     n = len(edges) - 1
 
     def hist(value):
@@ -233,12 +235,29 @@ def test_the_run_configuration_builds():
     assert analysis.measurement.name == "tau_id_es" and run.combine.cmssw_dir.endswith("CMSSW_14_1_0_pre4")
 
 
-@pytest.mark.skipif(not SYNCED.exists(), reason="needs the predecessor's synced shapes")
-@pytest.mark.parametrize("wps", list(WP_TAGS), ids=list(WP_TAGS.values()))
-def test_bin_edges_are_those_of_the_predecessor_shapes(wps):
-    import uproot
+def test_m_vis_edges_follow_the_data_of_the_working_point(tmp_path):
+    """The OS events passing the working points set the edges of each category; the same-sign events and those failing
+    the vsJet working point, which the skim keeps, do not."""
+    cfg = config(["mt"], analysis="bbtautau_shapesmith.tau_id_measurement:build", sample_lists=["sm2018_tau_id_measurement"], vsjet_wp="Tight", vsele_wp="VVLoose")
+    cfg = cfg.model_copy(update={"skim_dir": tmp_path / "skim", "output_dir": tmp_path / "out", "workers": 1})
+    analysis = only(build(cfg), "mt", "data")
+    nominal = []
 
-    path = SYNCED / f"2018-{WP_TAGS[wps]}_18_full" / wps[0] / wps[1] / "mt" / "htt_mt.inputs-sm-Run2018-TauID_ES.root"
-    with uproot.open(path) as f:
-        for category, edges in M_VIS_EDGES[wps].items():
-            assert tuple(f[f"mt_{category}/data_obs"].axis().edges()) == edges
+    def rows(sample, row):
+        row.update(q_1=1., q_2=-1., pt_1=30., eta_2=0., iso_1=.1, mt_1=30., extraelec_veto=0., extramuon_veto=0., dilepton_veto=0.)
+        result = []
+        for dm in (0., 1., 10., 11.):
+            for pt, m_vis in ((30., np.linspace(35., 155., 25)), (50., np.linspace(40., 150., 17))):
+                event = row | {"tau_decaymode_2": dm, "pt_2": pt}
+                nominal.extend(event | {"m_vis": m} for m in m_vis)
+                result += [event | {"m_vis": 150., "q_2": 1.}, event | {"m_vis": 150., "id_tau_vsJet_Tight_2": 0.}] * 10
+        return nominal + result
+
+    write_rows(cfg, analysis.channel("mt"), rows)
+    hists = run_hist(cfg, analysis, ["mt"], control=False, variables=None, systematics=False, processes=None, output=cfg.output_dir / "shapes.root")
+    frame, record = pd.DataFrame(nominal), json.loads((cfg.output_dir / "binning.json").read_text())
+    for category in analysis.channel("mt").categories:
+        values = frame.loc[mask(frame, [category.cut]), "m_vis"].to_numpy()
+        expected = list(equal_data_edges(values, M_VIS_BINNING))
+        assert hists[HistKey("mt", category.name, "data", "nominal", "Nominal", "m_vis")].edges.tolist() == expected
+        assert record["mt"][category.name]["m_vis"]["edges"] == expected and record["mt"][category.name]["m_vis"]["n_data"] == len(values)

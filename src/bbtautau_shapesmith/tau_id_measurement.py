@@ -24,7 +24,7 @@ from bbtautau_shapesmith.constants import ERA, LUMI_PB
 from bbtautau_shapesmith.cuts import SAME_SIGN
 from bbtautau_shapesmith.samples import sample_database, samples
 from bbtautau_shapesmith.switches import TauIdSwitches, parse
-from bbtautau_shapesmith.tau_id_binning import CONTROL_REGION_EDGES, M_VIS_EDGES
+from bbtautau_shapesmith.tau_id_binning import CONTROL_REGION_EDGES, M_VIS_BINNING
 from bbtautau_shapesmith.tau_id_systematics import ERA_TAG, mc_variation_sums, mc_variations
 from bbtautau_shapesmith.weights import TOP_PT
 
@@ -89,13 +89,12 @@ def working_point_regions() -> tuple[Region, ...]:
     )
 
 
-def categories(vsjet: str, vsele: str) -> tuple[Category, ...]:
-    edges = M_VIS_EDGES[vsjet, vsele]
+def categories() -> tuple[Category, ...]:
+    """The nine decay-mode (and pT) categories; their m_vis edges follow from the data of the working points."""
     result = []
     for dm, dm_cut in DECAY_MODE_CUTS.items():
         for pt, pt_cut in PT_CUTS.items():
-            name = f"{dm}{pt}"
-            result.append(Category(name, f"{dm_cut} & {pt_cut}", Variable("m_vis", "m_vis", edges[name])))
+            result.append(Category(f"{dm}{pt}", f"{dm_cut} & {pt_cut}", Variable("m_vis", "m_vis", M_VIS_BINNING)))
     return tuple(sorted(result, key=lambda c: list(CATEGORIES).index(c.name)))
 
 
@@ -185,7 +184,7 @@ def mt_channel(switches: TauIdSwitches, channel_samples: tuple[Sample, ...]) -> 
     subtract = tuple(p.name for p in processes if p.role == "background")
     return _channel(
         "mt", mt_cuts(switches.vsjet_wp, switches.vsele_wp), processes, channel_samples, working_point_regions(),
-        categories=categories(switches.vsjet_wp, switches.vsele_wp),
+        categories=categories(),
         variations=tuple(es_variation(shift) for shift in ES_GRID) + (mc_variations(mc_weights(switches.vsjet_wp, switches.vsele_wp)["tau_id"]) if switches.shape_systematics else ()),
         estimators=(
             DataMinus("QCD", "same_sign", subtract, clip_negative=True),
