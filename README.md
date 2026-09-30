@@ -113,14 +113,17 @@ exactly the nicks in `inventory/`; a new inventory adds its entries in the same 
 - **Shifts** (`systematics.py`, only with `shape_systematics: true`). The analysis declares every CROWN shift it
   reads. For a sample kind with declared shifts the skim fails on a declared shift without a shifted branch and on an
   undeclared `c__X` branch of a needed column (main n-tuple or friend):
-  - embedding (only with `embedding: true`): `CMS_scale_t_emb_dm{0,1,1011}_<wp>_2018` (branches `__embTauEs{1prong0pizero,1prong1pizero,3prong}`)
-    and `CMS_eff_t_emb_dm{0,1,1011}_pt{20to40,40toInf}_<wp>_2018` (`__embVsJetTauDM{0,1,1011}Pt{20to40,40toInf}`),
-    `wp` = `vsEleTight` in et, `vsEleVVLoose` in mt and tt; tt has no pt20to40 shifts. 9 pairs in et and mt, 6 in tt.
+  - embedding (only with `embedding: true`): `CMS_scale_t_emb_dm{0,1,1011}_<wp>_2018` (branches
+    `__CMS_scale_t_emb_DeepTau2018v2p5_DM<dm>_2018`) and `CMS_eff_t_emb_dm{0,1,1011}_pt{20to40,40toInf}_<wp>_2018`
+    (`__CMS_eff_t_emb_DeepTau2018v2p5_VSjet_DM<dm>_pt<bin>_2018`), `wp` = `vsEleTight` in et, `vsEleVVLoose` in mt and
+    tt; tt has no pt20to40 shifts. 9 nuisances in et and mt, 6 in tt. DM10 and DM11 are one fitted category, which
+    CROWN shifts per decay mode: the `dm1011` nuisances are `VariationSum`s of the DM10 and DM11 shifts (read as the
+    parts `<name>Up%dm10`, ...), exact in et and mt, to first order in tt, where both taus can be 3-prong.
   - fake factors (only with `jet_fakes: ff`): `CMS_ff_<key>_<channel>_2018` with branch suffix `__<key>`, for the
     17 keys of `FF_SHIFTS_LT` (et, mt) and the 34 of `FF_SHIFTS_TT` (tt, both legs), on data, MC and embedding.
     They follow the SM 2018 payload; a new payload with other keys fails the skim until the lists follow it.
   - `jetFakes` is built for every shift found on data or a subtracted process in `anti_iso`, so the embedding shifts
-    reach it too.
+    reach it too; the sums run after it.
 - **One skim for all switches.** A skim made with `embedding: true, jet_fakes: ff` (FF friend configured) serves all
   four combinations. Skims made without the friend or the shifts are incompatible with it: the first such run needs
   `shapesmith skim --force --samples …` for the samples it lists.
