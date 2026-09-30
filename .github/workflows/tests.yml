@@ -15,11 +15,20 @@ jobs:
         with:
           path: BBTauTauAnalysis-ShapeSmith
           persist-credentials: false
+      - name: Pick the ShapeSmith branch of the same name, else main
+        id: core
+        run: |
+          branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          if git ls-remote --exit-code https://github.com/KIT-CMS/ShapeSmith.git "refs/heads/$branch" > /dev/null; then
+            echo "ref=$branch" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          fi
       - name: Checkout ShapeSmith
         uses: actions/checkout@v4
         with:
           repository: KIT-CMS/ShapeSmith
-          ref: main
+          ref: ${{ steps.core.outputs.ref }}
           path: ShapeSmith
           persist-credentials: false
       - uses: actions/setup-python@v5
