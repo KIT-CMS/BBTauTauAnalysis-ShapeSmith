@@ -78,17 +78,19 @@ def route(nick: str) -> tuple[str, tuple[str, ...] | None]:
     raise KeyError(f"no group rule for sample {nick}")
 
 
-# (nick prefix, cut applied at skim time); first match wins, normalisation stays that of the whole sample.
-# The DY LHEFilterPtZ bins lack every zero-parton event: that part comes from the inclusive sample, the bins cover npartons >= 1.
+# (nick prefix, cut applied at skim time, nick prefix of the partition that needs it); first match wins, normalisation
+# stays that of the whole sample. The DY LHEFilterPtZ bins lack every zero-parton event: when they are listed, that
+# part comes from the inclusive sample and the bins cover npartons >= 1; without them the inclusive sample is uncut.
 SAMPLE_CUTS = (
-    ("DYJetsToLL_M-50_TuneCP5_13TeV-amcatnloFXFX", "npartons == 0"),
+    ("DYJetsToLL_M-50_TuneCP5_13TeV-amcatnloFXFX", "npartons == 0", "DYJetsToLL_LHEFilterPtZ-"),
 )
 
 
-def cut_of(nick: str) -> str | None:
-    for prefix, cut in SAMPLE_CUTS:
+def cut_of(nick: str, nicks: list[str]) -> str | None:
+    """The skim-time cut of a sample, given all nicks of the sample lists."""
+    for prefix, cut, partition in SAMPLE_CUTS:
         if nick.startswith(prefix):
-            return cut
+            return cut if any(other.startswith(partition) for other in nicks) else None
     return None
 
 
@@ -103,7 +105,7 @@ def samples(database: Path, sample_lists: list[str], channels: list[str]) -> dic
     for nick in nicks:
         group, routed = route(nick)
         row = values[nick]
-        sample = Sample(nick, group, row["kind"], float(row["xsec"]), int(row["nevents"]), float(row["generator_weight"]), cut=cut_of(nick))
+        sample = Sample(nick, group, row["kind"], float(row["xsec"]), int(row["nevents"]), float(row["generator_weight"]), cut=cut_of(nick, nicks))
         for channel in channels:
             if routed is None or channel in routed:
                 result[channel].append(sample)
