@@ -62,7 +62,7 @@ Switches of the tau run YAML (typed in `switches.py`; an unknown or mistyped swi
 The dilepton run YAML takes `sample_lists` only. Override a switch on the command line with
 `-s switches.jet_fakes=ff`. `--skip-systematics` skips the b-tag weight variations and the CROWN shifts.
 
-Every run YAML sets `log_level: INFO`; `-s log_level=DEBUG` shows every file, booking and fit of one run. Each command
+Every run YAML sets `log_level: DEBUG` (every file, booking and fit); `-s log_level=INFO` gives the short log of one run. Each command
 writes its log to `<output_dir>/logs/<command>_<time>.log` as well (see the core README, "Logging"). The analysis logs
 its switches with their defaults, the sample lists and the skim-time sample cuts at INFO, every sample at DEBUG.
 

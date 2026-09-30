@@ -13,4 +13,4 @@ ntuples:
 skim_dir: /ceph/sdaigler/shapesmith/sm2018_binned_v4
 output_dir: ../output/sm2018_binned_v4_dilepton
 workers: 16
-log_level: INFO   # DEBUG | INFO | WARNING | ERROR; console and <output_dir>/logs/<command>_<time>.log
+log_level: DEBUG  # DEBUG | INFO | WARNING | ERROR; console and <output_dir>/logs/<command>_<time>.log

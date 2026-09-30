@@ -15,4 +15,4 @@ ntuples:
 skim_dir: /ceph/sdaigler/shapesmith/ff_sm2018_binned_v4   # its own skims: both charges and the lepton vetoes stored, not applied
 output_dir: ../output/ff_sm2018_binned_v4                 # -> fake_factors/2018/
 workers: 16
-log_level: INFO                                           # DEBUG | INFO | WARNING | ERROR; console and <output_dir>/logs/<command>_<time>.log
+log_level: DEBUG                                          # DEBUG | INFO | WARNING | ERROR; console and <output_dir>/logs/<command>_<time>.log
