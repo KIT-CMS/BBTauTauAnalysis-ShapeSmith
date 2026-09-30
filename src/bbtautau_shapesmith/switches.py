@@ -1,6 +1,7 @@
 """The analysis switches of the run YAML (`switches:`), typed and checked; an unknown or mistyped switch raises."""
 from __future__ import annotations
 
+import logging
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
@@ -8,6 +9,8 @@ from shapesmith.model import AnalysisError
 
 STRICT = ConfigDict(extra="forbid", strict=True, frozen=True)
 SampleLists = list[str]  # inventory/<name>.txt: the KingMaker sample lists of the production
+
+logger = logging.getLogger(__name__)
 
 
 class TauSwitches(BaseModel):
@@ -51,6 +54,8 @@ class TauIdSwitches(BaseModel):
 
 def parse(model: type[BaseModel], switches: dict) -> BaseModel:
     try:
-        return model.model_validate(switches)
+        parsed = model.model_validate(switches)
     except ValidationError as error:
         raise AnalysisError(f"invalid switches: {error}") from error
+    logger.info(f"switches ({model.__name__}, defaults included): {parsed.model_dump()}")
+    return parsed
