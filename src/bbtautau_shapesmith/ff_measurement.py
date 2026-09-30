@@ -34,6 +34,8 @@ Differences to jvoss's configuration:
 - samples: the analysis sample list, e.g. the inclusive DY sample for npartons == 0 (jvoss: the pT(Z) bins only);
   like jvoss, TTV, EWK, single Higgs and the signal are not subtracted.
 - the et/mt fraction split has the n_jets edges [-0.5, 2.5, 22.5] of its categories (user decision U4).
+- the SystMCShiftDown of the corrections is smoothed at the centres of mass, as every other curve (user decision
+  U13); TauFakeFactors smooths it at the bin centres, because a deepcopy drops the centres of mass.
 """
 from __future__ import annotations
 

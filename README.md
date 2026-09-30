@@ -141,6 +141,8 @@ binning, fits and bandwidths are `ff_tables.py`, generated once by `scripts/make
 resolved configuration (do not edit by hand). `scripts/ff_parity.py` is the algorithm parity with TauFakeFactors: it
 runs the measurement on jvoss's preselection files with his regions and weights and compares every payload value,
 edge and fitted curve with his payload and his pickled fits, and `--suggest-binning` with his `adjust_binning.py`.
+One explained difference is by decision (U13): the SystMCShiftDown of the corrections is smoothed at the centres of
+mass; TauFakeFactors smooths it at the bin centres because of a deepcopy bug, which the parity reproduces separately.
 A new payload goes into a new dated directory of the CROWN analysis (`payloads/fake_factors/sm/fake-factors-<date>/`)
 and needs a fresh friend tag; `constants.FF_SHIFTS_LT/TT` must follow its keys.
 
@@ -159,7 +161,8 @@ yet.
   W and QCD = same-sign data minus all of them (negative bins clipped); TTT is the auxiliary template of
   `CMS_emb_ttbar_contamination_Run2018`. mm: MUEMB (genmatch 2/2, muon SFs of both legs), W, TTL, VVL and QCD =
   same-sign data minus MUEMB and W. MC and embedding weights are the predecessor's: KIT muon ID/iso SFs, the trigger
-  weight `mu24` for 25 <= pT < 28 GeV and `mu27` above 28 GeV.
+  weight `mu24` for 25 <= pT < 28 GeV and `mu27` above 28 GeV. The MC is normalised to the analysis luminosity of
+  59.83 fb-1 (the predecessor used 59.56 fb-1).
 - **Switches** `vsjet_wp` (Medium, Tight) and `vsele_wp` (VVLoose, Tight). The skim takes the loosest of them, and the
   four combinations are regions `wp_<vsjet>_<vsele>`, so one skim serves all four runs.
 - **ES grid**: `es-200` ... `es+200` (0.2 % steps, units of 0.1 %), template column variations of the embedded sample

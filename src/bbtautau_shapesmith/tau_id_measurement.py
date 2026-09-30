@@ -9,6 +9,9 @@ and vsele_wp choose the working points; one skim serves all four combinations.
 The embedded signal carries no tau ID or ES correction. Its energy scale is a grid of column variations derived from
 the nominal columns: the tau four-momentum scaled by s (pt_2, mass_2, m_vis), the MET corrected by (1 - s) times the
 tau pT, and mt_1 from that MET.
+
+The MC is normalised to the analysis luminosity, 59.83 fb-1 (constants.LUMI_PB); the predecessor used 59.56 fb-1.
+The embedded samples are data-driven and unaffected.
 """
 from __future__ import annotations
 

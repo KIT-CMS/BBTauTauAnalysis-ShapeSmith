@@ -11,8 +11,9 @@ in the LCG_108 ShapeSmith environment (TauFakeFactors' config loader needs ROOT)
    The measurement is ff_measurement.legs(channel, embedding=True) with the committed tables.
 3. `shapesmith measure`, then every payload is compared with jvoss's (CROWN bbtautau 1570b43): names, inputs, syst
    keys and bin edges identical, values within 1e-9 relative. Expected: the et/mt fraction n_jets edges (U4). The
-   comparison is repeated with the SystMCShiftDown of the corrections refitted at the bin centres, as TauFakeFactors
-   fits them (with_bin_centre_down_shifts).
+   SystMCShiftDown of the corrections is an explained difference (U13: ours is smoothed at the centres of mass,
+   TauFakeFactors' at the bin centres, because a deepcopy drops them), so the comparison is repeated with it refitted
+   at the bin centres, as TauFakeFactors fits it (with_bin_centre_down_shifts).
 4. The payloads are read with the CROWN friend's ff_payloads.read_legs.
 5. --suggest-binning parity: TauFakeFactors' adjust_binning.get_binning on data.root against ShapeSmith's suggestions.
 """
