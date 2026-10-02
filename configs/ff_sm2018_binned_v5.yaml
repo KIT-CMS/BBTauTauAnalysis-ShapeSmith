@@ -1,0 +1,18 @@
+# SM 2018 fake-factor measurement (`shapesmith measure`) on the sm2018_binned_v5 production, with embedding: derives the
+# production payload.
+# Switches (types and defaults in switches.py):
+#   sample_lists: the inventories inventory/<name>.txt of the production
+#   embedding:    true subtracts the genuine taus as EMB (needs the embedding list in sample_lists)
+analysis: bbtautau_shapesmith.ff_measurement:build
+era: "2018"
+channels: [et, mt, tt]
+switches: {sample_lists: [sm2018_binned_v3, sm2018_embedding], embedding: true}
+sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
+ntuples:
+  server: root://cmsdcache-kit-disk.gridka.de
+  base: /store/user/sdaigler/CROWN/ntuples/sm2018_binned_v5/CROWNRun
+  friends: []
+skim_dir: /ceph/sdaigler/shapesmith/ff_sm2018_binned_v5   # its own skims: both charges and the lepton vetoes stored, not applied
+output_dir: ../output/ff_sm2018_binned_v5                 # -> fake_factors/2018/
+workers: 16
+log_level: DEBUG                                          # DEBUG | INFO | WARNING | ERROR; console and <output_dir>/logs/<command>_<time>.log

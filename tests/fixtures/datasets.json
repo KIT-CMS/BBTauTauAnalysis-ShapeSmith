@@ -367,7 +367,7 @@
   "era": "2018",
   "generator_weight": 1.0,
   "instance": "prod/phys03",
-  "nevents": 21362177,
+  "nevents": 25419943,
   "nfiles": 57,
   "nick": "EmbeddingRun2018D_cwinter-embedding_2018UL_mutau_D_1772534952-00000000000000000000000000000000",
   "sample_type": "embedding",

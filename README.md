@@ -31,21 +31,21 @@ ntuples and share the skim directory (their channels do not overlap); the output
 
 ```bash
 # tau channels et/mt/tt: nominal shapes and, with control_regions: true, the named tau control regions
-shapesmith validate  -c configs/sm2018_binned_v4.yaml
-shapesmith skim      -c configs/sm2018_binned_v4.yaml                   # once per production; --samples TT,SingleMuon for a subset
-shapesmith hist      -c configs/sm2018_binned_v4.yaml --control --skip-systematics
-shapesmith estimate  -c configs/sm2018_binned_v4.yaml --control
-shapesmith plot      -c configs/sm2018_binned_v4.yaml --control
+shapesmith validate  -c configs/sm2018_binned_v5.yaml
+shapesmith skim      -c configs/sm2018_binned_v5.yaml                   # once per production; --samples TT,SingleMuon for a subset
+shapesmith hist      -c configs/sm2018_binned_v5.yaml --control --skip-systematics
+shapesmith estimate  -c configs/sm2018_binned_v5.yaml --control
+shapesmith plot      -c configs/sm2018_binned_v5.yaml --control
 # light-dilepton controls em/mm/ee
-shapesmith validate  -c configs/sm2018_binned_v4_dilepton.yaml
-shapesmith skim      -c configs/sm2018_binned_v4_dilepton.yaml
-shapesmith hist      -c configs/sm2018_binned_v4_dilepton.yaml --control --regions all --skip-systematics
-shapesmith plot      -c configs/sm2018_binned_v4_dilepton.yaml --control --channels mm,ee --variables yield,m_vis,pt_vis,n_jets
+shapesmith validate  -c configs/sm2018_binned_v5_dilepton.yaml
+shapesmith skim      -c configs/sm2018_binned_v5_dilepton.yaml
+shapesmith hist      -c configs/sm2018_binned_v5_dilepton.yaml --control --regions all --skip-systematics
+shapesmith plot      -c configs/sm2018_binned_v5_dilepton.yaml --control --channels mm,ee --variables yield,m_vis,pt_vis,n_jets
 # with NN friends (nn_friend: true, friend under ntuples.friends, re-skim):
-shapesmith hist      -c configs/sm2018_binned_v4.yaml && shapesmith estimate -c configs/sm2018_binned_v4.yaml
-shapesmith sync      -c configs/sm2018_binned_v4.yaml && shapesmith datacards -c configs/sm2018_binned_v4.yaml && shapesmith fit -c configs/sm2018_binned_v4.yaml
-shapesmith ml-export -c configs/sm2018_binned_v4.yaml
-shapesmith inspect   output/sm2018_binned_v4/shapes.root --unchanged   # variations equal to their nominal
+shapesmith hist      -c configs/sm2018_binned_v5.yaml && shapesmith estimate -c configs/sm2018_binned_v5.yaml
+shapesmith sync      -c configs/sm2018_binned_v5.yaml && shapesmith datacards -c configs/sm2018_binned_v5.yaml && shapesmith fit -c configs/sm2018_binned_v5.yaml
+shapesmith ml-export -c configs/sm2018_binned_v5.yaml
+shapesmith inspect   output/sm2018_binned_v5/shapes.root --unchanged   # variations equal to their nominal
 ```
 
 Switches of the tau run YAML (typed in `switches.py`; an unknown or mistyped switch fails):
@@ -81,8 +81,8 @@ inventory (v4 uses `sm2018_binned_v2`). A run YAML names every list of its produ
 | Inventory | Source (CROWN `analysis_configurations/bbtautau`) | Used by |
 |---|---|---|
 | `sm2018_binned_v2.txt` | `sample_list/sm_2018_binned.txt` @ `f99a322` "chore: adapt to sample database update" | productions sm2018_binned_v2, v4 |
-| `sm2018_binned_v3.txt` | `sample_list/sm_2018_binned.txt` @ `85c437a` "fix: added DYJetsToLL_M-50 for events with zero LHE partons" | the next production |
-| `sm2018_embedding.txt` | `sample_list/sm_2018_embedding.txt` @ `df97b0b` "feat: add the 2018 embedding sample list" | the embedding production (et, mt, tt) |
+| `sm2018_binned_v3.txt` | `sample_list/sm_2018_binned.txt` @ `85c437a` "fix: added DYJetsToLL_M-50 for events with zero LHE partons" | production sm2018_binned_v5 |
+| `sm2018_embedding.txt` | `sample_list/sm_2018_embedding.txt` @ `df97b0b` "feat: add the 2018 embedding sample list" | production sm2018_binned_v5 (et, mt, tt) |
 
 Check a copy with `diff <(git -C <crown>/analysis_configurations/bbtautau show <commit>:sample_list/<file>) inventory/<name>.txt`
 (the subject finds the commit again after a rebase).
@@ -90,18 +90,19 @@ Check a copy with `diff <(git -C <crown>/analysis_configurations/bbtautau show <
 `sm2018_binned_v3` adds the inclusive DY M-50 amcatnloFXFX sample, of which only the `npartons == 0`
 events are kept (`SAMPLE_CUTS` in `samples.py`): the LHEFilterPtZ bins lack every zero-parton event
 and cover `npartons >= 1`. It needs a production that contains this sample; the v4 run YAMLs keep
-`sm2018_binned_v2`. Only this sample reads `npartons`, so the skims of the other samples stay
+`sm2018_binned_v2`, the v5 run YAMLs use `sm2018_binned_v3`. Only this sample reads `npartons`, so the skims of the other samples stay
 valid when an existing skim directory switches to `sm2018_binned_v3`.
 
 Routing (`samples.route`): data streams go to the channels whose trigger they carry; embedded samples
 (`EmbeddingRun…`) by their final state, `_mutau_` → mt, `_eltau_` → et, `_tautau_` → tt (group `EMB`) and
 `_muemb_` → mm (group `MUEMB`, for the tau-ID measurement); every other sample by its nick prefix. A channel
-holds only the samples of its processes. The skim contract records `nevents` for every kind: fix the mutau 2018D
-event count in the sample database (21,362,177 → 25,419,943) before the first embedding skim, or re-skim that
-sample once with `shapesmith skim --force --samples EmbeddingRun2018D_cwinter-embedding_2018UL_mutau`.
+holds only the samples of its processes. The skim contract records `nevents` for every kind. The database
+`94bd5a0f` has a wrong mutau 2018D event count (21,362,177; its 57 files hold 25,419,943): use a database with the
+corrected count, and re-skim a skim made with the old one once with
+`shapesmith skim --force --samples EmbeddingRun2018D_cwinter-embedding_2018UL_mutau`.
 
-`tests/fixtures/datasets.json` holds the unchanged database entries (`KingMaker_sample_database` `94bd5a0f`) of
-exactly the nicks in `inventory/`; a new inventory adds its entries in the same change.
+`tests/fixtures/datasets.json` holds the database entries (`KingMaker_sample_database` `94bd5a0f`, with the corrected
+mutau 2018D event count) of exactly the nicks in `inventory/`; a new inventory adds its entries in the same change.
 
 ## Embedding and fake factors
 
@@ -134,13 +135,14 @@ exactly the nicks in `inventory/`; a new inventory adds its entries in the same 
 
 ## Fake-factor measurement
 
-`configs/ff_sm2018_binned_v4.yaml` runs `bbtautau_shapesmith.ff_measurement:build`, the SM 2018 fake-factor
+`configs/ff_sm2018_binned_v5.yaml` runs `bbtautau_shapesmith.ff_measurement:build`, the SM 2018 fake-factor
 measurement in jvoss's TauFakeFactors method (QCD and ttbar fake factors, fractions, the QCD DR->SR correction and the
-non-closures), with its own skim (both charges, the lepton vetoes stored for the ttbar scale regions):
+non-closures), with its own skim (both charges, the lepton vetoes stored for the ttbar scale regions). It derives the
+production payload with embedding; `configs/ff_sm2018_binned_v4.yaml` is the same measurement on v4, without embedding.
 
 ```bash
-shapesmith skim    -c configs/ff_sm2018_binned_v4.yaml
-shapesmith measure -c configs/ff_sm2018_binned_v4.yaml [--suggest-binning]   # -> output/.../fake_factors/2018/
+shapesmith skim    -c configs/ff_sm2018_binned_v5.yaml
+shapesmith measure -c configs/ff_sm2018_binned_v5.yaml [--suggest-binning]   # -> output/.../fake_factors/2018/
 ```
 
 The regions are built in `ff_measurement.py` from the analysis selection (`cuts.py`); every difference to jvoss's

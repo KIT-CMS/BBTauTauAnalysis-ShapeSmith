@@ -1,0 +1,16 @@
+# Light-dilepton controls (Z+jets in ee/mm, top in em) on the sm2018_binned_v5 production.
+# Same ntuples and skim_dir as sm2018_binned_v5.yaml (the channels do not overlap), separate output_dir.
+# Only the sample_lists switch applies; the embedding exists in et, mt and tt only.
+analysis: bbtautau_shapesmith.dilepton:build
+era: "2018"
+channels: [em, mm, ee]
+switches: {sample_lists: [sm2018_binned_v3]}
+sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
+ntuples:
+  server: root://cmsdcache-kit-disk.gridka.de
+  base: /store/user/sdaigler/CROWN/ntuples/sm2018_binned_v5/CROWNRun
+  friends: []
+skim_dir: /ceph/sdaigler/shapesmith/sm2018_binned_v5
+output_dir: ../output/sm2018_binned_v5_dilepton
+workers: 16
+log_level: DEBUG  # DEBUG | INFO | WARNING | ERROR; console and <output_dir>/logs/<command>_<time>.log

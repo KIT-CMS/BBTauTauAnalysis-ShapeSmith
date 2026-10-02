@@ -1,0 +1,29 @@
+# HH->bbtautau tau channels on the sm2018_binned_v5 production (2018 UL, NanoAODv15): data/MC in six scopes without
+# shifts, with the inclusive DY M-50 sample and the v3 b-tag efficiencies, plus the embedding (et, mt, tt) with its tau
+# shifts under the same tag.
+# Switches (types and defaults in switches.py):
+#   sample_lists:      the inventories inventory/<name>.txt, verbatim copies of the KingMaker sample lists of the
+#                      production (v5 ran with sm2018_binned_v3 and sm2018_embedding)
+#   jet_fakes:         mc (MC jet fakes + ABCD QCD) | ff (fake factors, needs FF friend trees)
+#   embedding:         true (genuine tautau from the embedded samples instead of the T parts of the MC)
+#   nn_friend:         false (NN categories only once NN friend trees exist; add them under ntuples.friends and re-skim)
+#   control_regions:   true widens the skim (both charges, VVVLoose taus, >= 2 jets, lepton isolation < 0.5) and adds the
+#                      named tau control regions; the nominal selection is unchanged, so one skim serves both
+#   shape_systematics: true (default) declares the embedding and fake-factor CROWN shifts
+analysis: bbtautau_shapesmith.analysis:build
+era: "2018"
+channels: [et, mt, tt]
+switches: {sample_lists: [sm2018_binned_v3, sm2018_embedding], jet_fakes: mc, embedding: true, nn_friend: false, control_regions: true}
+sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
+ntuples:
+  server: root://cmsdcache-kit-disk.gridka.de
+  base: /store/user/sdaigler/CROWN/ntuples/sm2018_binned_v5/CROWNRun
+  friends: []
+  # - {base: /store/user/sdaigler/CROWN/ntuples/sm2018_binned_v5/CROWNFriend/nn_v1, applies_to: [mc, data, embedding]}
+  # - {base: /store/user/sdaigler/CROWN/ntuples/sm2018_binned_v5/CROWNFriend/ff_v1, applies_to: [mc, data, embedding]}
+skim_dir: /ceph/sdaigler/shapesmith/sm2018_binned_v5      # shared with sm2018_binned_v5_dilepton.yaml (disjoint channels)
+output_dir: ../output/sm2018_binned_v5                    # relative to this file -> <repo>/output/...
+ml_dir: /ceph/sdaigler/shapesmith_ml/sm2018_binned_v5
+workers: 16
+log_level: DEBUG                                          # DEBUG | INFO | WARNING | ERROR; console and <output_dir>/logs/<command>_<time>.log
+combine: {cmssw_dir: /work/sdaigler/smhtt_ul/CMSSW_14_1_9, scram_arch: el9_amd64_gcc12}
