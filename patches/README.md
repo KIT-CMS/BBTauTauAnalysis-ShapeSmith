@@ -34,9 +34,15 @@ git -C CombineHarvester checkout v3.0.0
 git clone -b tauID_ES https://github.com/KIT-CMS/TauIDSFMeasurement.git CombineHarvester/TauIDSFMeasurement
 git -C CombineHarvester/TauIDSFMeasurement checkout 84095dd
 git -C CombineHarvester/TauIDSFMeasurement apply <this repo>/patches/TauIDSFMeasurement-tauID_ES.patch
+git clone -b ul https://github.com/KIT-CMS/SMRun2Legacy.git CombineHarvester/SMRun2Legacy
+git -C CombineHarvester/SMRun2Legacy checkout f103cf5
 scram b -j 8
 ```
 
-jvoss's area also carries CombineHarvester/SMRun2Legacy (not needed here) and local changes to
+CombineHarvester/SMRun2Legacy (branch `ul`, f103cf5 as in jvoss's area) is needed for the build:
+TauIDSFMeasurement's `src/BinomialBinByBin.cc` includes `CombineHarvester/SMRun2Legacy/interface/BinomialBinByBin.h`.
+Built this way on 2026-10-03 in `/work/sdaigler/tau_id_es/CMSSW_14_1_0_pre4`.
+
+jvoss's area also carries local changes to
 HiggsAnalysis/CombinedLimit `scripts/plotGof.py` and `scripts/plotImpacts.py` (GoF and impacts, not part of the
 measurement stage).

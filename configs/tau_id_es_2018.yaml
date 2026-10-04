@@ -12,7 +12,7 @@
 #   shapesmith measure -c configs/tau_id_es_2018.yaml --merge
 # The m_vis edges follow from the data of each run: <output_dir>/tau_id_es/2018/<vsjet>_<vsele>/binning.json.
 # combine.cmssw_dir: a CMSSW_14_1_0_pre4 with CombineHarvester and TauIDSFMeasurement tauID_ES plus
-# patches/TauIDSFMeasurement-tauID_ES.patch (not built yet; jvoss's area declares other JES sources, see patches/README.md).
+# patches/TauIDSFMeasurement-tauID_ES.patch and SMRun2Legacy (built 2026-10-03; see patches/README.md).
 analysis: bbtautau_shapesmith.tau_id_measurement:build
 era: "2018"
 channels: [mt, mm]
@@ -20,7 +20,7 @@ switches: {sample_lists: [sm2018_tau_id_measurement], vsjet_wp: Tight, vsele_wp:
 sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
 ntuples:
   server: root://cmsdcache-kit-disk.gridka.de
-  base: /store/user/sdaigler/CROWN/ntuples/tau_id_es_2018/CROWNRun         # the production does not exist yet
+  base: /store/user/sdaigler/CROWN/ntuples/sm2018_tau_id_v1/CROWNRun       # production sm2018_tau_id_v1 (CROWN bbtautau 4905f77, core bfba59c)
   friends: []
 skim_dir: /ceph/sdaigler/shapesmith/tau_id_es_2018
 output_dir: ../output/tau_id_es_2018                                        # relative to this file -> <repo>/output/...
