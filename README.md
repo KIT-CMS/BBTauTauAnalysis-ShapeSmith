@@ -41,12 +41,28 @@ shapesmith validate  -c configs/sm2018_binned_v5_dilepton.yaml
 shapesmith skim      -c configs/sm2018_binned_v5_dilepton.yaml
 shapesmith hist      -c configs/sm2018_binned_v5_dilepton.yaml --control --regions all --skip-systematics
 shapesmith plot      -c configs/sm2018_binned_v5_dilepton.yaml --control --channels mm,ee --variables yield,m_vis,pt_vis,n_jets
+# web galleries (after plot or measure; target, column and texts from the web: block of each run YAML)
+shapesmith publish   -c configs/sm2018_binned_v5.yaml                    # ~sdaigler/sm2018_binned_v5, column emb (+ title, about)
+shapesmith publish   -c configs/sm2018_binned_v5.yaml -s switches.embedding=false -s output_dir=../output/sm2018_binned_v5_noemb \
+                     -s web.variant=classic -s web.label=classic -s web.description=null   # column classic: et, mt, tt
+shapesmith publish   -c configs/sm2018_binned_v5_dilepton.yaml           # column classic: em, mm, ee
+shapesmith publish   -c configs/sm2018_binned_v5_rawff.yaml              # column emb raw ff
+shapesmith publish   -c configs/sm2018_binned_v5_ff.yaml                 # column emb ff
+shapesmith publish   -c configs/ff_sm2018_binned_v5.yaml                 # ~sdaigler/ff_sm2018_binned_v5: the FF measurement
 # with NN friends (nn_friend: true, friend under ntuples.friends, re-skim):
 shapesmith hist      -c configs/sm2018_binned_v5.yaml && shapesmith estimate -c configs/sm2018_binned_v5.yaml
 shapesmith sync      -c configs/sm2018_binned_v5.yaml && shapesmith datacards -c configs/sm2018_binned_v5.yaml && shapesmith fit -c configs/sm2018_binned_v5.yaml
 shapesmith ml-export -c configs/sm2018_binned_v5.yaml
 shapesmith inspect   output/sm2018_binned_v5/shapes.root --unchanged   # variations equal to their nominal
 ```
+
+`publish` copies the plots of a run (for the FF measurement those in `fake_factors/2018/`) into a static web gallery
+under `/web/sdaigler/public_html/`; run it after `plot` or `measure` with the same `-s` overrides. The `web:` block of
+each run YAML sets the gallery directory, the column (`variant`), its label and description; the title and the About
+text of the control gallery are in `sm2018_binned_v5.yaml`. Publishing a column again replaces it and copies only
+changed plots; the first publish of a column fixes its position. The classic column is the run without embedding:
+`hist`, `estimate` and `plot` of `sm2018_binned_v5.yaml` with `-s switches.embedding=false
+-s output_dir=../output/sm2018_binned_v5_noemb`; `web.description=null` keeps the description of the dilepton YAML.
 
 Switches of the tau run YAML (typed in `switches.py`; an unknown or mistyped switch fails):
 
