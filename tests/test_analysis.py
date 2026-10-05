@@ -4,8 +4,9 @@ from shapesmith.skim import needed_columns
 from shapesmith.validate import validate
 
 from bbtautau_shapesmith.analysis import build
-from bbtautau_shapesmith.constants import FF_COLUMNS, NN_COLUMNS, TAU_CHANNELS
+from bbtautau_shapesmith.constants import FF_COLUMNS, FF_RAW_COLUMNS, LT_CHANNELS, NN_COLUMNS, TAU_CHANNELS
 from bbtautau_shapesmith.systematics import embedding_variation_sums
+from bbtautau_shapesmith.weights import fake_factor_weight
 from tests.helpers import EMBEDDING_LIST, branches, config, embedding_branches
 
 COMBINATIONS = [(jet_fakes, embedding) for jet_fakes in ("mc", "ff") for embedding in (False, True)]
@@ -73,6 +74,23 @@ def test_all_needed_columns_exist(jet_fakes, embedding, channel):
         assert not missing, (sample.nick, missing)
 
 
+@pytest.mark.parametrize("channel", TAU_CHANNELS)
+def test_raw_fake_factors_read_only_the_raw_friend_columns(channel):
+    raw = analysis_for("ff", embedding=True, ff_type="raw", shape_systematics=False)
+    corrected = analysis_for("ff", embedding=True, shape_systematics=False)
+    definition = raw.channel(channel)
+    assert definition.region("anti_iso").add_weights == {"fake_factor": fake_factor_weight(channel, "raw")}
+    assert definition.processes == corrected.channel(channel).processes and definition.estimators == corrected.channel(channel).estimators
+    for sample in definition.samples:
+        needed = needed_columns(definition, sample)
+        assert not needed & set(FF_COLUMNS.values()), sample.nick
+        available = embedding_branches(channel) if sample.kind == "embedding" else branches(channel) | {"npartons"}
+        assert not needed - available - set(FF_RAW_COLUMNS.values()), sample.nick
+    data = next(s for s in definition.samples if s.kind == "data")
+    legs = ("lt",) if channel in LT_CHANNELS else ("tt_1", "tt_2")
+    assert needed_columns(definition, data) & set(FF_RAW_COLUMNS.values()) == {FF_RAW_COLUMNS[leg] for leg in legs}
+
+
 def test_ml_export_labels():
     ml = analysis_for("ff", embedding=True).ml
     assert "TTT" not in ml.processes and "data" not in ml.processes
@@ -88,6 +106,9 @@ def test_ml_export_labels():
     ({"jet_fakes": "data"}, "jet_fakes"),
     ({"sample_lists": []}, "sample_lists"),
     ({"control_regions": True, "jet_fakes": "ff"}, "control_regions requires jet_fakes: mc"),
+    ({"ff_type": "uncorrected", "jet_fakes": "ff"}, "ff_type"),
+    ({"ff_type": "raw", "shape_systematics": False}, "ff_type raw requires jet_fakes: ff"),
+    ({"ff_type": "raw", "jet_fakes": "ff"}, "ff_type raw supports nominal control plots only; set shape_systematics: false"),
 ])
 def test_invalid_switches_are_reported(switches, match):
     with pytest.raises(AnalysisError, match=match):

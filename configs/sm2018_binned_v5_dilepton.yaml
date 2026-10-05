@@ -14,3 +14,9 @@ skim_dir: /ceph/sdaigler/shapesmith/sm2018_binned_v5
 output_dir: ../output/sm2018_binned_v5_dilepton
 workers: 16
 log_level: DEBUG  # DEBUG | INFO | WARNING | ERROR; console and <output_dir>/logs/<command>_<time>.log
+# web gallery (shapesmith publish): the dilepton channels of the column "classic"
+web:
+  dir: /web/sdaigler/public_html/sm2018_binned_v5
+  variant: classic
+  label: classic
+  description: "MC for genuine ττ and jet→τh fakes, QCD from the ABCD method (fully classic); ee, em and mm from the dilepton control run (MC)."

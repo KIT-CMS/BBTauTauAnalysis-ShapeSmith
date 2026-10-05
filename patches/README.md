@@ -16,8 +16,8 @@ commented out and HEM declared, as in jvoss's. The patch has sha256
 `7f10cedf5e96e288d284f377cb2673f49692604255b3f5cbe2b46f888905a3d3`.
 
 jvoss's built area declares the 28 individual sources, which the shapes do not have, so the measurement needs an own
-area built with this patch; `combine.cmssw_dir` points to it (`/work/sdaigler/tau_id_es/CMSSW_14_1_0_pre4`, not built
-yet). `MorphingTauID2017` writes its `cb.PrintAll()` log to the hard-coded path
+area built with this patch; `combine.cmssw_dir` points to it (`/work/sdaigler/tau_id_es/CMSSW_14_1_0_pre4`, built
+2026-10-03). `MorphingTauID2017` writes its `cb.PrintAll()` log to the hard-coded path
 `/work/jvoss/ntuples/smhtt_ul_SFs_v15/log/cb_PrintAll.log`; that directory does not exist, so the binary prints
 "Could not open log file" and carries on.
 

@@ -6,7 +6,7 @@ from shapesmith.events import select
 from shapesmith.expressions import columns_in, columns_of, mask, product
 
 from bbtautau_shapesmith import cuts, weights
-from bbtautau_shapesmith.constants import FF_COLUMNS, TAU_CHANNELS
+from bbtautau_shapesmith.constants import FF_COLUMNS, FF_RAW_COLUMNS, LT_CHANNELS, TAU_CHANNELS
 from tests.helpers import branches, embedding_branches
 from tests.test_analysis import analysis_for
 
@@ -17,9 +17,25 @@ def test_selection_and_weight_columns_exist(channel):
     assert columns_of(cuts.skim_cuts(channel, control_regions=True).values()) <= branches(channel)
     assert columns_of(cuts.genmatch_cuts(channel).values()) <= branches(channel)
     assert columns_of(weights.mc_weights(channel).values()) <= branches(channel)
-    for region in cuts.regions(channel, "ff") + cuts.regions(channel, "mc") + cuts.diagnostic_regions(channel):
+    for region in cuts.regions(channel, "ff") + cuts.regions(channel, "ff", "raw") + cuts.regions(channel, "mc") + cuts.diagnostic_regions(channel):
         exprs = [*region.replace_cuts.values(), *region.add_weights.values(), *region.replace_weights.values()]
-        assert columns_of(exprs) <= branches(channel) | set(FF_COLUMNS.values()), region.name
+        assert columns_of(exprs) <= branches(channel) | set(FF_COLUMNS.values()) | set(FF_RAW_COLUMNS.values()), region.name
+
+
+@pytest.mark.parametrize("channel", TAU_CHANNELS)
+def test_raw_fake_factor_weight_treats_the_legs_like_the_corrected_one(channel):
+    corrected, raw = weights.fake_factor_weight(channel), weights.fake_factor_weight(channel, "raw")
+    legs = ("lt",) if channel in LT_CHANNELS else ("tt_1", "tt_2")
+    assert columns_in(raw) - columns_in(corrected) == {FF_RAW_COLUMNS[leg] for leg in legs}
+    assert columns_in(corrected) - columns_in(raw) == {FF_COLUMNS[leg] for leg in legs}
+    # the same values in both column sets give the same weight: 0.5 per failing leg in tt
+    rows = [{"id_tau_vsJet_Medium_1": pass_1, "id_tau_vsJet_Medium_2": pass_2} for pass_1 in (0, 1) for pass_2 in (0, 1)]
+    frame = pd.DataFrame(rows)
+    for leg, value in zip(legs, (.3, .7)):
+        frame[FF_COLUMNS[leg]] = frame[FF_RAW_COLUMNS[leg]] = value
+    expected = [.3] * 4 if channel != "tt" else [.5, .15, .35, 0.]
+    assert product(frame, [raw]).tolist() == pytest.approx(expected)
+    assert product(frame, [corrected]).tolist() == pytest.approx(expected)
 
 
 @pytest.mark.parametrize("channel", TAU_CHANNELS)

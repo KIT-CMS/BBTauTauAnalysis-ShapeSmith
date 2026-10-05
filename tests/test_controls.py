@@ -114,6 +114,15 @@ def test_v4_run_configs_share_ntuples_and_skims_but_not_outputs():
         load_analysis(cfg.model_copy(update={"sample_database": DATABASE}))
 
 
+def test_raw_ff_run_config_is_the_ff_run_config_with_raw_fake_factors():
+    corrected = load_config(REPO / "configs" / "sm2018_binned_v5_ff.yaml")
+    raw = load_config(REPO / "configs" / "sm2018_binned_v5_rawff.yaml")
+    assert raw.switches == corrected.switches | {"ff_type": "raw", "shape_systematics": False}
+    assert (raw.ntuples, raw.channels, raw.sample_database) == (corrected.ntuples, corrected.channels, corrected.sample_database)
+    assert all(getattr(raw, name) != getattr(corrected, name) for name in ("skim_dir", "output_dir", "ml_dir"))
+    load_analysis(raw.model_copy(update={"sample_database": DATABASE}))
+
+
 def only(analysis, channel_name, *processes):
     """The analysis reduced to one data and one MC sample and the given processes, with lumi 1."""
     channel = analysis.channel(channel_name)

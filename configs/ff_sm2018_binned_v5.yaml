@@ -16,3 +16,18 @@ skim_dir: /ceph/sdaigler/shapesmith/ff_sm2018_binned_v5   # its own skims: both 
 output_dir: ../output/ff_sm2018_binned_v5                 # -> fake_factors/2018/
 workers: 16
 log_level: DEBUG                                          # DEBUG | INFO | WARNING | ERROR; console and <output_dir>/logs/<command>_<time>.log
+# web gallery (shapesmith publish): the plots of the measurement, one column per measurement (named by its payload)
+web:
+  dir: /web/sdaigler/public_html/ff_sm2018_binned_v5
+  variant: payload_2026_10_03
+  label: fake-factors-2026-10-03
+  description: "FF measurement on sm2018_binned_v5 with τ-embedding for the genuine τh; in CROWN as payloads/fake_factors/sm/fake-factors-2026-10-03 (friends ff_v1)."
+  title: "sm2018_binned_v5 · fake factors"
+  about: |
+    Fake-factor measurement of the HH→bbττ 2018 analysis (NanoAODv15, production sm2018_binned_v5) with ShapeSmith, the TauFakeFactors method:
+    QCD fake factors from data, ttbar fake factors from MC times a global data/MC factor, the QCD and ttbar fractions,
+    the QCD DR→SR correction (measured with orthogonal fake factors) and the non-closure corrections in table order.
+    Genuine τh are subtracted with the τ-embedding.
+
+    Each correction shows its p-value against 1; a correction with p > 0.05 is set to 1.
+    The summary lists the ttbar data/MC factors; the first ttbar non-closure (decay mode) absorbs them.

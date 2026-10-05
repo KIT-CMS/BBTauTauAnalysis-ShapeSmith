@@ -54,6 +54,7 @@ Switches of the tau run YAML (typed in `switches.py`; an unknown or mistyped swi
 |---|---|---|
 | `sample_lists` | inventory names (required) | the samples to process, independent of the ntuple production in `ntuples.base` |
 | `jet_fakes` | `mc` (default), `ff` | MC jet fakes + ABCD QCD, or `jetFakes` from the fake-factor friend (data minus genuine and lepton fakes in `anti_iso`) |
+| `ff_type` | `corrected` (default), `raw` | the FF friend weight of `jetFakes`: corrected, or raw (no DR->SR and non-closure corrections; needs `jet_fakes: ff` and `shape_systematics: false`) |
 | `embedding` | `false` (default), `true` | genuine ττ from the embedded samples (`EMB`) instead of the T parts of the MC; needs the embedding inventory in `sample_lists` |
 | `nn_friend` | `false` (default), `true` | NN categories from the NN friend |
 | `control_regions` | `false` (default), `true` | wider skim plus the named pass/fail control regions; needs `jet_fakes: mc` |
@@ -132,6 +133,14 @@ mutau 2018D event count) of exactly the nicks in `inventory/`; a new inventory a
 - **One skim for all switches.** A skim made with `embedding: true, jet_fakes: ff` (FF friend configured) serves all
   four combinations. Skims made without the friend or the shifts are incompatible with it: the first such run needs
   `shapesmith skim --force --samples …` for the samples it lists.
+- **Raw fake factors** (`ff_type: raw`, `configs/sm2018_binned_v5_rawff.yaml`). `jetFakes` is weighted with the raw FF
+  of the friend (`fake_factor_raw` in et and mt, `fake_factor_1_raw`/`fake_factor_2_raw` in tt with the same half per
+  failing leg): the fractions times the QCD and ttbar fake factors, without the DR->SR and non-closure corrections.
+  A diagnostic of the corrections with nominal control plots only: the raw ttbar FF still carries the global ttbar
+  data/MC factor of the measurement (`ttbar_data_scale`: et 0.70, mt 1.15, tt 0.39 leading / 0.89 subleading), which
+  the first ttbar non-closure cancels in the corrected FF. The raw FF columns carry only the 8 shift keys of the
+  fractions and fake factors, so `shape_systematics: true` is rejected. Its skim holds the raw instead of the corrected
+  columns and has its own `skim_dir`.
 
 ## Fake-factor measurement
 
@@ -160,8 +169,8 @@ must follow its keys.
 
 `tau_id_measurement.py` (`configs/tau_id_es_2018.yaml`) is another measurement Analysis: the successor of smhtt_ul
 `tauID_SFs_dev`, run by the core measurement `shapesmith.measurements.tau_id_es`. It needs the production of CROWN
-`sm_tau_id_measurement_config` (list `sm2018_tau_id_measurement`, scopes mt and mm, all shifts), which does not exist
-yet.
+`sm_tau_id_measurement_config` (list `sm2018_tau_id_measurement`, scopes mt and mm, all shifts): production
+`sm2018_tau_id_v1` (2026-10-03/04, 0.73 TB, mostly MC with all shifts).
 
 - **Selection** as smhtt_ul `config/shapes` (special `TauID_ES`, 2018) with bbtautau column names: mt tag and probe
   with `mt_1 < 65`, `IsoMu24 || IsoMu27` and pT > 25 / 20 GeV, the nine categories DM0, DM1, DM1011 (pT >= 20 GeV) and
@@ -220,9 +229,9 @@ stored contracts and Parquet columns of one data and one MC skim per channel of 
 
 - NN friend trees (`predicted_class`, `predicted_max_value`) from a trained model + CROWN `sm_ml.py`. With embedding
   shifts the NN friend must be produced with `--shifts all`, or the NN category and score stay nominal under them.
-- Fake-factor friends (`fake_factor`, `fake_factor_1/2` and their shifts) from CROWN `fake_factors_friend_config.py`,
-  on data, MC and embedding. A new FF payload gets a new friend tag (a new `ntuples.friends` base); the skim contract
-  records the friend bases, so the stored skims then need `skim --force`.
+- Fake-factor friends (`fake_factor`, `fake_factor_1/2`, the raw `fake_factor_raw`, `fake_factor_1/2_raw` and their
+  shifts) from CROWN `fake_factors_friend_config.py`, on data, MC and embedding. A new FF payload gets a new friend tag
+  (a new `ntuples.friends` base); the skim contract records the friend bases, so the stored skims then need `skim --force`.
 - Embedding ntuples under the same `ntuples.base` and production tag as the data/MC they are combined with, produced
   with `--scopes et,mt,tt --shifts all`.
 

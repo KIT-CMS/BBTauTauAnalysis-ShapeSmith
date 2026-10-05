@@ -21,8 +21,10 @@ NN_CLASS_COLUMN = "predicted_class"
 NN_SCORE_COLUMN = "predicted_max_value"
 NN_COLUMNS = frozenset((NN_CLASS_COLUMN, NN_SCORE_COLUMN))
 
-# fake-factor friend (CROWN fake_factors_friend_config.py): the weight column per leg
+# fake-factor friend (CROWN fake_factors_friend_config.py): the weight column per leg, corrected and raw (the fractions
+# and the QCD and ttbar fake factors, without the DR->SR and non-closure corrections)
 FF_COLUMNS = {"lt": "fake_factor", "tt_1": "fake_factor_1", "tt_2": "fake_factor_2"}
+FF_RAW_COLUMNS = {"lt": "fake_factor_raw", "tt_1": "fake_factor_1_raw", "tt_2": "fake_factor_2_raw"}
 
 # CROWN shift names of the fake-factor friend without their direction (Up/Down): every Up/Down key of the SM 2018
 # payload (CROWN bbtautau 1570b43, payloads/fake_factors/sm/2018) except the SystBand{High,Low} and per-variable

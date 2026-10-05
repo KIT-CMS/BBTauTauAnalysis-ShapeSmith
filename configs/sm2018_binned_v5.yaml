@@ -27,3 +27,20 @@ ml_dir: /ceph/sdaigler/shapesmith_ml/sm2018_binned_v5
 workers: 16
 log_level: DEBUG                                          # DEBUG | INFO | WARNING | ERROR; console and <output_dir>/logs/<command>_<time>.log
 combine: {cmssw_dir: /work/sdaigler/smhtt_ul/CMSSW_14_1_9, scram_arch: el9_amd64_gcc12}
+# web gallery (shapesmith publish): this run is the column "emb"; the standard variant without embedding is the column
+# "classic":  shapesmith publish -c configs/sm2018_binned_v5.yaml -s switches.embedding=false
+#               -s output_dir=../output/sm2018_binned_v5_noemb -s web.variant=classic -s web.label=classic -s web.description=null
+# (description null keeps the text from sm2018_binned_v5_dilepton.yaml). title and about are the gallery's.
+web:
+  dir: /web/sdaigler/public_html/sm2018_binned_v5
+  variant: emb
+  label: emb
+  description: "τ-embedding for genuine ττ, MC jet→τh fakes, QCD from the ABCD method."
+  title: "sm2018_binned_v5 · control plots"
+  about: |
+    HH→bbττ 2018 (NanoAODv15), CROWN production sm2018_binned_v5; histograms and plots by ShapeSmith.
+    Same four variants as jvoss's 22_09_26_non_res_hh gallery: classic, emb, emb raw ff and emb ff.
+
+    Nominal region: opposite sign, b pair with ≥ 1 b-tag, isolated τh, mT < 70 GeV in et and mt.
+    The diagnostic b-tag regions exist only for classic and emb; the fake-factor runs have only the nominal region.
+    Plots are prefit, without systematic uncertainties.

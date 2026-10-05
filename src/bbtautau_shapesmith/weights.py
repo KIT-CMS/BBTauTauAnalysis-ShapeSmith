@@ -1,7 +1,7 @@
 """Event weights: MC scale factors, the embedded sample's weights, the fake factors (v15 branch names)."""
 from __future__ import annotations
 
-from bbtautau_shapesmith.constants import FF_COLUMNS, LT_CHANNELS, TAU_LEGS, TAU_VS_ELE_WP, TAU_VS_JET_WP, TAU_VS_MU_WP
+from bbtautau_shapesmith.constants import FF_COLUMNS, FF_RAW_COLUMNS, LT_CHANNELS, TAU_LEGS, TAU_VS_ELE_WP, TAU_VS_JET_WP, TAU_VS_MU_WP
 
 TOP_PT = {"top_pt": "topPtReweightWeight"}  # only ttbar ntuples carry it
 _DITAU_TRIGGERS = ("double_tau35_mediumiso", "double_tau35_tightiso", "double_tau40_mediumiso", "double_tau40_tightiso")
@@ -75,13 +75,14 @@ def embedding_weights(channel: str) -> dict[str, str]:
     }
 
 
-def fake_factor_weight(channel: str) -> str:
-    """The FF friend weight of the anti-isolated region; in tt each failing leg carries half of its fake factor."""
+def fake_factor_weight(channel: str, ff_type: str = "corrected") -> str:
+    """The FF friend weight (corrected or raw) of the anti-isolated region; in tt each failing leg carries half of its fake factor."""
+    columns = FF_RAW_COLUMNS if ff_type == "raw" else FF_COLUMNS
     if channel in LT_CHANNELS:
-        return FF_COLUMNS["lt"]
+        return columns["lt"]
     return (
-        f"0.5 * {FF_COLUMNS['tt_1']} * (id_tau_vsJet_{TAU_VS_JET_WP}_1 < 0.5)"
-        f" + 0.5 * {FF_COLUMNS['tt_2']} * (id_tau_vsJet_{TAU_VS_JET_WP}_2 < 0.5)"
+        f"0.5 * {columns['tt_1']} * (id_tau_vsJet_{TAU_VS_JET_WP}_1 < 0.5)"
+        f" + 0.5 * {columns['tt_2']} * (id_tau_vsJet_{TAU_VS_JET_WP}_2 < 0.5)"
     )
 
 

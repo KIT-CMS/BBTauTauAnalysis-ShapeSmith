@@ -77,14 +77,14 @@ def anti_iso_cut(channel: str) -> str:
     return f"(({isolated(1)} & {anti_isolated(2)}) | ({anti_isolated(1)} & {isolated(2)}))"
 
 
-def regions(channel: str, jet_fakes: str) -> tuple[Region, ...]:
-    """Estimation regions: same-sign always; the fake-factor region (FF friend weight) in ff mode, the ABCD regions in mc mode.
+def regions(channel: str, jet_fakes: str, ff_type: str = "corrected") -> tuple[Region, ...]:
+    """Estimation regions: same-sign always; the fake-factor region (FF friend weight of ff_type) in ff mode, the ABCD regions in mc mode.
 
     Genuine taus keep the Medium pass SF in the anti-isolated regions (TauFakeFactors and legacy precedent)."""
     anti = anti_iso_cut(channel)
     same_sign = Region("same_sign", replace_cuts={"os": SAME_SIGN})
     if jet_fakes == "ff":
-        return (same_sign, Region("anti_iso", replace_cuts={"tau_iso": anti}, add_weights={"fake_factor": fake_factor_weight(channel)}))
+        return (same_sign, Region("anti_iso", replace_cuts={"tau_iso": anti}, add_weights={"fake_factor": fake_factor_weight(channel, ff_type)}))
     return (
         same_sign,
         Region("abcd_same_sign", replace_cuts={"os": SAME_SIGN}),

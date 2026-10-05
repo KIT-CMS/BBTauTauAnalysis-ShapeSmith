@@ -18,6 +18,7 @@ class TauSwitches(BaseModel):
 
     sample_lists: SampleLists = Field(min_length=1)
     jet_fakes: Literal["mc", "ff"] = "mc"  # MC jet fakes + ABCD QCD, or the fake-factor estimate (FF friend)
+    ff_type: Literal["corrected", "raw"] = "corrected"  # FF friend weight; raw: no DR->SR and non-closure corrections (needs jet_fakes: ff, shape_systematics: false)
     embedding: bool = False  # genuine tautau from the embedded samples instead of MC
     nn_friend: bool = False  # NN categories from the NN friend
     control_regions: bool = False  # wider skim plus the named pass/fail control regions (needs jet_fakes: mc)
@@ -27,6 +28,14 @@ class TauSwitches(BaseModel):
     def _controls_need_mc_fakes(self) -> TauSwitches:
         if self.control_regions and self.jet_fakes != "mc":
             raise ValueError("control_regions requires jet_fakes: mc for raw pass/fail data/MC comparisons")
+        return self
+
+    @model_validator(mode="after")
+    def _raw_fake_factors_are_nominal_only(self) -> TauSwitches:
+        if self.ff_type == "raw" and self.jet_fakes != "ff":
+            raise ValueError("ff_type raw requires jet_fakes: ff")
+        if self.ff_type == "raw" and self.shape_systematics:
+            raise ValueError("ff_type raw supports nominal control plots only; set shape_systematics: false")
         return self
 
 

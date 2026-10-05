@@ -68,7 +68,7 @@ def channel(name: str, switches: TauSwitches, channel_samples: tuple[Sample, ...
         skim=cuts.skim_cuts(name, switches.control_regions),
         cuts=cuts.baseline_cuts(name),
         processes=table,
-        regions=cuts.regions(name, switches.jet_fakes) + (cuts.diagnostic_regions(name) if switches.control_regions else ()),
+        regions=cuts.regions(name, switches.jet_fakes, switches.ff_type) + (cuts.diagnostic_regions(name) if switches.control_regions else ()),
         categories=categories() if switches.nn_friend else (),
         variables=control_variables(switches.nn_friend),
         variations=btag_variations() + column_variations(name, switches),

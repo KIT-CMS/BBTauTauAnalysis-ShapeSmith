@@ -5,6 +5,7 @@
 # Switches (types and defaults in switches.py):
 #   sample_lists:      the inventories inventory/<name>.txt of the production
 #   jet_fakes:         ff (fake factors from the FF friend)
+#   ff_type:           corrected (default; the raw FF in sm2018_binned_v5_rawff.yaml)
 #   embedding:         true (genuine tautau from the embedded samples)
 #   nn_friend:         false (no NN friend yet: no categories, so no shapes.root, datacards or fit)
 #   control_regions:   false (requires jet_fakes: mc)
@@ -26,3 +27,9 @@ ml_dir: /ceph/sdaigler/shapesmith_ml/sm2018_binned_v5_ff
 workers: 16
 log_level: DEBUG                                          # DEBUG | INFO | WARNING | ERROR; console and <output_dir>/logs/<command>_<time>.log
 combine: {cmssw_dir: /work/sdaigler/smhtt_ul/CMSSW_14_1_9, scram_arch: el9_amd64_gcc12}
+# web gallery (shapesmith publish)
+web:
+  dir: /web/sdaigler/public_html/sm2018_binned_v5
+  variant: emb_ff
+  label: emb ff
+  description: "τ-embedding + jet→τh fakes from the fully corrected fake factor (friend ff_v1, payload fake-factors-2026-10-03: fractions, QCD DR→SR, non-closure corrections)."

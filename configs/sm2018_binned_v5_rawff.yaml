@@ -1,0 +1,36 @@
+# HH->bbtautau tau channels on the sm2018_binned_v5 production with the raw fake factors: sm2018_binned_v5_ff.yaml with
+# jetFakes weighted by the raw FF of the friend ff_v1 (fake_factor_raw, fake_factor_{1,2}_raw = the fractions times the
+# QCD and ttbar fake factors, without the DR->SR and non-closure corrections). A diagnostic of the corrections, nominal
+# control plots only: the raw ttbar FF carries the global ttbar data/MC factor of the measurement (et 0.70, mt 1.15,
+# tt 0.39 leading / 0.89 subleading), which the corrected FF cancels with the first ttbar non-closure correction.
+# Own skim_dir (the skim holds the raw FF columns instead of the corrected ones) and output_dir.
+# Switches (types and defaults in switches.py):
+#   sample_lists:      the inventories inventory/<name>.txt of the production
+#   jet_fakes:         ff (fake factors from the FF friend)
+#   ff_type:           raw (corrected is the default; raw needs jet_fakes: ff and shape_systematics: false)
+#   embedding:         true (genuine tautau from the embedded samples)
+#   nn_friend:         false (no NN friend yet: no categories, so no shapes.root, datacards or fit)
+#   control_regions:   false (requires jet_fakes: mc)
+#   shape_systematics: false (the raw FF friend has only the shifts of the fractions and fake factors)
+analysis: bbtautau_shapesmith.analysis:build
+era: "2018"
+channels: [et, mt, tt]
+switches: {sample_lists: [sm2018_binned_v3, sm2018_embedding], jet_fakes: ff, ff_type: raw, embedding: true, nn_friend: false, control_regions: false, shape_systematics: false}
+sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
+ntuples:
+  server: root://cmsdcache-kit-disk.gridka.de
+  base: /store/user/sdaigler/CROWN/ntuples/sm2018_binned_v5/CROWNRun
+  friends:
+    - {base: /store/user/sdaigler/CROWN/ntuples/sm2018_binned_v5/CROWNFriend/ff_v1, applies_to: [mc, data, embedding]}
+skim_dir: /ceph/sdaigler/shapesmith/sm2018_binned_v5_rawff   # not shared with sm2018_binned_v5_ff.yaml (raw FF columns)
+output_dir: ../output/sm2018_binned_v5_rawff                 # relative to this file -> <repo>/output/...
+ml_dir: /ceph/sdaigler/shapesmith_ml/sm2018_binned_v5_rawff
+workers: 8
+log_level: DEBUG                                             # DEBUG | INFO | WARNING | ERROR; console and <output_dir>/logs/<command>_<time>.log
+combine: {cmssw_dir: /work/sdaigler/smhtt_ul/CMSSW_14_1_9, scram_arch: el9_amd64_gcc12}
+# web gallery (shapesmith publish)
+web:
+  dir: /web/sdaigler/public_html/sm2018_binned_v5
+  variant: emb_raw_ff
+  label: emb raw ff
+  description: "τ-embedding + jet→τh fakes from the raw fake factor (process fractions × FF(QCD), FF(ttbar), without DR→SR and non-closure corrections). It contains the global ttbar data/MC factor of the FF measurement (et 0.70, mt 1.15, tt 0.39/0.89), which the first ttbar non-closure of the corrected FF cancels; a diagnostic, not a physics estimate."
