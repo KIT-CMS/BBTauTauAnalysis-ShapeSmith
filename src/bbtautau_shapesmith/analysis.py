@@ -1,6 +1,8 @@
 """Assemble the HH->bbtautau Analysis of the tau channels from the run configuration switches; ML export configuration."""
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from shapesmith.config import RunConfig
 from shapesmith.model import ABCD, Analysis, Channel, DataMinus, MLExportConfig, Process, Sample, TemplateShift
 
@@ -28,6 +30,17 @@ def label_of(process: Process) -> str:
     return LABEL_OF_GROUP.get(process.group, "is_Other")
 
 
+def process_union(channels: Iterable[Channel]) -> tuple[Process, ...]:
+    """The processes of all channels, each name once in channel order; a process that is auxiliary in one channel and
+    a background in another (TTT with and without embedding) takes its background role."""
+    union = {}
+    for channel in channels:
+        for process in channel.processes:
+            if process.name not in union or union[process.name].role == "auxiliary":
+                union[process.name] = process
+    return tuple(union.values())
+
+
 def ml_config(processes: tuple[Process, ...], jet_fakes: str) -> MLExportConfig:
     labels = {p.name: label_of(p) for p in processes if p.role in ("signal", "background")}
     region_of = {}
@@ -37,15 +50,20 @@ def ml_config(processes: tuple[Process, ...], jet_fakes: str) -> MLExportConfig:
     return MLExportConfig(variables=ML_VARIABLES, processes=tuple(labels), label_of=labels, region_of=region_of)
 
 
+def jet_fakes_output(jet_fakes: str) -> str:
+    return "jetFakes" if jet_fakes == "ff" else "QCD"
+
+
 def estimators(name: str, processes: tuple[Process, ...], switches: TauSwitches) -> tuple:
     """jetFakes = data - (genuine + lepton fakes) in the fake-factor region, or QCD from ABCD with every MC subtracted;
     with embedding the sums of the embedding shifts of DM10 and DM11 (after jetFakes, which carries them too) and the
     ttbar contamination of the embedded sample (+-10 % of genuine ttbar)."""
     genuine_and_lepton_fakes = backgrounds_in(processes, GENUINE) + backgrounds_in(processes, LEPTON_FAKE)
+    output = jet_fakes_output(switches.jet_fakes)
     if switches.jet_fakes == "ff":
-        result = (DataMinus("jetFakes", "anti_iso", genuine_and_lepton_fakes),)
+        result = (DataMinus(output, "anti_iso", genuine_and_lepton_fakes),)
     else:
-        result = (ABCD("QCD", "abcd_anti_iso", "abcd_same_sign", "abcd_same_sign_anti_iso", genuine_and_lepton_fakes + backgrounds_in(processes, JET_FAKE)),)
+        result = (ABCD(output, "abcd_anti_iso", "abcd_same_sign", "abcd_same_sign_anti_iso", genuine_and_lepton_fakes + backgrounds_in(processes, JET_FAKE)),)
     if switches.embedding and switches.shape_systematics:
         result += embedding_variation_sums(name)
     if switches.embedding:
@@ -81,14 +99,14 @@ def build(config: RunConfig) -> Analysis:
     switches = parse(TauSwitches, config.switches)
     by_channel = samples(sample_database(config), switches.sample_lists, config.channels)
     channels = {name: channel(name, switches, by_channel[name]) for name in config.channels}
-    first = next(iter(channels.values()))  # every tau channel has the same processes and estimators
+    processes = process_union(channels.values())  # the channels can differ in their processes
     return Analysis(
         name="hh_bbtautau_2018_v15",
         era=ERA,
         lumi_pb=LUMI_PB,
         signal=SIGNAL,
         channels=channels,
-        lnn=lnn(first.processes, first.estimators[0].output),
+        lnn=lnn(processes, jet_fakes_output(switches.jet_fakes)),
         style=style(),
-        ml=ml_config(first.processes, switches.jet_fakes),
+        ml=ml_config(processes, switches.jet_fakes),
     )

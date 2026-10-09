@@ -3,7 +3,7 @@ from shapesmith.model import ABCD, AnalysisError, DataMinus, TemplateShift
 from shapesmith.skim import needed_columns
 from shapesmith.validate import validate
 
-from bbtautau_shapesmith.analysis import build
+from bbtautau_shapesmith.analysis import build, process_union
 from bbtautau_shapesmith.constants import FF_COLUMNS, FF_RAW_COLUMNS, LT_CHANNELS, NN_COLUMNS, TAU_CHANNELS
 from bbtautau_shapesmith.systematics import embedding_variation_sums
 from bbtautau_shapesmith.weights import fake_factor_weight
@@ -97,6 +97,14 @@ def test_ml_export_labels():
     assert ml.label_of["EMB"] == "is_DY" and ml.label_of["jetFakes"] == "is_jetFakes" and ml.region_of == {"jetFakes": "anti_iso"}
     labels = analysis_for("mc").ml.label_of
     assert labels["EWKJ"] == labels["W"] == "is_jetFakes" and labels["EWKT"] == "is_Other" and labels["ZTT"] == "is_DY"
+
+
+def test_processes_of_every_channel():
+    """lnN and ML labels come from the union of the channel tables: TTT is auxiliary with embedding, a background without."""
+    embedded, simulated = analysis_for("mc", embedding=True).channel("mt"), analysis_for("mc").channel("tt")
+    roles = {p.name: p.role for p in process_union([embedded, simulated])}
+    assert roles["EMB"] == roles["ZTT"] == roles["TTT"] == "background"
+    assert [p.name for p in process_union([embedded, simulated])] == list(dict.fromkeys(p.name for p in embedded.processes + simulated.processes))
 
 
 @pytest.mark.parametrize("switches,match", [
