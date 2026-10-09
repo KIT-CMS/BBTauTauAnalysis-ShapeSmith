@@ -6,6 +6,7 @@ TAU_CHANNELS = ("et", "mt", "tt")
 LT_CHANNELS = ("et", "mt")  # tau channels with a light lepton on leg 1
 TAU_LEGS = {"et": (2,), "mt": (2,), "tt": (1, 2)}  # the hadronic tau legs
 DILEPTON_CHANNELS = ("em", "mm", "ee")  # light-dilepton controls: Z+jets in ee/mm, top in em
+CONTROL_CHANNELS = ("em",)  # control channels of the tau analysis, in every fit: em constrains ttbar
 
 TAU_VS_JET_WP = "Medium"
 TAU_VS_JET_LOOSE_WP = "VVVLoose"  # lower edge of the anti-isolated region

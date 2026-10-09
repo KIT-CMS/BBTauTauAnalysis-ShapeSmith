@@ -78,6 +78,16 @@ Switches of the tau run YAML (typed in `switches.py`; an unknown or mistyped swi
 | `shape_systematics` | `true` (default), `false` | the CROWN shifts of the embedded samples and of the fake-factor friend as shape variations |
 | `dy_correction` | `none` (default), `njets_btag` | every DY process (ZTT, ZL, ZJ) times the DY data/MC table `DY_NJETS_BTAG` (`constants.py`) of its n_bjets (0, 1, ≥ 2) and n_jets (≤ 2, 3, ≥ 4) |
 
+**em as the ttbar control channel.** A tau run YAML can list `em` in `channels` (e.g. `[et, mt, tt, em]`). It is a
+control channel (`Analysis.control_channels`): `datacards` and `fit` put it into every final state, never into one of
+its own. It is the dilepton em selection (OS, isolated e and μ, ≥ 2 jets) with the unsplit MC of the dilepton
+analysis (ttbar with the top-pT weight), one category `em_tt` with the b tag of the tau baseline counted in one bin,
+no further regions, the b-tag variations of the tau channels and the lnN `eff_e`, `eff_m` and
+`CMS_eff_trigger_em_2018` (2 %); `htt_tjXsec` correlates its ttbar with that of the tau channels. The friends of the
+tau channels name them (`channels: [et, mt, tt]`), so the em skim looks for none; a tau run with em has its own
+`skim_dir` (the em skim of the dilepton run has other columns). The ML labels come from the tau channels only, but em
+holds the signal and the single-Higgs processes too: run `ml-export` with `--channels et,mt,tt`.
+
 The dilepton run YAML takes `sample_lists` and `dy_correction` (on `DY`). The table is the mm data/MC of v5;
 `scripts/derive_dy_correction.py -c <dilepton run YAML> [--channels mm,ee] [--ttbar-scale 0.93]` derives it again from
 the control shapes of a dilepton run without the correction (`hist --control --regions all`) and prints it in the
@@ -252,9 +262,9 @@ must follow its keys.
 | NN categories, control variables and binning | `variables.py` |
 | b-tag weight variations, embedding and fake-factor shifts, lnN table | `systematics.py` |
 | colours, labels, axis titles of all six channels | `style.py` |
-| tau analysis assembly, estimators, ML export | `analysis.py` |
+| tau analysis assembly (with the control channel em), estimators, ML export | `analysis.py` |
 | fake-factor measurement: regions, processes, legs; its tables | `ff_measurement.py`, `ff_tables.py` |
-| dilepton channels and analysis assembly | `dilepton.py` |
+| dilepton channels and analysis assembly; the em control channel of the tau analysis | `dilepton.py` |
 | tau-ID/ES measurement: selection, processes, ES grid, assembly; its m_vis bins; its MC shape uncertainties | `tau_id_measurement.py`, `tau_id_binning.py`, `tau_id_systematics.py` |
 
 `tests/fixtures/branches_<channel>.txt` list the branches of one ttbar ntuple per channel of the

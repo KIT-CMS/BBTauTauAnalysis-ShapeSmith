@@ -76,8 +76,9 @@ def lnn(processes: tuple[Process, ...], jet_fakes_output: str) -> tuple[LnN, ...
 
     entries = [
         LnN("lumi_13TeV_$ERA", mc, 1.025),
-        LnN("eff_e", mc, 1.02, channels=("et",)),
-        LnN("eff_m", mc, 1.02, channels=("mt",)),
+        LnN("eff_e", mc, 1.02, channels=("et", "em")),
+        LnN("eff_m", mc, 1.02, channels=("mt", "em")),
+        LnN("CMS_eff_trigger_em_$ERA", mc, 1.02, channels=("em",)),
         LnN("eff_t_vsLep_$CHANNEL_$ERA", mc, 1.01, channels=LT_CHANNELS),
         LnN("eff_t_vsLep_$CHANNEL_$ERA", mc, 1.0201, channels=("tt",)),
         LnN("eff_t_vsJet_$CHANNEL_$ERA", mc, 1.02, channels=LT_CHANNELS),

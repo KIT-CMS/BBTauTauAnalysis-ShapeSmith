@@ -1,13 +1,14 @@
-"""Assemble the HH->bbtautau Analysis of the tau channels from the run configuration switches; ML export configuration."""
+"""Assemble the HH->bbtautau Analysis of the tau channels (and the ttbar control channel em) from the run configuration
+switches; ML export configuration."""
 from __future__ import annotations
 
 from collections.abc import Iterable
 
 from shapesmith.config import RunConfig
-from shapesmith.model import ABCD, Analysis, Category, Channel, DataMinus, MLExportConfig, Process, Sample, TemplateShift
+from shapesmith.model import ABCD, Analysis, AnalysisError, Category, Channel, DataMinus, MLExportConfig, Process, Sample, TemplateShift
 
-from bbtautau_shapesmith import cuts
-from bbtautau_shapesmith.constants import ERA, LUMI_PB
+from bbtautau_shapesmith import cuts, dilepton
+from bbtautau_shapesmith.constants import CONTROL_CHANNELS, ERA, LUMI_PB, TAU_CHANNELS
 from bbtautau_shapesmith.processes import EMBEDDED, GENUINE, JET_FAKE, LEPTON_FAKE, SIGNAL, SPLITS, backgrounds_in, tau_processes
 from bbtautau_shapesmith.samples import sample_database, samples
 from bbtautau_shapesmith.style import style
@@ -103,17 +104,23 @@ def channel(name: str, switches: TauSwitches, channel_samples: tuple[Sample, ...
 
 def build(config: RunConfig) -> Analysis:
     switches = parse(TauSwitches, config.switches)
+    if not config.channels or set(config.channels) - set(TAU_CHANNELS + CONTROL_CHANNELS):
+        raise AnalysisError(f"the tau analysis supports the channels {', '.join(TAU_CHANNELS)} and the control channels {', '.join(CONTROL_CHANNELS)}")
     switches.check_embedding(config.channels)
     by_channel = samples(sample_database(config), switches.sample_lists, config.channels)
-    channels = {name: channel(name, switches, by_channel[name]) for name in config.channels}
-    processes = process_union(channels.values())  # the channels can differ in their processes
+    channels = {
+        name: dilepton.top_control_channel(by_channel[name], switches.dy_correction) if name in CONTROL_CHANNELS else channel(name, switches, by_channel[name])
+        for name in config.channels
+    }
+    tau_channels = [c for name, c in channels.items() if name not in CONTROL_CHANNELS]
     return Analysis(
         name="hh_bbtautau_2018_v15",
         era=ERA,
         lumi_pb=LUMI_PB,
         signal=SIGNAL,
         channels=channels,
-        lnn=lnn(processes, jet_fakes_output(switches.jet_fakes)),
+        control_channels=tuple(name for name in config.channels if name in CONTROL_CHANNELS),
+        lnn=lnn(process_union(channels.values()), jet_fakes_output(switches.jet_fakes)),  # the channels can differ in their processes
         style=style(),
-        ml=ml_config(processes, switches.jet_fakes),
+        ml=ml_config(process_union(tau_channels), switches.jet_fakes),  # no NN training on a control channel
     )

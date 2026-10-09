@@ -6,7 +6,7 @@ from shapesmith.validate import validate
 from bbtautau_shapesmith import dilepton, ff_measurement
 from bbtautau_shapesmith.analysis import build, process_union
 from bbtautau_shapesmith.constants import FF_COLUMNS, FF_RAW_COLUMNS, LT_CHANNELS, NN_COLUMNS, TAU_CHANNELS
-from bbtautau_shapesmith.systematics import embedding_variation_sums
+from bbtautau_shapesmith.systematics import btag_variations, embedding_variation_sums
 from bbtautau_shapesmith.weights import dy_njets_btag_weight, fake_factor_weight
 from tests.helpers import EMBEDDING_LIST, branches, config, embedded, embedding_branches
 
@@ -134,6 +134,30 @@ def test_dy_correction_weights_the_dy_processes_only():
     assert corrected(fake_factors) == {(name, p) for name in TAU_CHANNELS for p in ("ZTT", "ZL", "ZJ")}
     controls = dilepton.build(config(["em", "mm", "ee"], "bbtautau_shapesmith.dilepton:build", dy_correction="njets_btag"))
     assert corrected(controls) == {(name, "DY") for name in ("em", "mm", "ee")}
+
+
+def test_em_is_the_ttbar_control_channel():
+    analysis = build(config(("et", "mt", "tt", "em"), jet_fakes="ff", embedding=["et", "mt"], fit_categories="control", sample_lists=["sm2018_binned_v3", EMBEDDING_LIST]))
+    validate(analysis)
+    assert analysis.control_channels == ("em",)
+    em = analysis.channel("em")
+    (category,) = em.categories
+    assert (category.name, category.cut, category.variable.name) == ("em_tt", "(n_bjets >= 1) & (bpair_pt_2 > 0)", "yield")
+    assert em.cuts["jets"] == "n_jets >= 2" and em.regions == () and em.estimators == ()
+    assert em.variations == btag_variations()  # the components of the tau channels, so that the b-tag nuisances correlate
+    assert set(em.backgrounds()) == {"DY", "TT", "ST", "VV", "TTV", "EWK", "W"} | SINGLE_HIGGS and "top_pt" in em.process("TT").selection.weights
+    assert {s.kind for s in em.samples} == {"data", "mc"} and all(s.nick.startswith("SingleMuon_") for s in em.samples_of("data"))
+    for sample in em.samples:
+        assert needed_columns(em, sample) <= branches("em") | {"npartons"}, sample.nick
+    lnn = {(entry.name, entry.channels): set(entry.processes) for entry in analysis.lnn}
+    assert lnn[("htt_tjXsec", None)] == {"TT", "TTL", "TTT"} and {"TT", "EMB"} & lnn[("lumi_13TeV_$ERA", None)] == {"TT"}  # TTT of tt
+    assert "TT" in lnn[("eff_e", ("et", "em"))] & lnn[("eff_m", ("mt", "em"))] & lnn[("CMS_eff_trigger_em_$ERA", ("em",))]
+    assert not {"DY", "TT", "ST"} & set(analysis.ml.processes)  # no NN labels from the control channel
+
+
+def test_other_channels_are_rejected():
+    with pytest.raises(AnalysisError, match="supports the channels et, mt, tt and the control channels em"):
+        build(config(("mt", "mm")))
 
 
 def test_ml_export_labels():

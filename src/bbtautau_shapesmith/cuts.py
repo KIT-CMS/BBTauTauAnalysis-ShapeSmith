@@ -12,6 +12,7 @@ TRIGGER = {
     "tt": "(trg_double_tau35_mediumiso > 0.5) | (trg_double_tau35_tightiso > 0.5) | (trg_double_tau40_mediumiso > 0.5) | (trg_double_tau40_tightiso > 0.5)",
 }
 SAME_SIGN = "((q_1 * q_2) > 0)"
+B_TAGGING = "(n_bjets >= 1) & (bpair_pt_2 > 0)"  # a b pair with at least one b tag
 
 
 def isolated(leg: int) -> str:
@@ -31,7 +32,7 @@ def baseline_cuts(channel: str) -> dict[str, str]:
         "extraelec_veto": "(extraelec_veto < 0.5)",
         "extramuon_veto": "(extramuon_veto < 0.5)",
         "os": "((q_1 * q_2) < 0)",
-        "b_tagging": "(n_bjets >= 1) & (bpair_pt_2 > 0)",
+        "b_tagging": B_TAGGING,
         "against_muon": " & ".join(f"(id_tau_vsMu_{TAU_VS_MU_WP[channel]}_{leg} > 0.5)" for leg in TAU_LEGS[channel]),
         "against_electron": " & ".join(f"(id_tau_vsEle_{TAU_VS_ELE_WP[channel]}_{leg} > 0.5)" for leg in TAU_LEGS[channel]),
         "tau_iso": " & ".join(isolated(leg) for leg in TAU_LEGS[channel]),

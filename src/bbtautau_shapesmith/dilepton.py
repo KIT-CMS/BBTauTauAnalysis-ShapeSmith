@@ -1,14 +1,18 @@
 """Light-dilepton controls: Z+jets in ee/mm and top in em with unsplit MC and no tau-fake estimate.
 
 Leg order and triggers follow CROWN's 2018 SM profile (em: electron leg 1, muon leg 2; mm/ee: leading pT first).
-A separate Analysis from the tau channels; the two share samples, style and the b-tag variations.
+A separate Analysis from the tau channels; the two share samples, style and the b-tag variations. em is also the ttbar
+control channel of the tau analysis (top_control_channel).
 """
 from __future__ import annotations
 
+import dataclasses
+
 from shapesmith.config import RunConfig
-from shapesmith.model import Analysis, AnalysisError, Channel, Region, Sample
+from shapesmith.model import Analysis, AnalysisError, Category, Channel, Region, Sample
 
 from bbtautau_shapesmith.constants import BTAG_BINS, DILEPTON_CHANNELS, ERA, LUMI_PB
+from bbtautau_shapesmith.cuts import B_TAGGING
 from bbtautau_shapesmith.processes import SIGNAL, dilepton_processes
 from bbtautau_shapesmith.samples import sample_database, samples
 from bbtautau_shapesmith.style import style
@@ -60,6 +64,18 @@ def channel(name: str, channel_samples: tuple[Sample, ...], dy_correction: str =
         variables={variable: variables[variable] for variable in PLOT_VARIABLES},
         variations=btag_variations(("correlated", "uncorrelated")),  # the summary scheme, not its decomposition
         keep_columns=("event", "run", "lumi"),
+    )
+
+
+def top_control_channel(channel_samples: tuple[Sample, ...], dy_correction: str = "none") -> Channel:
+    """em as the ttbar control channel of the tau analysis: the em selection (>= 2 jets) with the b tag of the tau
+    baseline as its one category, counted in one bin, without further regions; the b-tag variations of the tau
+    channels, so that they correlate."""
+    return dataclasses.replace(
+        channel("em", channel_samples, dy_correction),
+        regions=(),
+        categories=(Category("em_tt", B_TAGGING, control_variables()["yield"]),),
+        variations=btag_variations(),
     )
 
 
