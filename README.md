@@ -275,9 +275,9 @@ must follow its keys.
 |---|---|
 | produced samples (verbatim KingMaker sample lists), groups, routing, per-sample cuts, normalisation | `inventory/*.txt`, `samples.py` |
 | the switches and their checks | `switches.py` |
-| era, luminosity, channel sets, working points, b-tag bins, friend columns, class names, FF shift keys, embedding shift tables | `constants.py` |
+| era, luminosity, channel sets, working points, b-tag and jet bins, friend columns, class names, FF shift keys, embedding shift tables, the DY correction table | `constants.py` |
 | tau channels: baseline/skim selection, gen-match splits, estimation and control regions | `cuts.py` |
-| MC, embedding, fake-factor and dilepton weights, trigger chains | `weights.py` |
+| MC, embedding, fake-factor and dilepton weights, trigger chains, the DY correction weight | `weights.py` |
 | process tables (tau: gen-match split, dilepton: unsplit) | `processes.py` |
 | NN categories, control variables and binning | `variables.py` |
 | b-tag weight variations, embedding and fake-factor shifts, lnN table | `systematics.py` |
