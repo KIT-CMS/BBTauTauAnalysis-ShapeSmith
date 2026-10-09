@@ -6,6 +6,7 @@ from shapesmith.model import ColumnVariation, VariationSum, WeightVariation
 from bbtautau_shapesmith.constants import FF_SHIFTS_LT, FF_SHIFTS_TT
 from bbtautau_shapesmith.systematics import embedding_variation_sums, embedding_variations, ff_variations
 from bbtautau_shapesmith.weights import fake_factor_weight
+from tests.helpers import embedded
 from tests.test_analysis import COMBINATIONS, analysis_for
 
 
@@ -17,7 +18,7 @@ def column_variations(channel):
 def test_column_variations_come_with_their_switch(jet_fakes, embedding):
     analysis = analysis_for(jet_fakes, embedding)
     for name, channel in analysis.channels.items():
-        expected = (embedding_variations(name) if embedding else ()) + (ff_variations(name) if jet_fakes == "ff" else ())
+        expected = (embedding_variations(name) if embedded(embedding, name) else ()) + (ff_variations(name) if jet_fakes == "ff" else ())
         assert tuple(column_variations(channel)) == expected
         assert sum(isinstance(v, WeightVariation) for v in channel.variations) == 80  # the b-tag components
 

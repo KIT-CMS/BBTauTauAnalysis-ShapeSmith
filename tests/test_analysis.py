@@ -7,9 +7,9 @@ from bbtautau_shapesmith.analysis import build, process_union
 from bbtautau_shapesmith.constants import FF_COLUMNS, FF_RAW_COLUMNS, LT_CHANNELS, NN_COLUMNS, TAU_CHANNELS
 from bbtautau_shapesmith.systematics import embedding_variation_sums
 from bbtautau_shapesmith.weights import fake_factor_weight
-from tests.helpers import EMBEDDING_LIST, branches, config, embedding_branches
+from tests.helpers import EMBEDDING_LIST, branches, config, embedded, embedding_branches
 
-COMBINATIONS = [(jet_fakes, embedding) for jet_fakes in ("mc", "ff") for embedding in (False, True)]
+COMBINATIONS = [(jet_fakes, embedding) for jet_fakes in ("mc", "ff") for embedding in (False, True, ["et", "mt"])]
 T_PARTS = {"ZTT", "TTT", "STT", "VVT", "TTVT", "EWKT"}
 L_PARTS = {"ZL", "TTL", "STL", "VVL", "TTVL", "EWKL"}
 J_PARTS = {"ZJ", "TTJ", "STJ", "VVJ", "TTVJ", "EWKJ"}
@@ -36,11 +36,11 @@ def test_process_table(jet_fakes, embedding):
     channel = analysis_for(jet_fakes, embedding).channel("mt")
     roles = {p.name: p.role for p in channel.processes}
     backgrounds = {name for name, role in roles.items() if role == "background"}
-    genuine = {"EMB"} if embedding else T_PARTS
+    genuine = {"EMB"} if embedded(embedding, "mt") else T_PARTS
     jet_fakes_mc = J_PARTS | {"W"} if jet_fakes == "mc" else set()
     assert backgrounds == genuine | L_PARTS | jet_fakes_mc | SINGLE_HIGGS
     assert roles["data"] == "data" and roles["HH2B2Tau"] == "signal"
-    assert ("TTT" in roles and roles["TTT"] == "auxiliary") == embedding  # the template of the ttbar contamination
+    assert ("TTT" in roles and roles["TTT"] == "auxiliary") == embedded(embedding, "mt")  # the template of the ttbar contamination
     output = "jetFakes" if jet_fakes == "ff" else "QCD"
     assert set(channel.backgrounds()) == backgrounds | {output}
     top = {p.name for p in channel.processes if "top_pt" in p.selection.weights}
@@ -51,15 +51,15 @@ def test_process_table(jet_fakes, embedding):
 def test_estimators(jet_fakes, embedding):
     channel = analysis_for(jet_fakes, embedding).channel("tt")
     first, *rest = channel.estimators
-    genuine = ("EMB",) if embedding else ("ZTT", "TTT", "STT", "VVT", "TTVT", "EWKT")
+    genuine = ("EMB",) if embedded(embedding, "tt") else ("ZTT", "TTT", "STT", "VVT", "TTVT", "EWKT")
     lepton_fakes = ("ZL", "TTL", "STL", "VVL", "TTVL", "EWKL")
     if jet_fakes == "ff":
         assert first == DataMinus("jetFakes", "anti_iso", genuine + lepton_fakes)
     else:
         assert first == ABCD("QCD", "abcd_anti_iso", "abcd_same_sign", "abcd_same_sign_anti_iso",
                              genuine + lepton_fakes + ("ZJ", "TTJ", "STJ", "VVJ", "TTVJ", "EWKJ", "W"))
-    sums = list(embedding_variation_sums("tt")) if embedding else []
-    assert rest == sums + ([TemplateShift("CMS_htt_emb_ttbar_2018", "EMB", "TTT", 0.1)] if embedding else [])
+    sums = list(embedding_variation_sums("tt")) if embedded(embedding, "tt") else []
+    assert rest == sums + ([TemplateShift("CMS_htt_emb_ttbar_2018", "EMB", "TTT", 0.1)] if embedded(embedding, "tt") else [])
     assert all(e not in analysis_for(jet_fakes, embedding, shape_systematics=False).channel("tt").estimators for e in sums)
 
 
@@ -91,6 +91,26 @@ def test_raw_fake_factors_read_only_the_raw_friend_columns(channel):
     assert needed_columns(definition, data) & set(FF_RAW_COLUMNS.values()) == {FF_RAW_COLUMNS[leg] for leg in legs}
 
 
+def test_embedding_per_channel():
+    """embedding: [et, mt]: EMB and the ttbar contamination in et and mt, the MC T parts in tt."""
+    analysis = analysis_for("mc", ["et", "mt"])
+    for name in LT_CHANNELS:
+        channel = analysis.channel(name)
+        assert "EMB" in channel.backgrounds() and channel.process("TTT").role == "auxiliary" and not T_PARTS & set(channel.backgrounds())
+        assert TemplateShift("CMS_htt_emb_ttbar_2018", "EMB", "TTT", 0.1) in channel.estimators
+    tt = analysis.channel("tt")
+    assert T_PARTS <= set(tt.backgrounds()) and "EMB" not in {p.name for p in tt.processes}
+    assert not any(s.kind == "embedding" for s in tt.samples)
+    assert not any(isinstance(e, TemplateShift) for e in tt.estimators) and not any("emb" in v.name for v in tt.variations)
+    lnn = {(entry.name, entry.channels): set(entry.processes) for entry in analysis.lnn}
+    assert {"ZTT", "TTT", "STT", "VVT"} <= lnn[("lumi_13TeV_$ERA", None)] and "EMB" not in lnn[("lumi_13TeV_$ERA", None)]
+    assert lnn[("htt_tjXsec", None)] == {"TTT", "TTL", "TTJ"} and lnn[("htt_zjXsec", None)] == {"ZTT", "ZL", "ZJ"}
+    ml = analysis.ml
+    assert {"EMB", "ZTT", "TTT"} <= set(ml.processes)
+    assert "EMB" in ml.exported(analysis.channel("et")) and not {"ZTT", "TTT"} & set(ml.exported(analysis.channel("et")))
+    assert {"ZTT", "TTT"} <= set(ml.exported(tt)) and "EMB" not in ml.exported(tt)
+
+
 def test_ml_export_labels():
     ml = analysis_for("ff", embedding=True).ml
     assert "TTT" not in ml.processes and "data" not in ml.processes
@@ -111,6 +131,8 @@ def test_processes_of_every_channel():
     ({"sample_list": "sm2018_binned_v2"}, "sample_list"),
     ({"production": "sm2018_binned_v1"}, "production"),
     ({"embedding": "yes"}, "embedding"),
+    ({"embedding": ["xx"]}, "embedding"),
+    ({"embedding": ["et", "et"]}, "listed twice"),
     ({"jet_fakes": "data"}, "jet_fakes"),
     ({"sample_lists": []}, "sample_lists"),
     ({"control_regions": True, "jet_fakes": "ff"}, "control_regions requires jet_fakes: mc"),
@@ -121,6 +143,11 @@ def test_processes_of_every_channel():
 def test_invalid_switches_are_reported(switches, match):
     with pytest.raises(AnalysisError, match=match):
         build(config(**switches))
+
+
+def test_an_embedded_channel_must_be_a_channel_of_the_run():
+    with pytest.raises(AnalysisError, match="embedding: tt not among the channels et, mt"):
+        build(config(["et", "mt"], embedding=["tt"], sample_lists=["sm2018_binned_v3", EMBEDDING_LIST]))
 
 
 def test_embedding_needs_the_embedding_sample_list():

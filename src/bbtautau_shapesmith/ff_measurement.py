@@ -15,9 +15,9 @@ cuts.isolated/anti_isolated, as in the analysis. Per leg (tt: the leading "" and
 The skim is the analysis control-region skim (both charges, VVVLoose taus, >= 2 jets or the b tag, lt iso_1 < 0.5)
 without the lepton vetoes.
 
-Processes: data; the genuine taus from EMB (embedding) or the MC T parts; the L and J parts of DY/TT/ST/VV; W. The
-fake factors, fractions and non-closures subtract all of them (the ttbar data/MC factor all but TTJ); the three DR->SR steps
-subtract the MC T parts instead of EMB, as TauFakeFactors (DR_SR use_embedding: false).
+Processes: data; the genuine taus from EMB (in the embedded channels) or the MC T parts; the L and J parts of
+DY/TT/ST/VV; W. The fake factors, fractions and non-closures subtract all of them (the ttbar data/MC factor all but
+TTJ); the three DR->SR steps subtract the MC T parts instead of EMB, as TauFakeFactors (DR_SR use_embedding: false).
 
 Differences to jvoss's configuration:
 - et ttbar: jvoss cuts mt_1 < 70 only in the AR (inflating his MC fake factor about 1.9x); here in SR and AR as the
@@ -172,13 +172,14 @@ def build(config: RunConfig) -> Analysis:
     switches = parse(FakeFactorSwitches, config.switches)
     if config.era != ERA or not config.channels or set(config.channels) - set(TAU_CHANNELS):
         raise AnalysisError(f"the fake-factor measurement supports era {ERA} and the channels {', '.join(TAU_CHANNELS)}")
-    measurement = FakeFactorMeasurement({name: legs(name, switches.embedding) for name in config.channels})
+    switches.check_embedding(config.channels)
+    measurement = FakeFactorMeasurement({name: legs(name, switches.embedded(name)) for name in config.channels})
     by_channel = samples(sample_database(config), switches.sample_lists, config.channels)
     return Analysis(
         name="hh_bbtautau_2018_v15_fake_factors",
         era=ERA,
         lumi_pb=LUMI_PB,
         signal=None,
-        channels={name: channel(name, switches.embedding, by_channel[name], measurement) for name in config.channels},
+        channels={name: channel(name, switches.embedded(name), by_channel[name], measurement) for name in config.channels},
         measurement=measurement,
     )

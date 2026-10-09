@@ -27,6 +27,11 @@ def embedding_branches(channel: str) -> set[str]:
     return (branches(channel) - absent) | EMBEDDING_EXTRA | (EMBEDDING_EXTRA_ET if channel == "et" else set())
 
 
+def embedded(embedding: bool | list[str], channel: str) -> bool:
+    """The switch embedding (true/false or the embedded channels) for one channel."""
+    return channel in embedding if isinstance(embedding, list) else embedding
+
+
 def nicks(sample_list: str = "sm2018_binned_v2") -> tuple[str, ...]:
     return read_sample_list(INVENTORY / f"{sample_list}.txt")
 

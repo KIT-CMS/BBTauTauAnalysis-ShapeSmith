@@ -71,7 +71,7 @@ Switches of the tau run YAML (typed in `switches.py`; an unknown or mistyped swi
 | `sample_lists` | inventory names (required) | the samples to process, independent of the ntuple production in `ntuples.base` |
 | `jet_fakes` | `mc` (default), `ff` | MC jet fakes + ABCD QCD, or `jetFakes` from the fake-factor friend (data minus genuine and lepton fakes in `anti_iso`) |
 | `ff_type` | `corrected` (default), `raw` | the FF friend weight of `jetFakes`: corrected, or raw (no DR->SR and non-closure corrections; needs `jet_fakes: ff` and `shape_systematics: false`) |
-| `embedding` | `false` (default), `true` | genuine ττ from the embedded samples (`EMB`) instead of the T parts of the MC; needs the embedding inventory in `sample_lists` |
+| `embedding` | `false` (default), `true`, a list of channels (`[et, mt]`) | genuine ττ from the embedded samples (`EMB`) instead of the T parts of the MC, in every tau channel or in the listed ones (each a channel of the run); needs the embedding inventory in `sample_lists` |
 | `nn_friend` | `false` (default), `true` | NN categories from the NN friend |
 | `control_regions` | `false` (default), `true` | wider skim plus the named pass/fail control regions; needs `jet_fakes: mc` |
 | `shape_systematics` | `true` (default), `false` | the CROWN shifts of the embedded samples and of the fake-factor friend as shape variations |
@@ -124,9 +124,11 @@ mutau 2018D event count) of exactly the nicks in `inventory/`; a new inventory a
 ## Embedding and fake factors
 
 - **Processes.** Gen-match splits T (genuine ττ, the lepton leg from a τ decay), L (lepton fakes), J (jet → τh) for
-  DY, TT, ST, VV, TTV and EWK. With `embedding: true`, `EMB` (genmatch T) replaces every T part; `TTT` stays as
-  an auxiliary process (booked in nominal, in no datacard or plot) for the ttbar contamination
-  `CMS_htt_emb_ttbar_2018` (EMB ± 10 % of TTT). With `jet_fakes: ff`, `jetFakes` replaces the J parts and W.
+  DY, TT, ST, VV, TTV and EWK. In an embedded channel (`embedding: true`, or the channel in the list
+  `embedding: [et, mt]`), `EMB` (genmatch T) replaces every T part; `TTT` stays as an auxiliary process (booked in
+  nominal, in no datacard or plot) for the ttbar contamination `CMS_htt_emb_ttbar_2018` (EMB ± 10 % of TTT). The
+  lnN table and the ML labels take the processes of all channels. With `jet_fakes: ff`, `jetFakes` replaces the J
+  parts and W.
 - **EMB weights** (Part-A contract): `emb_genweight`, the embedding selection SFs, the embedding lepton ID/iso SFs
   (mt `id_wgt_mu_1`, `iso_wgt_mu_1`; et `id_wgt_ele_1`, `iso_wgt_ele_1`), the vsJet SF of genuine τh, vsE/vsMu and the
   trigger SF; no pileup and no b-tag weight. They carry their own names (`emb_…`), so regions that replace MC
@@ -135,7 +137,7 @@ mutau 2018D event count) of exactly the nicks in `inventory/`; a new inventory a
 - **Shifts** (`systematics.py`, only with `shape_systematics: true`). The analysis declares every CROWN shift it
   reads. For a sample kind with declared shifts the skim fails on a declared shift without a shifted branch and on an
   undeclared `c__X` branch of a needed column (main n-tuple or friend):
-  - embedding (only with `embedding: true`): `CMS_scale_t_emb_dm{0,1,1011}_<wp>_2018` (branches
+  - embedding (only in the embedded channels): `CMS_scale_t_emb_dm{0,1,1011}_<wp>_2018` (branches
     `__CMS_scale_t_emb_DeepTau2018v2p5_DM<dm>_2018`) and `CMS_eff_t_emb_dm{0,1,1011}_pt{20to40,40toInf}_<wp>_2018`
     (`__CMS_eff_t_emb_DeepTau2018v2p5_VSjet_DM<dm>_pt<bin>_2018`), `wp` = `vsEleTight` in et, `vsEleVVLoose` in mt and
     tt; tt has no pt20to40 shifts. 9 nuisances in et and mt, 6 in tt. DM10 and DM11 are one fitted category, which

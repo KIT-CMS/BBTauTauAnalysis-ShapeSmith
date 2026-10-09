@@ -75,6 +75,16 @@ def test_the_subtractions(embedding):
     assert leg.fractions.subtract == genuine + fakes and leg.fractions.ttbar == "TTJ"
 
 
+def test_embedding_per_channel():
+    """embedding: [et, mt] subtracts EMB in et and mt and the MC T parts in tt: one run for the mixed payload."""
+    analysis = measurement_analysis(["et", "mt"])
+    fakes = L_PARTS + J_PARTS + ("W",)
+    for name, genuine in (("et", ("EMB",)), ("mt", ("EMB",)), ("tt", T_PARTS)):
+        for leg in analysis.measurement.legs[name]:
+            assert leg.qcd.subtract == leg.ttbar.scale.subtract == leg.fractions.subtract == genuine + fakes, name
+    assert not any(s.kind == "embedding" for s in analysis.channel("tt").samples)
+
+
 def test_the_tables():
     for channel, tables in TABLES.items():
         for name, table in tables.items():

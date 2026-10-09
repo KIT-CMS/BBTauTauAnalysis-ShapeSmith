@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import logging
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, ValidationError, model_validator
 from shapesmith.model import AnalysisError
 
 STRICT = ConfigDict(extra="forbid", strict=True, frozen=True)
@@ -13,13 +13,37 @@ SampleLists = list[str]  # inventory/<name>.txt: the KingMaker sample lists of t
 logger = logging.getLogger(__name__)
 
 
-class TauSwitches(BaseModel):
+def _distinct(embedding: bool | list[str]) -> bool | list[str]:
+    if isinstance(embedding, list) and len(set(embedding)) < len(embedding):
+        raise ValueError(f"a channel is listed twice: {embedding}")
+    return embedding
+
+
+# true or false for every tau channel, or the embedded channels (a list: strict pydantic takes no YAML list as tuple)
+Embedding = Annotated[bool | list[Literal["et", "mt", "tt"]], AfterValidator(_distinct)]
+
+
+class _EmbeddedChannels:
+    """The channel methods of the switch `embedding`."""
+
+    def embedded(self, channel: str) -> bool:
+        """Genuine taus of the channel from the embedded samples."""
+        return channel in self.embedding if isinstance(self.embedding, list) else self.embedding
+
+    def check_embedding(self, channels: list[str]) -> None:
+        """A listed embedded channel must be a channel of the run."""
+        unknown = [channel for channel in self.embedding if channel not in channels] if isinstance(self.embedding, list) else []
+        if unknown:
+            raise AnalysisError(f"embedding: {', '.join(unknown)} not among the channels {', '.join(channels)}")
+
+
+class TauSwitches(_EmbeddedChannels, BaseModel):
     model_config = STRICT
 
     sample_lists: SampleLists = Field(min_length=1)
     jet_fakes: Literal["mc", "ff"] = "mc"  # MC jet fakes + ABCD QCD, or the fake-factor estimate (FF friend)
     ff_type: Literal["corrected", "raw"] = "corrected"  # FF friend weight; raw: no DR->SR and non-closure corrections (needs jet_fakes: ff, shape_systematics: false)
-    embedding: bool = False  # genuine tautau from the embedded samples instead of MC
+    embedding: Embedding = False  # genuine tautau from the embedded samples instead of MC, in every tau channel or the listed ones
     nn_friend: bool = False  # NN categories from the NN friend
     control_regions: bool = False  # wider skim plus the named pass/fail control regions (needs jet_fakes: mc)
     shape_systematics: bool = True  # the embedding and fake-factor shifts (column variations)
@@ -39,11 +63,11 @@ class TauSwitches(BaseModel):
         return self
 
 
-class FakeFactorSwitches(BaseModel):
+class FakeFactorSwitches(_EmbeddedChannels, BaseModel):
     model_config = STRICT
 
     sample_lists: SampleLists = Field(min_length=1)
-    embedding: bool = False  # genuine taus subtracted as EMB instead of MC (not in the DR->SR steps)
+    embedding: Embedding = False  # genuine taus subtracted as EMB instead of MC (not in the DR->SR steps), in every or the listed channels
 
 
 class DileptonSwitches(BaseModel):

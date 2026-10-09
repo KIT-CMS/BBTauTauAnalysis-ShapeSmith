@@ -56,17 +56,17 @@ def jet_fakes_output(jet_fakes: str) -> str:
 
 def estimators(name: str, processes: tuple[Process, ...], switches: TauSwitches) -> tuple:
     """jetFakes = data - (genuine + lepton fakes) in the fake-factor region, or QCD from ABCD with every MC subtracted;
-    with embedding the sums of the embedding shifts of DM10 and DM11 (after jetFakes, which carries them too) and the
-    ttbar contamination of the embedded sample (+-10 % of genuine ttbar)."""
+    in an embedded channel the sums of the embedding shifts of DM10 and DM11 (after jetFakes, which carries them too)
+    and the ttbar contamination of the embedded sample (+-10 % of genuine ttbar)."""
     genuine_and_lepton_fakes = backgrounds_in(processes, GENUINE) + backgrounds_in(processes, LEPTON_FAKE)
     output = jet_fakes_output(switches.jet_fakes)
     if switches.jet_fakes == "ff":
         result = (DataMinus(output, "anti_iso", genuine_and_lepton_fakes),)
     else:
         result = (ABCD(output, "abcd_anti_iso", "abcd_same_sign", "abcd_same_sign_anti_iso", genuine_and_lepton_fakes + backgrounds_in(processes, JET_FAKE)),)
-    if switches.embedding and switches.shape_systematics:
+    if switches.embedded(name) and switches.shape_systematics:
         result += embedding_variation_sums(name)
-    if switches.embedding:
+    if switches.embedded(name):
         result += (TemplateShift(f"CMS_htt_emb_ttbar_{ERA}", EMBEDDED, SPLITS["TT"]["T"], 0.1),)
     return result
 
@@ -74,11 +74,11 @@ def estimators(name: str, processes: tuple[Process, ...], switches: TauSwitches)
 def column_variations(name: str, switches: TauSwitches) -> tuple:
     if not switches.shape_systematics:
         return ()
-    return (embedding_variations(name) if switches.embedding else ()) + (ff_variations(name) if switches.jet_fakes == "ff" else ())
+    return (embedding_variations(name) if switches.embedded(name) else ()) + (ff_variations(name) if switches.jet_fakes == "ff" else ())
 
 
 def channel(name: str, switches: TauSwitches, channel_samples: tuple[Sample, ...]) -> Channel:
-    table = tau_processes(name, switches.jet_fakes, switches.embedding)
+    table = tau_processes(name, switches.jet_fakes, switches.embedded(name))
     groups = {p.group for p in table}
     return Channel(
         name=name,
@@ -97,6 +97,7 @@ def channel(name: str, switches: TauSwitches, channel_samples: tuple[Sample, ...
 
 def build(config: RunConfig) -> Analysis:
     switches = parse(TauSwitches, config.switches)
+    switches.check_embedding(config.channels)
     by_channel = samples(sample_database(config), switches.sample_lists, config.channels)
     channels = {name: channel(name, switches, by_channel[name]) for name in config.channels}
     processes = process_union(channels.values())  # the channels can differ in their processes
