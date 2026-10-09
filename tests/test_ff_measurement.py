@@ -62,6 +62,8 @@ def test_the_regions():
     assert scale["lepton_vetoes"].startswith("~(") and "dilepton_veto" in scale["lepton_vetoes"] and scale["os"] == cuts.SAME_SIGN
     assert "dilepton_veto" not in region_cuts(tt, "ttbar_scale_ar_like")["lepton_vetoes"]
     assert not any("veto" in name for name in mt.skim)  # stored, not applied
+    # the analysis tau eta cut in the measurement and its skim (et, mt)
+    assert mt.cuts["tau_eta"] == mt.skim["tau_eta"] == et.cuts["tau_eta"] == "(abs(eta_2) < 2.3)" and "tau_eta" not in tt.cuts
 
 
 @pytest.mark.parametrize("embedding", [False, True])

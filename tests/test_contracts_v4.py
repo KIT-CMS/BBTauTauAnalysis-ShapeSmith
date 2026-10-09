@@ -14,9 +14,13 @@ RUN_YAML = {"et": "sm2018_binned_v4", "mt": "sm2018_binned_v4", "tt": "sm2018_bi
             "em": "sm2018_binned_v4_dilepton", "mm": "sm2018_binned_v4_dilepton", "ee": "sm2018_binned_v4_dilepton"}
 
 
+TAU_ETA = {"tau_eta": "(abs(eta_2) < 2.3)"}  # v6, A5: the selection of the et and mt skims
+
+
 def changes(channel_name: str, kind: str) -> list[str]:
-    """Why a v4 skim needs a re-skim today: the electron reco SF of the et MC (v6, A3)."""
-    return ["columns missing: reco_wgt_ele_1"] if (channel_name, kind) == ("et", "mc") else []
+    """Why a v4 skim needs a re-skim today: the tau eta cut in et and mt (v6, A5), the electron reco SF of the et MC
+    (v6, A3)."""
+    return (["selection changed"] if channel_name in ("et", "mt") else []) + (["columns missing: reco_wgt_ele_1"] if (channel_name, kind) == ("et", "mc") else [])
 
 
 @pytest.mark.parametrize("channel_name", sorted(STORED))
@@ -24,7 +28,7 @@ def test_v4_skims_are_reused(channel_name):
     config = load_config(REPO / "configs" / f"{RUN_YAML[channel_name]}.yaml").model_copy(update={"sample_database": DATABASE})
     channel = load_analysis(config).channel(channel_name)
     stored = STORED[channel_name]
-    assert dict(channel.skim) == stored["selection"]  # byte for byte
+    assert dict(channel.skim) == stored["selection"] | (TAU_ETA if channel_name in ("et", "mt") else {})  # byte for byte
     samples = {s.nick: s for s in channel.samples}
     for nick, skim in stored["samples"].items():
         expected = contract(config, channel, samples[nick], needed_columns(channel, samples[nick]))

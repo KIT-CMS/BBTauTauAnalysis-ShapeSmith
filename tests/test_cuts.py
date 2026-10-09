@@ -47,6 +47,15 @@ def test_embedding_weights_follow_the_part_a_contract(channel):
     assert {"emb_vs_mu", "emb_vs_ele", "emb_tau_id", "emb_trigger"} <= set(emb)
 
 
+@pytest.mark.parametrize("channel", TAU_CHANNELS)
+def test_tau_eta_in_et_and_mt(channel):
+    expected = "(abs(eta_2) < 2.3)" if channel in LT_CHANNELS else None
+    for selection in (cuts.baseline_cuts(channel), cuts.skim_cuts(channel), cuts.skim_cuts(channel, control_regions=True)):
+        assert selection.get("tau_eta") == expected
+    frame = pd.DataFrame({"eta_2": [-2.31, -2.29, 2.29, 2.3]})
+    assert mask(frame, [cuts.baseline_cuts("mt")["tau_eta"]]).tolist() == [False, True, True, False]
+
+
 def test_light_lepton_scale_factors():
     """et: electron ID (wp90iso, covering the isolation) and reconstruction SF in MC; the embedding keeps its own
     ID and iso SFs and has no reconstruction SF."""

@@ -40,6 +40,8 @@ def baseline_cuts(channel: str) -> dict[str, str]:
         cuts["dilepton_veto"] = "(dilepton_veto < 0.5)"  # not produced for tt (no light lepton in the final state)
         cuts["lepton_iso"] = "(iso_1 < 0.15)"
         cuts["mt_cut"] = "(mt_1 < 70)"
+        # EMB has hardly any tau_h beyond 2.3, where the Run-2 vsMu SFs end; tt: the trigger matching cuts at 2.1
+        cuts["tau_eta"] = "(abs(eta_2) < 2.3)"
     else:
         cuts["pt_selection"] = "(pt_1 > 40) & (pt_2 > 40)"
     cuts["trg_selection"] = TRIGGER[channel]

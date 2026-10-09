@@ -69,8 +69,8 @@ histograms of an existing `control_shapes.root`.
 
 The nominal baseline requires OS, at least one b-tag and `bpair_pt_2 > 0`, Medium vsJet ID
 on every tau leg, tau anti-electron/muon ID, trigger requirements and extra-lepton vetoes.
-In `et`/`mt`, it also requires `iso_1 < 0.15`, `mt_1 < 70` GeV and the dilepton veto;
-in `tt`, both taus must have pT > 40 GeV. The `et`/`mt` trigger selections require tau
+In `et`/`mt`, it also requires `iso_1 < 0.15`, `mt_1 < 70` GeV, tau `|eta_2| < 2.3` and the dilepton
+veto; in `tt`, both taus must have pT > 40 GeV (the trigger matching limits their |eta| to 2.1). The `et`/`mt` trigger selections require tau
 pT > 30 GeV and electron/muon pT > 33/25 GeV, respectively, plus the single-lepton trigger flag.
 
 **Tau pass/fail** refers to the vsJet ID, not the light-lepton isolation:
