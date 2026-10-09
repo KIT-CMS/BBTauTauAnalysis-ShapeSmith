@@ -145,10 +145,12 @@ mutau 2018D event count) of exactly the nicks in `inventory/`; a new inventory a
   reads. For a sample kind with declared shifts the skim fails on a declared shift without a shifted branch and on an
   undeclared `c__X` branch of a needed column (main n-tuple or friend):
   - embedding (only in the embedded channels): `CMS_scale_t_emb_dm{0,1,1011}_<wp>_2018` (branches
-    `__CMS_scale_t_emb_DeepTau2018v2p5_DM<dm>_2018`) and `CMS_eff_t_emb_dm{0,1,1011}_pt{20to40,40toInf}_<wp>_2018`
-    (`__CMS_eff_t_emb_DeepTau2018v2p5_VSjet_DM<dm>_pt<bin>_2018`), `wp` = `vsEleTight` in et, `vsEleVVLoose` in mt and
-    tt; tt has no pt20to40 shifts. 9 nuisances in et and mt, 6 in tt. DM10 and DM11 are one fitted category, which
-    CROWN shifts per decay mode: the `dm1011` nuisances are `VariationSum`s of the DM10 and DM11 shifts (read as the
+    `__CMS_scale_t_emb_DeepTau2018v2p5_DM<dm>_2018`) and `CMS_eff_t_emb_dm{0,1,1011}_<wp>_2018`
+    (`__CMS_eff_t_emb_DeepTau2018v2p5_VSjet_DM<dm>_2018`), `wp` = `vsEleTight` in et, `vsEleVVLoose` in mt and tt;
+    6 nuisances per channel. The energy scale and the vsJet SF of the embedding are binned in the decay mode only
+    (production v6); the v5 embedding has pT-binned vsJet shifts (`..._pt{20to40,40toInf}_2018`) instead, so v5 runs
+    with embedding shifts need `--skip-systematics` or `shape_systematics: false`. DM10 and DM11 are one fitted
+    category, which CROWN shifts per decay mode: the `dm1011` nuisances are `VariationSum`s of the DM10 and DM11 shifts (read as the
     parts `<name>Up%dm10`, ...), exact in et and mt, to first order in tt, where both taus can be 3-prong.
   - fake factors (only with `jet_fakes: ff`): `CMS_ff_<key>_<channel>_2018` with branch suffix `__<key>`, for the
     17 keys of `FF_SHIFTS_LT` (et, mt) and the 34 of `FF_SHIFTS_TT` (tt, both legs), on data, MC and embedding.

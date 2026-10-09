@@ -46,11 +46,10 @@ FF_SHIFTS_TT = FF_SHIFTS_LT + (
     "ttbar_subleading_non_closure_CorrStatShift", "ttbar_subleading_non_closure_CorrSystBandAsym", "ttbar_subleading_non_closure_CorrSystMCShift",
 )
 
-# Embedding tau corrections, one nuisance per measured decay-mode category: nuisance token -> the decay modes of its
-# CROWN shifts. DM10 and DM11 are one fit, which CROWN shifts per decay mode; the nuisance sums the two.
+# Embedding tau corrections (energy scale and vsJet SF, both binned in the decay mode), one nuisance per measured
+# decay-mode category: nuisance token -> the decay modes of its CROWN shifts. DM10 and DM11 are one fit, which CROWN
+# shifts per decay mode; the nuisance sums the two.
 EMBEDDING_TAU_DECAY_MODES = {"0": (0,), "1": (1,), "1011": (10, 11)}
-# vsJet pT bins; tt has no 20-40 GeV bin because its selection requires both taus above 40 GeV
-EMBEDDING_VS_JET_PT_BINS = {"et": ("20to40", "40toInf"), "mt": ("20to40", "40toInf"), "tt": ("40toInf",)}
 
 # UParT b-tag shape-correction components; columns btag_weight_upart_{up,down}_<component>
 BTAG_COMPONENTS = (

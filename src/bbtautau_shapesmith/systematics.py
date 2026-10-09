@@ -7,7 +7,7 @@ from collections.abc import Iterable
 from shapesmith.histogram import part_of
 from shapesmith.model import ColumnVariation, LnN, Process, VariationSum, WeightVariation
 
-from bbtautau_shapesmith.constants import BTAG_COMPONENTS, EMBEDDING_TAU_DECAY_MODES, EMBEDDING_VS_JET_PT_BINS, ERA, FF_SHIFTS_LT, FF_SHIFTS_TT, LT_CHANNELS, TAU_VS_ELE_WP
+from bbtautau_shapesmith.constants import BTAG_COMPONENTS, EMBEDDING_TAU_DECAY_MODES, ERA, FF_SHIFTS_LT, FF_SHIFTS_TT, LT_CHANNELS, TAU_VS_ELE_WP
 from bbtautau_shapesmith.processes import EMBEDDED, SIGNAL
 
 
@@ -34,9 +34,8 @@ def _embedding_nuisances(channel: str) -> list[tuple[str, dict[int, str]]]:
         shifts = {dm: f"CMS_scale_t_emb_DeepTau2018v2p5_DM{dm}_{ERA}" for dm in decay_modes}
         result.append((f"CMS_scale_t_emb_dm{token}_{wp}_{ERA}", shifts))
     for token, decay_modes in EMBEDDING_TAU_DECAY_MODES.items():
-        for pt in EMBEDDING_VS_JET_PT_BINS[channel]:
-            shifts = {dm: f"CMS_eff_t_emb_DeepTau2018v2p5_VSjet_DM{dm}_pt{pt}_{ERA}" for dm in decay_modes}
-            result.append((f"CMS_eff_t_emb_dm{token}_pt{pt}_{wp}_{ERA}", shifts))
+        shifts = {dm: f"CMS_eff_t_emb_DeepTau2018v2p5_VSjet_DM{dm}_{ERA}" for dm in decay_modes}
+        result.append((f"CMS_eff_t_emb_dm{token}_{wp}_{ERA}", shifts))
     return result
 
 
