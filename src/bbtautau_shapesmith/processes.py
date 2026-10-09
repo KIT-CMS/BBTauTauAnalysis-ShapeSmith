@@ -27,6 +27,9 @@ SPLITS = {
 SINGLE_HIGGS = {"ggH": "ggH125", "qqH": "qqH125", "ttH": "ttH125", "VH": "VH125"}  # group -> process
 PLOT_GROUP = {"DY": "Z", "TT": "TT", "ST": "ST", "VV": "VV", "TTV": "rare", "EWK": "rare", "W": "rare", **dict.fromkeys(SINGLE_HIGGS, "rare")}
 
+# hadron flavour of the GenJet of the leading-score b-pair jet (MC only; 246 = no GenJet, light as in the BTV convention)
+HADRON_FLAVOURS = {"b": "(genjet_hadFlavour_1 == 5)", "c": "(genjet_hadFlavour_1 == 4)", "l": "(genjet_hadFlavour_1 != 5) & (genjet_hadFlavour_1 != 4)"}
+
 # analysis vocabulary for the estimates and the ML labels
 GENUINE = frozenset({EMBEDDED, *(parts["T"] for parts in SPLITS.values())})
 LEPTON_FAKE = frozenset(parts["L"] for parts in SPLITS.values())
@@ -57,11 +60,15 @@ def tau_processes(channel: str, jet_fakes: str, embedding: bool, dy_correction: 
     return tuple(result)
 
 
-def dilepton_processes(channel: str, dy_correction: str = "none") -> tuple[Process, ...]:
+def dilepton_processes(channel: str, dy_correction: str = "none", flavours: bool = False) -> tuple[Process, ...]:
+    """With flavours, the auxiliary flavour templates of DY (mm, ee) or ttbar (em), e.g. DY_b, DY_c and DY_l."""
     mc = dilepton_mc_weights(channel)
     result = _data_and_signal(mc)
     result += [_mc(group, group, mc, dy_correction=dy_correction) for group in (*SPLITS, "W")]
     result += [_mc(name, group, mc) for group, name in SINGLE_HIGGS.items()]
+    if flavours:
+        group = "TT" if channel == "em" else "DY"
+        result += [_mc(f"{group}_{flavour}", group, mc, {"flavour": cut}, role="auxiliary", dy_correction=dy_correction) for flavour, cut in HADRON_FLAVOURS.items()]
     return tuple(result)
 
 

@@ -15,6 +15,8 @@ TAU_VS_ELE_WP = {"mt": "VVLoose", "et": "Tight", "tt": "VVLoose"}
 
 # b-tag multiplicity bins of the control regions (each combined with >= 2 jets)
 BTAG_BINS = {"btag0": "n_bjets == 0", "btag1": "n_bjets == 1", "btag2": "n_bjets == 2", "btag3p": "n_bjets >= 3"}
+# jet multiplicity bins of the dilepton diagnostic regions (switch diagnostics), each with 0 and >= 1 b tags
+NJETS_BINS = {"nj2": "n_jets == 2", "nj3": "n_jets == 3", "nj4p": "n_jets >= 4"}
 
 # DY correction (switch dy_correction: njets_btag): DY data/MC in the mm Z window of sm2018_binned_v5, rows n_bjets
 # 0, 1, >= 2 (measured with 2), columns n_jets <= 2, 3, >= 4 (the tau selections have >= 2 jets), the other MC

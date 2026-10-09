@@ -8,7 +8,7 @@ from shapesmith.config import RunConfig
 from shapesmith.model import ABCD, Analysis, AnalysisError, Category, Channel, DataMinus, MLExportConfig, Process, Sample, TemplateShift
 
 from bbtautau_shapesmith import cuts, dilepton
-from bbtautau_shapesmith.constants import CONTROL_CHANNELS, ERA, LUMI_PB, TAU_CHANNELS
+from bbtautau_shapesmith.constants import BTAG_BINS, CONTROL_CHANNELS, ERA, LT_CHANNELS, LUMI_PB, TAU_CHANNELS
 from bbtautau_shapesmith.processes import EMBEDDED, GENUINE, JET_FAKE, LEPTON_FAKE, SIGNAL, SPLITS, backgrounds_in, tau_processes
 from bbtautau_shapesmith.samples import sample_database, samples
 from bbtautau_shapesmith.style import style
@@ -55,16 +55,29 @@ def jet_fakes_output(jet_fakes: str) -> str:
     return "jetFakes" if jet_fakes == "ff" else "QCD"
 
 
+def diagnostic_estimators(name: str, every_mc: tuple[str, ...]) -> tuple:
+    """QCD in the control regions of every b-tag bin: in et and mt the same-sign data minus every MC (OS/SS = 1, which
+    only btag0 can measure), also for the lepton anti-isolation region; in tt ABCD with the tau-fail regions."""
+    if name not in LT_CHANNELS:
+        return tuple(ABCD("QCD", f"{b}_ss_pass", f"{b}_os_fail", f"{b}_ss_fail", every_mc, target=f"{b}_os_pass") for b in BTAG_BINS)
+    pairs = [(f"{b}_ss_{tau_id}", f"{b}_os_{tau_id}") for b in BTAG_BINS for tau_id in ("pass", "fail")] + [("lepton_antiiso_ss", "lepton_antiiso")]
+    return tuple(DataMinus("QCD", region, every_mc, clip_negative=True, target=target) for region, target in pairs)
+
+
 def estimators(name: str, processes: tuple[Process, ...], switches: TauSwitches) -> tuple:
-    """jetFakes = data - (genuine + lepton fakes) in the fake-factor region, or QCD from ABCD with every MC subtracted;
-    in an embedded channel the sums of the embedding shifts of DM10 and DM11 (after jetFakes, which carries them too)
-    and the ttbar contamination of the embedded sample (+-10 % of genuine ttbar)."""
+    """jetFakes = data - (genuine + lepton fakes) in the fake-factor region, or QCD from ABCD with every MC subtracted
+    (with diagnostics also in the control regions); in an embedded channel the sums of the embedding shifts of DM10 and
+    DM11 (after the estimates, which carry them too) and the ttbar contamination of the embedded sample (+-10 % of
+    genuine ttbar)."""
     genuine_and_lepton_fakes = backgrounds_in(processes, GENUINE) + backgrounds_in(processes, LEPTON_FAKE)
+    every_mc = genuine_and_lepton_fakes + backgrounds_in(processes, JET_FAKE)
     output = jet_fakes_output(switches.jet_fakes)
     if switches.jet_fakes == "ff":
         result = (DataMinus(output, "anti_iso", genuine_and_lepton_fakes),)
     else:
-        result = (ABCD(output, "abcd_anti_iso", "abcd_same_sign", "abcd_same_sign_anti_iso", genuine_and_lepton_fakes + backgrounds_in(processes, JET_FAKE)),)
+        result = (ABCD(output, "abcd_anti_iso", "abcd_same_sign", "abcd_same_sign_anti_iso", every_mc),)
+    if switches.diagnostics:
+        result += diagnostic_estimators(name, every_mc)
     if switches.embedded(name) and switches.shape_systematics:
         result += embedding_variation_sums(name)
     if switches.embedded(name):
@@ -95,7 +108,7 @@ def channel(name: str, switches: TauSwitches, channel_samples: tuple[Sample, ...
         processes=table,
         regions=cuts.regions(name, switches.jet_fakes, switches.ff_type) + (cuts.diagnostic_regions(name) if switches.control_regions else ()),
         categories=fit_categories(switches),
-        variables=control_variables(switches.nn_friend),
+        variables=control_variables(switches.nn_friend, switches.diagnostics),
         variations=btag_variations() + column_variations(name, switches),
         estimators=estimators(name, table, switches),
         keep_columns=("event", "run", "lumi"),

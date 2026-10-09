@@ -49,6 +49,7 @@ class TauSwitches(_EmbeddedChannels, BaseModel):
     nn_friend: bool = False  # NN categories from the NN friend
     fit_categories: Literal["nn", "control"] = "nn"  # nn: the NN categories (with nn_friend); control: one category 'nominal' per channel
     control_regions: bool = False  # wider skim plus the named pass/fail control regions (needs jet_fakes: mc)
+    diagnostics: bool = False  # QCD in the control regions and the diagnostic variables (needs control_regions; npv_good, rho from v6)
     shape_systematics: bool = True  # the embedding and fake-factor shifts (column variations)
     dy_correction: DyCorrection = "none"  # on every DY process (ZTT, ZL, ZJ)
 
@@ -56,6 +57,12 @@ class TauSwitches(_EmbeddedChannels, BaseModel):
     def _controls_need_mc_fakes(self) -> TauSwitches:
         if self.control_regions and self.jet_fakes != "mc":
             raise ValueError("control_regions requires jet_fakes: mc for raw pass/fail data/MC comparisons")
+        return self
+
+    @model_validator(mode="after")
+    def _diagnostics_need_control_regions(self) -> TauSwitches:
+        if self.diagnostics and not self.control_regions:
+            raise ValueError("diagnostics requires control_regions: true")
         return self
 
     @model_validator(mode="after")
@@ -83,6 +90,7 @@ class DileptonSwitches(BaseModel):
 
     sample_lists: SampleLists = Field(min_length=1)
     dy_correction: DyCorrection = "none"  # none to derive the table, njets_btag for its closure
+    diagnostics: bool = False  # n_jets regions, flavour templates of DY (mm, ee) and ttbar (em), the diagnostic variables
 
 
 class TauIdSwitches(BaseModel):

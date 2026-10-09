@@ -7,8 +7,9 @@ from bbtautau_shapesmith import dilepton, ff_measurement
 from bbtautau_shapesmith.analysis import build, process_union
 from bbtautau_shapesmith.constants import FF_COLUMNS, FF_RAW_COLUMNS, LT_CHANNELS, NN_COLUMNS, TAU_CHANNELS
 from bbtautau_shapesmith.systematics import btag_variations, embedding_variation_sums
+from bbtautau_shapesmith.variables import DIAGNOSTIC_VARIABLES
 from bbtautau_shapesmith.weights import dy_njets_btag_weight, fake_factor_weight
-from tests.helpers import EMBEDDING_LIST, branches, config, embedded, embedding_branches
+from tests.helpers import EMBEDDING_LIST, V6_COLUMNS, branches, config, embedded, embedding_branches
 
 COMBINATIONS = [(jet_fakes, embedding) for jet_fakes in ("mc", "ff") for embedding in (False, True, ["et", "mt"])]
 T_PARTS = {"ZTT", "TTT", "STT", "VVT", "TTVT", "EWKT"}
@@ -136,6 +137,24 @@ def test_dy_correction_weights_the_dy_processes_only():
     assert corrected(controls) == {(name, "DY") for name in ("em", "mm", "ee")}
 
 
+def test_diagnostics_estimate_qcd_in_the_control_regions():
+    analysis = analysis_for("mc", ["et", "mt"], control_regions=True, diagnostics=True)
+    mt, tt = analysis.channel("mt"), analysis.channel("tt")
+    every_mc = mt.estimators[0].subtract  # as the nominal ABCD
+    assert DataMinus("QCD", "btag1_ss_fail", every_mc, clip_negative=True, target="btag1_os_fail") in mt.estimators
+    assert DataMinus("QCD", "lepton_antiiso_ss", every_mc, clip_negative=True, target="lepton_antiiso") in mt.estimators
+    assert len([e for e in mt.estimators if isinstance(e, DataMinus)]) == 9 and mt.backgrounds().count("QCD") == 1
+    abcd = [e for e in tt.estimators if isinstance(e, ABCD)]
+    assert ABCD("QCD", "btag2_ss_pass", "btag2_os_fail", "btag2_ss_fail", tt.estimators[0].subtract, target="btag2_os_pass") in abcd
+    assert [e.target for e in abcd] == ["nominal", "btag0_os_pass", "btag1_os_pass", "btag2_os_pass", "btag3p_os_pass"]
+    for name, channel in analysis.channels.items():
+        assert set(DIAGNOSTIC_VARIABLES) <= set(channel.variables) & set(analysis.style.axis_labels[name])
+        for sample in channel.samples:
+            available = (embedding_branches(name) if sample.kind == "embedding" else branches(name) | {"npartons"}) | V6_COLUMNS
+            assert not needed_columns(channel, sample) - available, sample.nick
+    assert not set(DIAGNOSTIC_VARIABLES) & set(analysis_for("mc", control_regions=True).channel("mt").variables)
+
+
 def test_em_is_the_ttbar_control_channel():
     analysis = build(config(("et", "mt", "tt", "em"), jet_fakes="ff", embedding=["et", "mt"], fit_categories="control", sample_lists=["sm2018_binned_v3", EMBEDDING_LIST]))
     validate(analysis)
@@ -185,6 +204,7 @@ def test_processes_of_every_channel():
     ({"jet_fakes": "data"}, "jet_fakes"),
     ({"sample_lists": []}, "sample_lists"),
     ({"control_regions": True, "jet_fakes": "ff"}, "control_regions requires jet_fakes: mc"),
+    ({"diagnostics": True}, "diagnostics requires control_regions: true"),
     ({"ff_type": "uncorrected", "jet_fakes": "ff"}, "ff_type"),
     ({"ff_type": "raw", "shape_systematics": False}, "ff_type raw requires jet_fakes: ff"),
     ({"ff_type": "raw", "jet_fakes": "ff"}, "ff_type raw supports nominal control plots only; set shape_systematics: false"),

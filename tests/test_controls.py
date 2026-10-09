@@ -13,10 +13,10 @@ from shapesmith.plotting.stack import run_plot
 from shapesmith.skim import needed_columns
 from shapesmith.store import write_skim
 
-from bbtautau_shapesmith.constants import DILEPTON_CHANNELS, NN_COLUMNS, TAU_CHANNELS
+from bbtautau_shapesmith.constants import DILEPTON_CHANNELS, NJETS_BINS, NN_COLUMNS, TAU_CHANNELS
 from bbtautau_shapesmith.dilepton import build
-from bbtautau_shapesmith.variables import control_variables
-from tests.helpers import DATABASE, REPO, branches, config
+from bbtautau_shapesmith.variables import DIAGNOSTIC_VARIABLES, control_variables
+from tests.helpers import DATABASE, REPO, V6_COLUMNS, branches, config
 from tests.test_analysis import analysis_for
 
 DILEPTON = "bbtautau_shapesmith.dilepton:build"
@@ -53,6 +53,33 @@ def test_btag_regions_partition_two_jet_events(channel):
     for name in ("btag0", "btag1", "btag2", "btag3p"):
         counts += mask(frame, {**definition.cuts, **definition.region(name).replace_cuts}.values())
     assert counts.tolist() == [1] * 5
+
+
+@pytest.mark.parametrize("channel", DILEPTON_CHANNELS)
+def test_diagnostic_jet_regions_partition_two_jet_events(channel):
+    definition = build(config([channel], DILEPTON, diagnostics=True)).channel(channel)
+    frame = pd.DataFrame([event(n_jets=jets, n_bjets=btags) for jets in range(2, 7) for btags in range(3)])
+    counts = np.zeros(len(frame), dtype=int)
+    for jets in NJETS_BINS:
+        for tag in ("btag0", "btag1p"):
+            counts += mask(frame, {**definition.cuts, **definition.region(f"{jets}_{tag}").replace_cuts}.values())
+    assert counts.tolist() == [1] * len(frame)
+
+
+@pytest.mark.parametrize("channel", DILEPTON_CHANNELS)
+def test_flavour_templates_read_the_flavour_of_mc_only(channel):
+    definition = build(config([channel], DILEPTON, diagnostics=True)).channel(channel)
+    group = "TT" if channel == "em" else "DY"
+    templates = [p for p in definition.processes if p.role == "auxiliary"]
+    assert [(p.name, p.group) for p in templates] == [(f"{group}_{flavour}", group) for flavour in ("b", "c", "l")]
+    frame = pd.DataFrame({"genjet_hadFlavour_1": [5, 4, 0, 21, 246]})
+    assert sum(mask(frame, p.selection.cuts.values()).astype(int) for p in templates).tolist() == [1] * 5
+    assert mask(frame, templates[0].selection.cuts.values()).tolist() == [True, False, False, False, False]
+    assert "genjet_hadFlavour_1" in needed_columns(definition, definition.samples_of(group)[0])
+    assert "genjet_hadFlavour_1" not in needed_columns(definition, definition.samples_of("data")[0])
+    assert set(DIAGNOSTIC_VARIABLES) <= set(definition.variables)
+    for sample in definition.samples:
+        assert needed_columns(definition, sample) <= branches(channel) | V6_COLUMNS | {"npartons"}, sample.nick
 
 
 def test_dilepton_data_routing_unsplit_mc_and_no_tau_estimate():

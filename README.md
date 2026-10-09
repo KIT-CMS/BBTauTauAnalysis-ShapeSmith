@@ -75,6 +75,7 @@ Switches of the tau run YAML (typed in `switches.py`; an unknown or mistyped swi
 | `nn_friend` | `false` (default), `true` | NN categories from the NN friend |
 | `fit_categories` | `nn` (default), `control` | the categories of `hist`, `datacards` and `fit`: the NN classes (with `nn_friend`), or one category `nominal` per tau channel with the nominal region in one bin (`yield`), e.g. for `fit --background-only` without NN friends |
 | `control_regions` | `false` (default), `true` | wider skim plus the named pass/fail control regions; needs `jet_fakes: mc` |
+| `diagnostics` | `false` (default), `true` | QCD in the control regions (et/mt: same-sign data minus MC, tt: ABCD with the fail regions) and the variables `met_uncorrected`, `metphi_uncorrected`, `npv_good`, `rho` (the last two from production v6 on); needs `control_regions: true` |
 | `shape_systematics` | `true` (default), `false` | the CROWN shifts of the embedded samples and of the fake-factor friend as shape variations |
 | `dy_correction` | `none` (default), `njets_btag` | every DY process (ZTT, ZL, ZJ) times the DY data/MC table `DY_NJETS_BTAG` (`constants.py`) of its n_bjets (0, 1, ≥ 2) and n_jets (≤ 2, 3, ≥ 4) |
 
@@ -88,7 +89,10 @@ tau channels name them (`channels: [et, mt, tt]`), so the em skim looks for none
 `skim_dir` (the em skim of the dilepton run has other columns). The ML labels come from the tau channels only, but em
 holds the signal and the single-Higgs processes too: run `ml-export` with `--channels et,mt,tt`.
 
-The dilepton run YAML takes `sample_lists` and `dy_correction` (on `DY`). The table is the mm data/MC of v5;
+The dilepton run YAML takes `sample_lists`, `dy_correction` (on `DY`) and `diagnostics` (the jet-multiplicity regions
+`nj2`, `nj3`, `nj4p` with 0 and ≥ 1 b tags, the diagnostic variables, and the auxiliary flavour templates `DY_b`,
+`DY_c`, `DY_l` in mm/ee and `TT_b`, `TT_c`, `TT_l` in em from the GenJet hadron flavour of the leading-score b-pair
+jet, booked in the nominal region; data reads no flavour column). The table is the mm data/MC of v5;
 `scripts/derive_dy_correction.py -c <dilepton run YAML> [--channels mm,ee] [--ttbar-scale 0.93]` derives it again from
 the control shapes of a dilepton run without the correction (`hist --control --regions all`) and prints it in the
 format of `constants.py`. Override a switch on the command line with

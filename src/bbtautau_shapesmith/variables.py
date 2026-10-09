@@ -77,13 +77,23 @@ _BINNING = {
     "pt_tautaubb": np.arange(0, 520, 20),
     "mass_tautaubb": np.arange(100, 930, 30),
 }
+# switch diagnostics: the MET without recoil correction and jet/lepton propagation, the pileup proxies (v6 n-tuples)
+_DIAGNOSTIC_BINNING = {
+    "met_uncorrected": np.arange(0, 165, 5),
+    "metphi_uncorrected": np.linspace(-np.pi, np.pi, 51),
+    "npv_good": np.arange(-0.5, 80.5, 1),
+    "rho": np.linspace(0, 60, 61),
+}
+DIAGNOSTIC_VARIABLES = tuple(_DIAGNOSTIC_BINNING)
 _EXPRESSIONS = {"yield": "1.0", "sum_deltaR_tt_bb": "bpair_deltaR + deltaR_ditaupair", "NN_score": NN_SCORE_COLUMN}
 _EXPRESSION_BINNING = {"yield": (0.5, 1.5), "sum_deltaR_tt_bb": np.arange(0, 10.6, 0.2), "NN_score": np.linspace(0.0, 1.0, 21)}
 
 
-def control_variables(nn_friend: bool = False) -> dict[str, Variable]:
-    """Control variables (`yield` is the one-bin event count); the NN score only when the NN friend tree is part of the run (nn_friend)."""
-    variables = {name: Variable(name, name, _edges(edges)) for name, edges in _BINNING.items()}
+def control_variables(nn_friend: bool = False, diagnostics: bool = False) -> dict[str, Variable]:
+    """Control variables (`yield` is the one-bin event count); the NN score only when the NN friend tree is part of the
+    run (nn_friend), the diagnostic variables only with diagnostics."""
+    binning = {**_BINNING, **(_DIAGNOSTIC_BINNING if diagnostics else {})}
+    variables = {name: Variable(name, name, _edges(edges)) for name, edges in binning.items()}
     for name, expr in _EXPRESSIONS.items():
         if name == "NN_score" and not nn_friend:
             continue

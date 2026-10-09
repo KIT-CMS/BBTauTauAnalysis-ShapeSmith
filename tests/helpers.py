@@ -13,6 +13,8 @@ EMBEDDING_LIST = "sm2018_embedding"
 # relative to the MC branch fixtures, until a branch fixture of a real embedding file exists.
 EMBEDDING_EXTRA = {"emb_genweight", "emb_idsel_wgt_1", "emb_idsel_wgt_2", "emb_triggersel_wgt"}
 EMBEDDING_EXTRA_ET = {"iso_wgt_ele_1"}
+# CROWN output of the v6 production (B7) that the diagnostics read, until a branch fixture of a v6 file exists
+V6_COLUMNS = {"npv_good", "rho"}
 
 
 def branches(channel: str) -> set[str]:
