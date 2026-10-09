@@ -41,7 +41,7 @@ shapesmith plot      -c configs/sm2018_binned_v6.yaml --control [--region btag0_
 shapesmith skim      -c configs/sm2018_binned_v6_dilepton.yaml
 shapesmith hist      -c configs/sm2018_binned_v6_dilepton.yaml --control --regions all --skip-systematics
 shapesmith plot      -c configs/sm2018_binned_v6_dilepton.yaml --control --region btag1
-python scripts/derive_dy_correction.py -c configs/sm2018_binned_v6_dilepton.yaml [--ttbar-scale 0.93]   # -> DY_NJETS_BTAG
+python scripts/derive_dy_correction.py -c configs/sm2018_binned_v6_dilepton.yaml --ttbar-scale em   # -> DY_NJETS_BTAG
 # fake-factor measurement: the mixed payload of the friend ff_v2 and the cross-check without embedding
 shapesmith skim      -c configs/ff_sm2018_binned_v6.yaml
 shapesmith measure   -c configs/ff_sm2018_binned_v6.yaml && shapesmith measure -c configs/ff_sm2018_binned_v6_noemb.yaml
@@ -107,9 +107,9 @@ The dilepton run YAML takes `sample_lists`, `dy_correction` (on `DY`) and `diagn
 `nj2`, `nj3`, `nj4p` with 0 and ≥ 1 b tags, the diagnostic variables, and the auxiliary flavour templates `DY_b`,
 `DY_c`, `DY_l` in mm/ee and `TT_b`, `TT_c`, `TT_l` in em from the GenJet hadron flavour of the leading-score b-pair
 jet, booked in the nominal region; data reads no flavour column). The table is the mm data/MC of v5;
-`scripts/derive_dy_correction.py -c <dilepton run YAML> [--channels mm,ee] [--ttbar-scale 0.93]` derives it again from
+`scripts/derive_dy_correction.py -c <dilepton run YAML> [--channels mm,ee] [--ttbar-scale em]` derives it again from
 the control shapes of a dilepton run without the correction (`hist --control --regions all`) and prints it in the
-format of `constants.py`. Override a switch on the command line with
+format of `constants.py`; `--ttbar-scale em` scales the subtracted ttbar with the em data/MC of the same b-tag region. Override a switch on the command line with
 `-s switches.jet_fakes=ff`. `--skip-systematics` skips the b-tag weight variations and the CROWN shifts.
 
 Every run YAML sets `log_level: DEBUG` (every file, booking and fit); `-s log_level=INFO` gives the short log of one run. Each command
