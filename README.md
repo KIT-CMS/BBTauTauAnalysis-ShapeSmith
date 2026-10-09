@@ -61,7 +61,7 @@ shapesmith publish   -c configs/ff_sm2018_binned_v6_noemb.yaml           # its c
 # with NN friends (nn_friend: true, fit_categories: nn, friend under ntuples.friends, re-skim):
 shapesmith hist      -c configs/sm2018_binned_v6_ff.yaml && shapesmith estimate -c configs/sm2018_binned_v6_ff.yaml
 shapesmith sync      -c configs/sm2018_binned_v6_ff.yaml && shapesmith datacards -c configs/sm2018_binned_v6_ff.yaml && shapesmith fit -c configs/sm2018_binned_v6_ff.yaml
-shapesmith ml-export -c configs/sm2018_binned_v6_ff.yaml --channels et,mt,tt
+shapesmith ml-export -c configs/sm2018_binned_v6_ff.yaml
 shapesmith inspect   output/sm2018_binned_v6_ff/shapes.root --unchanged   # variations equal to their nominal
 ```
 
@@ -100,8 +100,8 @@ analysis (ttbar with the top-pT weight), one category `em_tt` with the b tag of 
 no further regions, the b-tag variations of the tau channels and the lnN `eff_e`, `eff_m` and
 `CMS_eff_trigger_em_2018` (2 %); `htt_tjXsec` correlates its ttbar with that of the tau channels. The friends of the
 tau channels name them (`channels: [et, mt, tt]`), so the em skim looks for none; a tau run with em has its own
-`skim_dir` (the em skim of the dilepton run has other columns). The ML labels come from the tau channels only, but em
-holds the signal and the single-Higgs processes too: run `ml-export` with `--channels et,mt,tt`.
+`skim_dir` (the em skim of the dilepton run has other columns). The ML labels come from the tau channels only, and
+`ml-export` skips the control channel em.
 
 The dilepton run YAML takes `sample_lists`, `dy_correction` (on `DY`) and `diagnostics` (the jet-multiplicity regions
 `nj2`, `nj3`, `nj4p` with 0 and ≥ 1 b tags, the diagnostic variables, and the auxiliary flavour templates `DY_b`,
