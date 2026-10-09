@@ -6,7 +6,7 @@ from shapesmith.events import select
 from shapesmith.expressions import columns_in, columns_of, mask, product
 
 from bbtautau_shapesmith import cuts, weights
-from bbtautau_shapesmith.constants import FF_COLUMNS, FF_RAW_COLUMNS, LT_CHANNELS, TAU_CHANNELS
+from bbtautau_shapesmith.constants import DY_NJETS_BTAG, FF_COLUMNS, FF_RAW_COLUMNS, LT_CHANNELS, TAU_CHANNELS
 from tests.helpers import branches, embedding_branches
 from tests.test_analysis import analysis_for
 
@@ -54,6 +54,14 @@ def test_tau_eta_in_et_and_mt(channel):
         assert selection.get("tau_eta") == expected
     frame = pd.DataFrame({"eta_2": [-2.31, -2.29, 2.29, 2.3]})
     assert mask(frame, [cuts.baseline_cuts("mt")["tau_eta"]]).tolist() == [False, True, True, False]
+
+
+def test_dy_correction_weight_takes_the_table_value_of_each_cell():
+    frame = pd.DataFrame([{"n_bjets": b, "n_jets": j} for b in range(4) for j in (2, 3, 4, 6)] + [{"n_bjets": 1, "n_jets": 1}])
+    table = DY_NJETS_BTAG
+    expected = [table[min(b, 2)][min(j, 4) - 2] for b in range(4) for j in (2, 3, 4, 6)] + [table[1][0]]
+    assert product(frame, [weights.dy_njets_btag_weight()]).tolist() == pytest.approx(expected)
+    assert columns_in(weights.dy_njets_btag_weight()) == {"n_bjets", "n_jets"} <= branches("tt") & branches("mm")
 
 
 def test_light_lepton_scale_factors():

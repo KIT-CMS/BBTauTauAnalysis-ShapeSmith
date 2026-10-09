@@ -75,8 +75,12 @@ Switches of the tau run YAML (typed in `switches.py`; an unknown or mistyped swi
 | `nn_friend` | `false` (default), `true` | NN categories from the NN friend |
 | `control_regions` | `false` (default), `true` | wider skim plus the named pass/fail control regions; needs `jet_fakes: mc` |
 | `shape_systematics` | `true` (default), `false` | the CROWN shifts of the embedded samples and of the fake-factor friend as shape variations |
+| `dy_correction` | `none` (default), `njets_btag` | every DY process (ZTT, ZL, ZJ) times the DY data/MC table `DY_NJETS_BTAG` (`constants.py`) of its n_bjets (0, 1, ≥ 2) and n_jets (≤ 2, 3, ≥ 4) |
 
-The dilepton run YAML takes `sample_lists` only. Override a switch on the command line with
+The dilepton run YAML takes `sample_lists` and `dy_correction` (on `DY`). The table is the mm data/MC of v5;
+`scripts/derive_dy_correction.py -c <dilepton run YAML> [--channels mm,ee] [--ttbar-scale 0.93]` derives it again from
+the control shapes of a dilepton run without the correction (`hist --control --regions all`) and prints it in the
+format of `constants.py`. Override a switch on the command line with
 `-s switches.jet_fakes=ff`. `--skip-systematics` skips the b-tag weight variations and the CROWN shifts.
 
 Every run YAML sets `log_level: DEBUG` (every file, booking and fit); `-s log_level=INFO` gives the short log of one run. Each command

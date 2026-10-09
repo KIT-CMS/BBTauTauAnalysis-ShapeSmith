@@ -21,6 +21,8 @@ def _distinct(embedding: bool | list[str]) -> bool | list[str]:
 
 # true or false for every tau channel, or the embedded channels (a list: strict pydantic takes no YAML list as tuple)
 Embedding = Annotated[bool | list[Literal["et", "mt", "tt"]], AfterValidator(_distinct)]
+# njets_btag: every DY process times the data/MC table DY_NJETS_BTAG (constants.py) of its n_bjets and n_jets
+DyCorrection = Literal["none", "njets_btag"]
 
 
 class _EmbeddedChannels:
@@ -47,6 +49,7 @@ class TauSwitches(_EmbeddedChannels, BaseModel):
     nn_friend: bool = False  # NN categories from the NN friend
     control_regions: bool = False  # wider skim plus the named pass/fail control regions (needs jet_fakes: mc)
     shape_systematics: bool = True  # the embedding and fake-factor shifts (column variations)
+    dy_correction: DyCorrection = "none"  # on every DY process (ZTT, ZL, ZJ)
 
     @model_validator(mode="after")
     def _controls_need_mc_fakes(self) -> TauSwitches:
@@ -68,12 +71,14 @@ class FakeFactorSwitches(_EmbeddedChannels, BaseModel):
 
     sample_lists: SampleLists = Field(min_length=1)
     embedding: Embedding = False  # genuine taus subtracted as EMB instead of MC (not in the DR->SR steps), in every or the listed channels
+    dy_correction: DyCorrection = "none"  # also on the subtracted DY processes
 
 
 class DileptonSwitches(BaseModel):
     model_config = STRICT
 
     sample_lists: SampleLists = Field(min_length=1)
+    dy_correction: DyCorrection = "none"  # none to derive the table, njets_btag for its closure
 
 
 class TauIdSwitches(BaseModel):

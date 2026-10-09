@@ -40,7 +40,7 @@ the jet requirement preserves nominal events because `n_jets` and `n_bjets` can 
 pT thresholds. Triggers, tau anti-electron/muon requirements and lepton vetoes remain in the skim.
 
 The switch requires `jet_fakes: mc`; combining it with `jet_fakes: ff` is rejected. The dilepton
-Analysis always defines its control regions and accepts only `sample_lists` under `switches`;
+Analysis always defines its control regions and accepts only `sample_lists` and `dy_correction` under `switches`;
 do not add `control_regions` to its YAML.
 
 The YAML switch and the command-line options have different jobs:

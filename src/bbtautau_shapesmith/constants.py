@@ -15,6 +15,11 @@ TAU_VS_ELE_WP = {"mt": "VVLoose", "et": "Tight", "tt": "VVLoose"}
 # b-tag multiplicity bins of the control regions (each combined with >= 2 jets)
 BTAG_BINS = {"btag0": "n_bjets == 0", "btag1": "n_bjets == 1", "btag2": "n_bjets == 2", "btag3p": "n_bjets >= 3"}
 
+# DY correction (switch dy_correction: njets_btag): DY data/MC in the mm Z window of sm2018_binned_v5, rows n_bjets
+# 0, 1, >= 2 (measured with 2), columns n_jets <= 2, 3, >= 4 (the tau selections have >= 2 jets), the other MC
+# subtracted with ttbar times 0.888 (btag1) and 0.965 (btag2). Derive it again with scripts/derive_dy_correction.py.
+DY_NJETS_BTAG = {0: (0.869, 1.013, 1.294), 1: (1.074, 1.282, 1.732), 2: (0.916, 1.133, 1.543)}
+
 # NN output classes in training order: index = friend column predicted_class, datacard bin id = index + 1
 NN_CLASS_NAMES = ("HH2B2Tau", "DY", "ST", "TT", "VV", "jetFakes", "Other")
 NN_CLASS_COLUMN = "predicted_class"

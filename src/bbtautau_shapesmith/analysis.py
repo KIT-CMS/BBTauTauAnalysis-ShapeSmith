@@ -78,7 +78,7 @@ def column_variations(name: str, switches: TauSwitches) -> tuple:
 
 
 def channel(name: str, switches: TauSwitches, channel_samples: tuple[Sample, ...]) -> Channel:
-    table = tau_processes(name, switches.jet_fakes, switches.embedded(name))
+    table = tau_processes(name, switches.jet_fakes, switches.embedded(name), switches.dy_correction)
     groups = {p.group for p in table}
     return Channel(
         name=name,

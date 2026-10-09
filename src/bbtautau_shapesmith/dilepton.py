@@ -45,8 +45,8 @@ def regions() -> tuple[Region, ...]:
     return btag + (Region("same_sign", replace_cuts={"os": "(q_1 * q_2) > 0"}),)
 
 
-def channel(name: str, channel_samples: tuple[Sample, ...]) -> Channel:
-    table = dilepton_processes(name)
+def channel(name: str, channel_samples: tuple[Sample, ...], dy_correction: str = "none") -> Channel:
+    table = dilepton_processes(name, dy_correction)
     groups = {p.group for p in table}
     cuts = baseline_cuts(name)
     variables = control_variables()
@@ -73,6 +73,6 @@ def build(config: RunConfig) -> Analysis:
         era=ERA,
         lumi_pb=LUMI_PB,
         signal=SIGNAL,
-        channels={name: channel(name, by_channel[name]) for name in config.channels},
+        channels={name: channel(name, by_channel[name], switches.dy_correction) for name in config.channels},
         style=style(),
     )

@@ -49,7 +49,7 @@ from bbtautau_shapesmith.ff_tables import TABLES
 from bbtautau_shapesmith.processes import EMBEDDED, SPLITS, PLOT_GROUP
 from bbtautau_shapesmith.samples import sample_database, samples
 from bbtautau_shapesmith.switches import FakeFactorSwitches, parse
-from bbtautau_shapesmith.weights import TOP_PT, embedding_weights, mc_weights
+from bbtautau_shapesmith.weights import embedding_weights, group_weights, mc_weights
 
 GROUPS = ("DY", "TT", "ST", "VV")  # split into T, L and J
 VETO_CUTS = ("extraelec_veto", "extramuon_veto", "dilepton_veto")
@@ -64,11 +64,11 @@ def parts(part: str) -> tuple[str, ...]:
     return tuple(SPLITS[group][part] for group in GROUPS)
 
 
-def measurement_processes(channel: str, embedding: bool) -> tuple[Process, ...]:
+def measurement_processes(channel: str, embedding: bool, dy_correction: str = "none") -> tuple[Process, ...]:
     mc, genmatch = mc_weights(channel), cuts.genmatch_cuts(channel)
 
     def simulated(name: str, group: str, part: str | None = None, role: str = "background") -> Process:
-        weights = {**mc, **TOP_PT} if group == "TT" else mc
+        weights = {**mc, **group_weights(group, dy_correction)}
         return Process(name, group, role, PLOT_GROUP[group], Selection(cuts={"genmatch": genmatch[part]} if part else {}, weights=weights))
 
     result = [Process("data", "data", "data", "data")]
@@ -151,8 +151,8 @@ def legs(channel: str, embedding: bool) -> tuple[Leg, ...]:
     return tuple(result)
 
 
-def channel(name: str, embedding: bool, channel_samples: tuple[Sample, ...], measurement: FakeFactorMeasurement) -> Channel:
-    table = measurement_processes(name, embedding)
+def channel(name: str, switches: FakeFactorSwitches, channel_samples: tuple[Sample, ...], measurement: FakeFactorMeasurement) -> Channel:
+    table = measurement_processes(name, switches.embedded(name), switches.dy_correction)
     groups = {p.group for p in table}
     regions = {}
     for leg, suffix in zip(TAU_LEGS[name], ("", "_subleading")):
@@ -180,6 +180,6 @@ def build(config: RunConfig) -> Analysis:
         era=ERA,
         lumi_pb=LUMI_PB,
         signal=None,
-        channels={name: channel(name, switches.embedded(name), by_channel[name], measurement) for name in config.channels},
+        channels={name: channel(name, switches, by_channel[name], measurement) for name in config.channels},
         measurement=measurement,
     )

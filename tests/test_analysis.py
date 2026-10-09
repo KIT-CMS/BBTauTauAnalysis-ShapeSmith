@@ -3,10 +3,11 @@ from shapesmith.model import ABCD, AnalysisError, DataMinus, TemplateShift
 from shapesmith.skim import needed_columns
 from shapesmith.validate import validate
 
+from bbtautau_shapesmith import dilepton, ff_measurement
 from bbtautau_shapesmith.analysis import build, process_union
 from bbtautau_shapesmith.constants import FF_COLUMNS, FF_RAW_COLUMNS, LT_CHANNELS, NN_COLUMNS, TAU_CHANNELS
 from bbtautau_shapesmith.systematics import embedding_variation_sums
-from bbtautau_shapesmith.weights import fake_factor_weight
+from bbtautau_shapesmith.weights import dy_njets_btag_weight, fake_factor_weight
 from tests.helpers import EMBEDDING_LIST, branches, config, embedded, embedding_branches
 
 COMBINATIONS = [(jet_fakes, embedding) for jet_fakes in ("mc", "ff") for embedding in (False, True, ["et", "mt"])]
@@ -109,6 +110,20 @@ def test_embedding_per_channel():
     assert {"EMB", "ZTT", "TTT"} <= set(ml.processes)
     assert "EMB" in ml.exported(analysis.channel("et")) and not {"ZTT", "TTT"} & set(ml.exported(analysis.channel("et")))
     assert {"ZTT", "TTT"} <= set(ml.exported(tt)) and "EMB" not in ml.exported(tt)
+
+
+def test_dy_correction_weights_the_dy_processes_only():
+    def corrected(analysis):
+        return {(name, p.name) for name, channel in analysis.channels.items() for p in channel.processes if "dy_correction" in p.selection.weights}
+
+    tau = analysis_for("mc", dy_correction="njets_btag")
+    assert corrected(tau) == {(name, p) for name in TAU_CHANNELS for p in ("ZTT", "ZL", "ZJ")}
+    assert tau.channel("mt").process("ZL").selection.weights["dy_correction"] == dy_njets_btag_weight()
+    assert not corrected(analysis_for("mc"))
+    fake_factors = ff_measurement.build(config(analysis="bbtautau_shapesmith.ff_measurement:build", sample_lists=["sm2018_binned_v3"], dy_correction="njets_btag"))
+    assert corrected(fake_factors) == {(name, p) for name in TAU_CHANNELS for p in ("ZTT", "ZL", "ZJ")}
+    controls = dilepton.build(config(["em", "mm", "ee"], "bbtautau_shapesmith.dilepton:build", dy_correction="njets_btag"))
+    assert corrected(controls) == {(name, "DY") for name in ("em", "mm", "ee")}
 
 
 def test_ml_export_labels():
