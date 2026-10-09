@@ -1,0 +1,48 @@
+# HH->bbtautau tau channels on the sm2018_binned_v6 production (2018 UL, NanoAODv15): data/MC in six scopes without
+# shifts, the embedding (et, mt, tt) with its tau shifts under the same tag; the v6 corrections in CROWN (recoil jets
+# and bins, EGM data scale, b-tag SF below 30 GeV, embedding ES and vsJet SF per decay mode, npv_good/rho/jet flavours).
+# Control run: MC jet fakes and ABCD QCD, embedding in et and mt, MC genuine tautau in tt.
+# Switches (types and defaults in switches.py):
+#   sample_lists:      the inventories inventory/<name>.txt, verbatim copies of the KingMaker sample lists of the
+#                      production (v6 ran with sm2018_binned_v6, without the ttZ/ZZ double counting, and sm2018_embedding)
+#   jet_fakes:         mc (MC jet fakes + ABCD QCD) | ff (fake factors, needs FF friend trees)
+#   embedding:         [et, mt] (genuine tautau from the embedded samples in et and mt, from MC in tt)
+#   nn_friend:         false (NN categories only once NN friend trees exist; add them under ntuples.friends and re-skim)
+#   control_regions:   true widens the skim (both charges, VVVLoose taus, >= 2 jets, lepton isolation < 0.5) and adds the
+#                      named tau control regions; the nominal selection is unchanged, so one skim serves both
+#   diagnostics:       true (QCD in the control regions; met_uncorrected, metphi_uncorrected, npv_good, rho)
+#   dy_correction:     njets_btag (DY times DY_NJETS_BTAG of constants.py; it acts in tt, where DY gives the genuine tautau)
+#   shape_systematics: true (default) declares the embedding and fake-factor CROWN shifts
+analysis: bbtautau_shapesmith.analysis:build
+era: "2018"
+channels: [et, mt, tt]
+switches: {sample_lists: [sm2018_binned_v6, sm2018_embedding], jet_fakes: mc, embedding: [et, mt], nn_friend: false, control_regions: true, diagnostics: true, dy_correction: njets_btag}
+sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
+ntuples:
+  server: root://cmsdcache-kit-disk.gridka.de
+  base: /store/user/sdaigler/CROWN/ntuples/sm2018_binned_v6/CROWNRun
+  friends: []
+skim_dir: /ceph/sdaigler/shapesmith/sm2018_binned_v6      # its own (the dilepton run and the em control channel have their own)
+output_dir: ../output/sm2018_binned_v6                    # relative to this file -> <repo>/output/...
+ml_dir: /ceph/sdaigler/shapesmith_ml/sm2018_binned_v6
+workers: 16
+log_level: DEBUG                                          # DEBUG | INFO | WARNING | ERROR; console and <output_dir>/logs/<command>_<time>.log
+combine: {cmssw_dir: /work/sdaigler/smhtt_ul/CMSSW_14_1_9, scram_arch: el9_amd64_gcc12}
+# web gallery (shapesmith publish): this run is the column "emb"; the variant without embedding is the column
+# "classic":  shapesmith publish -c configs/sm2018_binned_v6.yaml -s switches.embedding=false
+#               -s output_dir=../output/sm2018_binned_v6_noemb -s web.variant=classic -s web.label=classic -s web.description=null
+# (description null keeps the text from sm2018_binned_v6_dilepton.yaml). title and about are the gallery's.
+web:
+  dir: /web/sdaigler/public_html/sm2018_binned_v6
+  variant: emb
+  label: emb
+  description: "τ-embedding for genuine ττ in et and mt (MC in tt), MC jet→τh fakes, QCD from the ABCD method (also in the control regions), DY corrected in n_jets × n_bjets."
+  title: "sm2018_binned_v6 · control plots"
+  about: |
+    HH→bbττ 2018 (NanoAODv15), CROWN production sm2018_binned_v6; histograms and plots by ShapeSmith.
+    Columns: classic (MC genuine ττ), emb (τ-embedding in et and mt, MC genuine ττ in tt) and emb ff (fake factors ff_v2).
+
+    Nominal region: opposite sign, b pair with ≥ 1 b-tag, isolated τh, mT < 70 GeV and |η(τh)| < 2.3 in et and mt.
+    The diagnostic b-tag regions exist only for classic and emb, with QCD from same-sign data (et, mt) or ABCD (tt);
+    the fake-factor run has only the nominal region. DY is corrected with the mm data/MC in n_jets × n_bjets.
+    Plots are prefit, without systematic uncertainties.

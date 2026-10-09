@@ -25,44 +25,58 @@ and installs that checkout before installing the analysis, so a core change is p
 
 ## Running
 
-Two run configurations per production. The tau channels (gen-match splits, jet-fake estimate)
-and the light-dilepton controls (unsplit MC, no estimate) are separate Analyses. Both read the same
-ntuples and share the skim directory (their channels do not overlap); the outputs are separate.
+The tau channels (gen-match splits, jet-fake estimate) and the light-dilepton controls (unsplit MC, no estimate) are
+separate Analyses on the same ntuples, with separate outputs. From v6 on every run has its own skim directory: the
+tau control run, the fake-factor run (with em as the ttbar control channel), the dilepton run and the fake-factor
+measurement (its two runs share one).
 
 ```bash
-# tau channels et/mt/tt: nominal shapes and, with control_regions: true, the named tau control regions
-shapesmith validate  -c configs/sm2018_binned_v5.yaml
-shapesmith skim      -c configs/sm2018_binned_v5.yaml                   # once per production; --samples TT,SingleMuon for a subset
-shapesmith hist      -c configs/sm2018_binned_v5.yaml --control --skip-systematics
-shapesmith estimate  -c configs/sm2018_binned_v5.yaml --control
-shapesmith plot      -c configs/sm2018_binned_v5.yaml --control
-# light-dilepton controls em/mm/ee
-shapesmith validate  -c configs/sm2018_binned_v5_dilepton.yaml
-shapesmith skim      -c configs/sm2018_binned_v5_dilepton.yaml
-shapesmith hist      -c configs/sm2018_binned_v5_dilepton.yaml --control --regions all --skip-systematics
-shapesmith plot      -c configs/sm2018_binned_v5_dilepton.yaml --control --channels mm,ee --variables yield,m_vis,pt_vis,n_jets
+# tau channels et/mt/tt, control run: MC jet fakes + ABCD QCD, embedding in et/mt, QCD in the control regions, DY correction
+shapesmith validate  -c configs/sm2018_binned_v6.yaml
+shapesmith skim      -c configs/sm2018_binned_v6.yaml                   # once per production; --samples TT,SingleMuon for a subset
+shapesmith hist      -c configs/sm2018_binned_v6.yaml --control --skip-systematics   # nominal + the regions of the estimates
+shapesmith estimate  -c configs/sm2018_binned_v6.yaml --control
+shapesmith plot      -c configs/sm2018_binned_v6.yaml --control [--region btag0_os_pass]
+# light-dilepton controls em/mm/ee; the DY table from mm and ee (dy_correction: none there)
+shapesmith skim      -c configs/sm2018_binned_v6_dilepton.yaml
+shapesmith hist      -c configs/sm2018_binned_v6_dilepton.yaml --control --regions all --skip-systematics
+shapesmith plot      -c configs/sm2018_binned_v6_dilepton.yaml --control --region btag1
+python scripts/derive_dy_correction.py -c configs/sm2018_binned_v6_dilepton.yaml [--ttbar-scale 0.93]   # -> DY_NJETS_BTAG
+# fake-factor measurement: the mixed payload of the friend ff_v2 and the cross-check without embedding
+shapesmith skim      -c configs/ff_sm2018_binned_v6.yaml
+shapesmith measure   -c configs/ff_sm2018_binned_v6.yaml && shapesmith measure -c configs/ff_sm2018_binned_v6_noemb.yaml
+# fake-factor run (friend ff_v2) with em as the ttbar control channel: control plots, then the background-only fit
+shapesmith skim      -c configs/sm2018_binned_v6_ff.yaml
+shapesmith hist      -c configs/sm2018_binned_v6_ff.yaml --control --skip-systematics && shapesmith estimate -c configs/sm2018_binned_v6_ff.yaml --control
+shapesmith hist      -c configs/sm2018_binned_v6_ff.yaml --skip-systematics && shapesmith estimate -c configs/sm2018_binned_v6_ff.yaml   # categories nominal, em_tt
+shapesmith datacards -c configs/sm2018_binned_v6_ff.yaml && shapesmith fit -c configs/sm2018_binned_v6_ff.yaml --background-only   # -> datacards/background_fit.md
 # web galleries (after plot or measure; target, column and texts from the web: block of each run YAML)
-shapesmith publish   -c configs/sm2018_binned_v5.yaml                    # ~sdaigler/sm2018_binned_v5, column emb (+ title, about)
-shapesmith publish   -c configs/sm2018_binned_v5.yaml -s switches.embedding=false -s output_dir=../output/sm2018_binned_v5_noemb \
+shapesmith publish   -c configs/sm2018_binned_v6.yaml                    # ~sdaigler/sm2018_binned_v6, column emb (+ title, about)
+shapesmith publish   -c configs/sm2018_binned_v6.yaml -s switches.embedding=false -s output_dir=../output/sm2018_binned_v6_noemb \
                      -s web.variant=classic -s web.label=classic -s web.description=null   # column classic: et, mt, tt
-shapesmith publish   -c configs/sm2018_binned_v5_dilepton.yaml           # column classic: em, mm, ee
-shapesmith publish   -c configs/sm2018_binned_v5_rawff.yaml              # column emb raw ff
-shapesmith publish   -c configs/sm2018_binned_v5_ff.yaml                 # column emb ff
-shapesmith publish   -c configs/ff_sm2018_binned_v5.yaml                 # ~sdaigler/ff_sm2018_binned_v5: the FF measurement
-# with NN friends (nn_friend: true, friend under ntuples.friends, re-skim):
-shapesmith hist      -c configs/sm2018_binned_v5.yaml && shapesmith estimate -c configs/sm2018_binned_v5.yaml
-shapesmith sync      -c configs/sm2018_binned_v5.yaml && shapesmith datacards -c configs/sm2018_binned_v5.yaml && shapesmith fit -c configs/sm2018_binned_v5.yaml
-shapesmith ml-export -c configs/sm2018_binned_v5.yaml
-shapesmith inspect   output/sm2018_binned_v5/shapes.root --unchanged   # variations equal to their nominal
+shapesmith publish   -c configs/sm2018_binned_v6_dilepton.yaml           # column classic: em, mm, ee
+shapesmith publish   -c configs/sm2018_binned_v6_ff.yaml                 # column emb ff
+shapesmith publish   -c configs/ff_sm2018_binned_v6.yaml                 # ~sdaigler/ff_sm2018_binned_v6: the FF measurement
+shapesmith publish   -c configs/ff_sm2018_binned_v6_noemb.yaml           # its cross-check column
+# with NN friends (nn_friend: true, fit_categories: nn, friend under ntuples.friends, re-skim):
+shapesmith hist      -c configs/sm2018_binned_v6_ff.yaml && shapesmith estimate -c configs/sm2018_binned_v6_ff.yaml
+shapesmith sync      -c configs/sm2018_binned_v6_ff.yaml && shapesmith datacards -c configs/sm2018_binned_v6_ff.yaml && shapesmith fit -c configs/sm2018_binned_v6_ff.yaml
+shapesmith ml-export -c configs/sm2018_binned_v6_ff.yaml --channels et,mt,tt
+shapesmith inspect   output/sm2018_binned_v6_ff/shapes.root --unchanged   # variations equal to their nominal
 ```
 
 `publish` copies the plots of a run (for the FF measurement those in `fake_factors/2018/`) into a static web gallery
 under `/web/sdaigler/public_html/`; run it after `plot` or `measure` with the same `-s` overrides. The `web:` block of
 each run YAML sets the gallery directory, the column (`variant`), its label and description; the title and the About
-text of the control gallery are in `sm2018_binned_v5.yaml`. Publishing a column again replaces it and copies only
+text of the control gallery are in `sm2018_binned_v6.yaml`. Publishing a column again replaces it and copies only
 changed plots; the first publish of a column fixes its position. The classic column is the run without embedding:
-`hist`, `estimate` and `plot` of `sm2018_binned_v5.yaml` with `-s switches.embedding=false
--s output_dir=../output/sm2018_binned_v5_noemb`; `web.description=null` keeps the description of the dilepton YAML.
+`hist`, `estimate` and `plot` of `sm2018_binned_v6.yaml` with `-s switches.embedding=false
+-s output_dir=../output/sm2018_binned_v6_noemb`; `web.description=null` keeps the description of the dilepton YAML.
+
+The v5 run YAMLs (`*v5*.yaml`, galleries `sm2018_binned_v5` and `ff_sm2018_binned_v5`, run as above) share one skim
+directory between the tau and the dilepton run. With the v6 code, `hist`, `estimate` and `plot` of tt, em, mm and ee
+run on their stored skims with `--skip-systematics` (the v5 embedding shifts are pT-binned, see below); the et and mt
+skims need `skim --force` (the tau |η| < 2.3 cut, the electron reconstruction SF of the et MC).
 
 Switches of the tau run YAML (typed in `switches.py`; an unknown or mistyped switch fails):
 
@@ -190,14 +204,16 @@ mutau 2018D event count) of exactly the nicks in `inventory/`; a new inventory a
 
 ## Fake-factor measurement
 
-`configs/ff_sm2018_binned_v5.yaml` runs `bbtautau_shapesmith.ff_measurement:build`, the SM 2018 fake-factor
+`configs/ff_sm2018_binned_v6.yaml` runs `bbtautau_shapesmith.ff_measurement:build`, the SM 2018 fake-factor
 measurement in jvoss's TauFakeFactors method (QCD and ttbar fake factors, fractions, the QCD DR->SR correction and the
 non-closures), with its own skim (both charges, the lepton vetoes stored for the ttbar scale regions). It derives the
-production payload with embedding; `configs/ff_sm2018_binned_v4.yaml` is the same measurement on v4, without embedding.
+payload of the v6 friend ff_v2 (embedding in et and mt, MC in tt); `ff_sm2018_binned_v6_noemb.yaml` is its
+cross-check without embedding on the same skim. `ff_sm2018_binned_v5.yaml` (payload of ff_v1, embedding in every
+channel) and `ff_sm2018_binned_v4.yaml` (without embedding) are the earlier measurements.
 
 ```bash
-shapesmith skim    -c configs/ff_sm2018_binned_v5.yaml
-shapesmith measure -c configs/ff_sm2018_binned_v5.yaml [--suggest-binning]   # -> output/.../fake_factors/2018/
+shapesmith skim    -c configs/ff_sm2018_binned_v6.yaml
+shapesmith measure -c configs/ff_sm2018_binned_v6.yaml [--suggest-binning]   # -> output/.../fake_factors/2018/
 ```
 
 Switches of the measurement (`FakeFactorSwitches`): `sample_lists`; `embedding` as in the analysis (`false`, `true`

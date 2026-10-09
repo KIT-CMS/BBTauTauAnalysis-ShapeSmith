@@ -1,0 +1,27 @@
+# Light-dilepton controls (Z+jets in ee/mm, top in em) on the sm2018_binned_v6 production.
+# Same ntuples as sm2018_binned_v6.yaml, its own skim_dir (em is also the control channel of the tau runs, with other
+# columns) and output_dir.
+# Switches (types and defaults in switches.py):
+#   sample_lists:  the inventories inventory/<name>.txt of the production (the embedding exists in et, mt and tt only)
+#   dy_correction: none (default): the source of DY_NJETS_BTAG (scripts/derive_dy_correction.py); its closure with
+#                  -s switches.dy_correction=njets_btag -s output_dir=../output/sm2018_binned_v6_dilepton_dycorr
+#   diagnostics:   true (n_jets regions, DY and ttbar flavour templates, met_uncorrected, metphi_uncorrected, npv_good, rho)
+analysis: bbtautau_shapesmith.dilepton:build
+era: "2018"
+channels: [em, mm, ee]
+switches: {sample_lists: [sm2018_binned_v6], diagnostics: true}
+sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
+ntuples:
+  server: root://cmsdcache-kit-disk.gridka.de
+  base: /store/user/sdaigler/CROWN/ntuples/sm2018_binned_v6/CROWNRun
+  friends: []
+skim_dir: /ceph/sdaigler/shapesmith/sm2018_binned_v6_dilepton
+output_dir: ../output/sm2018_binned_v6_dilepton
+workers: 16
+log_level: DEBUG  # DEBUG | INFO | WARNING | ERROR; console and <output_dir>/logs/<command>_<time>.log
+# web gallery (shapesmith publish): the dilepton channels of the column "classic"
+web:
+  dir: /web/sdaigler/public_html/sm2018_binned_v6
+  variant: classic
+  label: classic
+  description: "MC for genuine ττ and jet→τh fakes, QCD from the ABCD method (fully classic); ee, em and mm from the dilepton control run (MC, DY uncorrected)."

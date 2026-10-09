@@ -1,0 +1,27 @@
+# SM 2018 fake-factor measurement on the sm2018_binned_v6 production without embedding: the cross-check of
+# ff_sm2018_binned_v6.yaml with the genuine taus subtracted as MC in every channel (tt is the same); no friend.
+# The same skim_dir as ff_sm2018_binned_v6.yaml (one skim holds EMB and every MC part), its own output_dir.
+# Switches (types and defaults in switches.py):
+#   sample_lists:       the inventories inventory/<name>.txt of the production (the embedding list is not read)
+#   embedding:          false
+#   dy_correction:      njets_btag, as ff_sm2018_binned_v6.yaml
+#   tt_fraction_region: application, as ff_sm2018_binned_v6.yaml
+analysis: bbtautau_shapesmith.ff_measurement:build
+era: "2018"
+channels: [et, mt, tt]
+switches: {sample_lists: [sm2018_binned_v6, sm2018_embedding], embedding: false, dy_correction: njets_btag, tt_fraction_region: application}
+sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
+ntuples:
+  server: root://cmsdcache-kit-disk.gridka.de
+  base: /store/user/sdaigler/CROWN/ntuples/sm2018_binned_v6/CROWNRun
+  friends: []
+skim_dir: /ceph/sdaigler/shapesmith/ff_sm2018_binned_v6   # shared with ff_sm2018_binned_v6.yaml
+output_dir: ../output/ff_sm2018_binned_v6_noemb           # -> fake_factors/2018/
+workers: 16
+log_level: DEBUG                                          # DEBUG | INFO | WARNING | ERROR; console and <output_dir>/logs/<command>_<time>.log
+# web gallery (shapesmith publish): a column next to ff_v2
+web:
+  dir: /web/sdaigler/public_html/ff_sm2018_binned_v6
+  variant: mc
+  label: MC genuine τh
+  description: "FF measurement on sm2018_binned_v6, genuine τh subtracted with MC in every channel (cross-check, no friend)."

@@ -1,0 +1,38 @@
+# HH->bbtautau tau channels on the sm2018_binned_v6 production with fake factors: jetFakes from the FF friend ff_v2
+# (the mixed payload of configs/ff_sm2018_binned_v6.yaml) instead of the MC jet fakes and ABCD QCD, embedding in et and
+# mt, MC genuine tautau in tt, and em as the ttbar control channel of the fits. Own skim_dir and output_dir: the skim
+# selection differs from sm2018_binned_v6.yaml (control_regions needs jet_fakes: mc) and holds the friend columns.
+# Switches (types and defaults in switches.py):
+#   sample_lists:      the inventories inventory/<name>.txt of the production
+#   jet_fakes:         ff (fake factors from the FF friend)
+#   embedding:         [et, mt] (as the FF measurement of the payload)
+#   nn_friend:         false (no NN friend yet)
+#   fit_categories:    control (one category 'nominal' per tau channel and em_tt in em: datacards and
+#                      fit --background-only without NN friends)
+#   control_regions:   false (requires jet_fakes: mc)
+#   dy_correction:     njets_btag, as the FF measurement
+#   shape_systematics: true (default) declares the embedding and fake-factor CROWN shifts
+analysis: bbtautau_shapesmith.analysis:build
+era: "2018"
+channels: [et, mt, tt, em]                                # em: the ttbar control channel (in every final state)
+switches: {sample_lists: [sm2018_binned_v6, sm2018_embedding], jet_fakes: ff, embedding: [et, mt], nn_friend: false, fit_categories: control, control_regions: false, dy_correction: njets_btag}
+sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
+ntuples:
+  server: root://cmsdcache-kit-disk.gridka.de
+  base: /store/user/sdaigler/CROWN/ntuples/sm2018_binned_v6/CROWNRun
+  friends:                                                # the tau channels only: the em skim reads no friend
+    - {base: /store/user/sdaigler/CROWN/ntuples/sm2018_binned_v6/CROWNFriend/ff_v2, applies_to: [mc, data, embedding], channels: [et, mt, tt]}
+  # - {base: /store/user/sdaigler/CROWN/ntuples/sm2018_binned_v6/CROWNFriend/fastmtt, applies_to: [mc, data, embedding], channels: [et, mt, tt]}
+  # - {base: /store/user/sdaigler/CROWN/ntuples/sm2018_binned_v6/CROWNFriend/nn_v1, applies_to: [mc, data, embedding], channels: [et, mt, tt]}
+skim_dir: /ceph/sdaigler/shapesmith/sm2018_binned_v6_ff   # not shared with sm2018_binned_v6.yaml (different skim selection)
+output_dir: ../output/sm2018_binned_v6_ff                 # relative to this file -> <repo>/output/...
+ml_dir: /ceph/sdaigler/shapesmith_ml/sm2018_binned_v6_ff
+workers: 16
+log_level: DEBUG                                          # DEBUG | INFO | WARNING | ERROR; console and <output_dir>/logs/<command>_<time>.log
+combine: {cmssw_dir: /work/sdaigler/smhtt_ul/CMSSW_14_1_9, scram_arch: el9_amd64_gcc12}
+# web gallery (shapesmith publish)
+web:
+  dir: /web/sdaigler/public_html/sm2018_binned_v6
+  variant: emb_ff
+  label: emb ff
+  description: "τ-embedding in et and mt (MC genuine ττ in tt) + jet→τh fakes from the fully corrected fake factor (friend ff_v2: fractions, QCD DR→SR, non-closure corrections); em is the ttbar control channel."
