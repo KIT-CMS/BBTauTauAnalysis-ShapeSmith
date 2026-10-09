@@ -11,7 +11,8 @@ cuts.isolated/anti_isolated, as in the analysis. Per leg (tt: the leading "" and
 - QCD DR->SR (the correction itself): the orthogonal regions with opposite sign (lt: mt_1 < 70 of the baseline);
 - ttbar: SR the baseline, AR the leg anti-isolated; scale regions the same with inverted lepton vetoes, and their
   same-sign versions for the QCD there;
-- fractions: the AR (lt), in tt both taus anti-isolated for both legs (user decision U6).
+- fractions: the AR (lt); in tt both taus anti-isolated for both legs (user decision U6, tt_fraction_region:
+  both_anti_iso) or, per leg, its AR (tt_fraction_region: application, the v6 choice).
 The skim is the analysis control-region skim (both charges, VVVLoose taus, >= 2 jets or the b tag, lt iso_1 < 0.5)
 without the lepton vetoes.
 
@@ -27,7 +28,8 @@ Differences to jvoss's configuration:
 - b tag: (n_bjets >= 1) & (bpair_pt_2 > 0) for jvoss's n_bjets >= 1 && bpair_pt_{1,2} >= 20 (the same events), and
   iso_1 < 0.15 for 0 <= iso_1 <= 0.15 (the same events at float precision).
 - triggers and offline thresholds: the analysis ones (et: ele32 with pt_1 > 33, jvoss ele32 || ele35).
-- tt fraction AR: the other tau anti-isolated for jvoss's fails Medium (the same events with VVVLoose taus).
+- tt fraction AR (both_anti_iso): the other tau anti-isolated for jvoss's fails Medium (the same events with VVVLoose
+  taus).
 - weights: the analysis weights, with the b-tag weight (jvoss: none), without jvoss's Z pT reweighting, the vsJet
   SF on genuine taus in every region (jvoss: the Medium SF only for a tau-ID cut in the region, so failing genuine
   taus of the tt fraction AR get none), and the analysis embedding weights.
@@ -96,10 +98,11 @@ def tau_id(channel: str, anti_isolated: tuple[int, ...]) -> str:
     return " & ".join(cuts.anti_isolated(leg) if leg in anti_isolated else cuts.isolated(leg) for leg in TAU_LEGS[channel])
 
 
-def leg_regions(channel: str, leg: int, suffix: str) -> dict[str, dict[str, str]]:
+def leg_regions(channel: str, leg: int, suffix: str, tt_fraction_region: str = "both_anti_iso") -> dict[str, dict[str, str]]:
     """The cut replacements of the regions of one leg, by region name."""
     lt = channel in LT_CHANNELS
     other = tuple(t for t in TAU_LEGS[channel] if t != leg)
+    fraction_legs = (leg,) if lt or tt_fraction_region == "application" else TAU_LEGS[channel]
     qcd = {"os": cuts.SAME_SIGN, "b_tagging": JETS, **({"mt_cut": "(mt_1 < 50)"} if lt else {})}
     # the DR->SR regions are orthogonal by the lepton isolation (lt) or by the other tau anti-isolated (tt)
     sideband, anti_other = ({"lepton_iso": LEPTON_SIDEBAND[channel]}, ()) if lt else ({}, other)
@@ -113,7 +116,7 @@ def leg_regions(channel: str, leg: int, suffix: str) -> dict[str, dict[str, str]
         f"QCD{suffix}_dr_sr_ar_like": {"b_tagging": JETS, **sideband, "tau_iso": tau_id(channel, (leg, *anti_other))},
         f"ttbar{suffix}_sr": {},
         f"ttbar{suffix}_ar": {"tau_iso": tau_id(channel, (leg,))},
-        f"process_fractions{suffix}_ar": {"tau_iso": tau_id(channel, (leg,) if lt else TAU_LEGS[channel])},
+        f"process_fractions{suffix}_ar": {"tau_iso": tau_id(channel, fraction_legs)},
     }
     for sign, charge in (("", {}), ("_ss", {"os": cuts.SAME_SIGN})):
         regions[f"ttbar{suffix}_scale_sr_like{sign}"] = {**inverted, **charge}
@@ -156,7 +159,7 @@ def channel(name: str, switches: FakeFactorSwitches, channel_samples: tuple[Samp
     groups = {p.group for p in table}
     regions = {}
     for leg, suffix in zip(TAU_LEGS[name], ("", "_subleading")):
-        regions.update(leg_regions(name, leg, suffix))
+        regions.update(leg_regions(name, leg, suffix, switches.tt_fraction_region))
     return Channel(
         name=name,
         samples=tuple(s for s in channel_samples if s.group in groups),

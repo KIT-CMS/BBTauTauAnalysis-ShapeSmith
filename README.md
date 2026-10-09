@@ -185,6 +185,13 @@ shapesmith skim    -c configs/ff_sm2018_binned_v5.yaml
 shapesmith measure -c configs/ff_sm2018_binned_v5.yaml [--suggest-binning]   # -> output/.../fake_factors/2018/
 ```
 
+Switches of the measurement (`FakeFactorSwitches`): `sample_lists`; `embedding` as in the analysis (`false`, `true`
+or the embedded channels: genuine τh subtracted as EMB there and as the MC T parts elsewhere, so `[et, mt]` gives the
+mixed payload of v6 in one run); `dy_correction` as in the analysis, on the subtracted DY processes;
+`tt_fraction_region`: `both_anti_iso` (default, U6 and jvoss parity) measures the tt fractions of both legs with both
+taus anti-isolated, `application` those of each leg in its application region (that tau anti-isolated, the other
+isolated), where ttbar is 3-6 times more frequent (v6).
+
 The regions are built in `ff_measurement.py` from the analysis selection (`cuts.py`); every difference to jvoss's
 configuration is listed in its docstring. The binning, fits and bandwidths are `ff_tables.py`, generated once by
 `scripts/make_ff_tables.py` from TauFakeFactors' resolved configuration (do not edit by hand). `scripts/ff_parity.py`

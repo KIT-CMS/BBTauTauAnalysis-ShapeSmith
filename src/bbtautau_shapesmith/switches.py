@@ -72,6 +72,9 @@ class FakeFactorSwitches(_EmbeddedChannels, BaseModel):
     sample_lists: SampleLists = Field(min_length=1)
     embedding: Embedding = False  # genuine taus subtracted as EMB instead of MC (not in the DR->SR steps), in every or the listed channels
     dy_correction: DyCorrection = "none"  # also on the subtracted DY processes
+    # the tt fraction region of a leg: both taus anti-isolated (U6, jvoss parity), or its application region (the leg
+    # anti-isolated, the other tau isolated), where the fake factor is applied
+    tt_fraction_region: Literal["both_anti_iso", "application"] = "both_anti_iso"
 
 
 class DileptonSwitches(BaseModel):

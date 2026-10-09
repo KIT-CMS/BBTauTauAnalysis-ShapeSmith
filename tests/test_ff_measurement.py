@@ -13,9 +13,9 @@ from tests.helpers import EMBEDDING_LIST, branches, config, embedding_branches
 T_PARTS, L_PARTS, J_PARTS = ("ZTT", "TTT", "STT", "VVT"), ("ZL", "TTL", "STL", "VVL"), ("ZJ", "TTJ", "STJ", "VVJ")
 
 
-def measurement_analysis(embedding=False, channels=TAU_CHANNELS):
+def measurement_analysis(embedding=False, channels=TAU_CHANNELS, **switches):
     sample_lists = ["sm2018_binned_v3", EMBEDDING_LIST] if embedding else ["sm2018_binned_v3"]
-    analysis = build(config(channels, "bbtautau_shapesmith.ff_measurement:build", embedding=embedding, sample_lists=sample_lists))
+    analysis = build(config(channels, "bbtautau_shapesmith.ff_measurement:build", embedding=embedding, sample_lists=sample_lists, **switches))
     validate(analysis)
     return analysis
 
@@ -46,6 +46,16 @@ def test_the_tau_id_is_the_analysis_tau_id():
     both = f"{cuts.anti_isolated(1)} & {cuts.anti_isolated(2)}"
     assert region_cuts(tt, "process_fractions_ar")["tau_iso"] == region_cuts(tt, "process_fractions_subleading_ar")["tau_iso"] == both
     assert region_cuts(mt, "process_fractions_ar") == {**mt.cuts, "tau_iso": cuts.anti_isolated(2)}
+
+
+def test_the_tt_fractions_in_the_application_region():
+    """tt_fraction_region: application measures the fractions of each leg where its fake factor is applied."""
+    tt = measurement_analysis(channels=("tt",), tt_fraction_region="application").channel("tt")
+    assert region_cuts(tt, "process_fractions_ar")["tau_iso"] == f"{cuts.anti_isolated(1)} & {cuts.isolated(2)}" == region_cuts(tt, "ttbar_ar")["tau_iso"]
+    assert region_cuts(tt, "process_fractions_subleading_ar")["tau_iso"] == f"{cuts.isolated(1)} & {cuts.anti_isolated(2)}"
+    assert region_cuts(tt, "process_fractions_subleading_ar") == region_cuts(tt, "ttbar_subleading_ar")
+    mt = measurement_analysis(channels=("mt",), tt_fraction_region="application").channel("mt")
+    assert region_cuts(mt, "process_fractions_ar") == region_cuts(measurement_analysis(channels=("mt",)).channel("mt"), "process_fractions_ar")
 
 
 def test_the_regions():
