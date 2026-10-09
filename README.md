@@ -235,7 +235,7 @@ must follow its keys.
 | tau-ID/ES measurement: selection, processes, ES grid, assembly; its m_vis bins; its MC shape uncertainties | `tau_id_measurement.py`, `tau_id_binning.py`, `tau_id_systematics.py` |
 
 `tests/fixtures/branches_<channel>.txt` list the branches of one ttbar ntuple per channel of the
-`sm2018_binned_v4` production (`scripts/dump_branches.py <root:// URL>`); the tests check every
+`sm2018_binned_v5` production (`scripts/dump_branches.py <root:// URL>`); the tests check every
 selection, weight and variable against them, and the embedding columns against them plus the Part-A output
 contract until a branch fixture of a real embedding file exists. `tests/fixtures/skim_contracts_v4.json` holds the
 stored contracts and Parquet columns of one data and one MC skim per channel of v4 (from the golden references of
