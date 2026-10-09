@@ -65,6 +65,15 @@ def test_v3_adds_the_zero_parton_part_of_the_inclusive_dy_sample():
     assert [s.nick for s in table.values() if s.cut is not None] == [INCLUSIVE_DY]
 
 
+def test_v6_drops_the_ttz_and_zz_double_counting():
+    dropped = {
+        "ttZJets_TuneCP5_13TeV_madgraphMLM_pythia8_RunIISummer20UL18NanoAODv15-150X_mc2018_realistic_v1-v1",  # inclusive LO ttZ
+        "TTZToNuNu_TuneCP5_13TeV_amcatnlo-pythia8_RunIISummer20UL18NanoAODv15-150X_mc2018_realistic_v1-v1",  # in TTZToLLNuNu_M-10
+        "ZZTo2Nu2Q_5f_TuneCP5_13TeV-amcatnloFXFX-pythia8_RunIISummer20UL18NanoAODv15-150X_mc2018_realistic_v1-v1",  # = ZZTo2Q2Nu
+    }
+    assert sorted(nicks("sm2018_binned_v6")) == sorted(set(nicks("sm2018_binned_v3")) - dropped) and len(nicks("sm2018_binned_v6")) == 77
+
+
 def test_the_inclusive_dy_sample_is_uncut_without_the_ptz_bins():
     table = {s.nick: s for s in samples(DATABASE, ["sm2018_tau_id_measurement"], ["mt"])["mt"]}
     assert table[INCLUSIVE_DY].cut is None and not any(nick.startswith("DYJetsToLL_LHEFilterPtZ-") for nick in table)

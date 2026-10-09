@@ -99,10 +99,16 @@ inventory (v4 uses `sm2018_binned_v2`). A run YAML names every list of its produ
 |---|---|---|
 | `sm2018_binned_v2.txt` | `sample_list/sm_2018_binned.txt` @ `f99a322` "chore: adapt to sample database update" | productions sm2018_binned_v2, v4 |
 | `sm2018_binned_v3.txt` | `sample_list/sm_2018_binned.txt` @ `85c437a` "fix: added DYJetsToLL_M-50 for events with zero LHE partons" | production sm2018_binned_v5 |
-| `sm2018_embedding.txt` | `sample_list/sm_2018_embedding.txt` @ `df97b0b` "feat: add the 2018 embedding sample list" | production sm2018_binned_v5 (et, mt, tt) |
+| `sm2018_binned_v6.txt` | `sample_list/sm_2018_binned.txt` @ `f9c14c6` "fix: drop the ttZ and ZZ double counting from the SM sample lists" | production sm2018_binned_v6 |
+| `sm2018_embedding.txt` | `sample_list/sm_2018_embedding.txt` @ `df97b0b` "feat: add the 2018 embedding sample list" | productions sm2018_binned_v5, v6 (et, mt, tt) |
 
 Check a copy with `diff <(git -C <crown>/analysis_configurations/bbtautau show <commit>:sample_list/<file>) inventory/<name>.txt`
 (the subject finds the commit again after a rebase).
+
+`sm2018_binned_v6` drops three samples counted twice: the inclusive LO `ttZJets` (ttZ is `TTZToLLNuNu_M-10`,
+`TTZToQQ` and `TTZToLL_M-1to10`), `TTZToNuNu` (contained in `TTZToLLNuNu_M-10`) and `ZZTo2Nu2Q_5f` (the process of
+`ZZTo2Q2Nu`), as the legacy analysis. `ttWJets` stays, the only ttW sample of the database. Being a subset of
+`sm2018_binned_v3`, it also serves the v5 production (hist, estimate and plot only).
 
 `sm2018_binned_v3` adds the inclusive DY M-50 amcatnloFXFX sample, of which only the `npartons == 0`
 events are kept (`SAMPLE_CUTS` in `samples.py`): the LHEFilterPtZ bins lack every zero-parton event
