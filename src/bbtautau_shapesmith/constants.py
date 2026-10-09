@@ -18,10 +18,11 @@ BTAG_BINS = {"btag0": "n_bjets == 0", "btag1": "n_bjets == 1", "btag2": "n_bjets
 # jet multiplicity bins of the dilepton diagnostic regions (switch diagnostics), each with 0 and >= 1 b tags
 NJETS_BINS = {"nj2": "n_jets == 2", "nj3": "n_jets == 3", "nj4p": "n_jets >= 4"}
 
-# DY correction (switch dy_correction: njets_btag): DY data/MC in the mm Z window of sm2018_binned_v5, rows n_bjets
-# 0, 1, >= 2 (measured with 2), columns n_jets <= 2, 3, >= 4 (the tau selections have >= 2 jets), the other MC
-# subtracted with ttbar times 0.888 (btag1) and 0.965 (btag2). Derive it again with scripts/derive_dy_correction.py.
-DY_NJETS_BTAG = {0: (0.869, 1.013, 1.294), 1: (1.074, 1.282, 1.732), 2: (0.916, 1.133, 1.543)}
+# DY correction (switch dy_correction: njets_btag): DY data/MC in the mm and ee Z window of sm2018_binned_v6, rows
+# n_bjets 0, 1, >= 2 (measured with 2), columns n_jets <= 2, 3, >= 4 (the tau selections have >= 2 jets), the other
+# MC subtracted with ttbar times the em data/MC of the same b-tag region (0.843, 0.885, 0.980). Derived with
+# scripts/derive_dy_correction.py --ttbar-scale em.
+DY_NJETS_BTAG = {0: (0.868, 1.009, 1.291), 1: (1.090, 1.298, 1.752), 2: (0.958, 1.167, 1.674)}
 
 # NN output classes in training order: index = friend column predicted_class, datacard bin id = index + 1
 NN_CLASS_NAMES = ("HH2B2Tau", "DY", "ST", "TT", "VV", "jetFakes", "Other")

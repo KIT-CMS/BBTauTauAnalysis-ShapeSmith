@@ -106,7 +106,7 @@ tau channels name them (`channels: [et, mt, tt]`), so the em skim looks for none
 The dilepton run YAML takes `sample_lists`, `dy_correction` (on `DY`) and `diagnostics` (the jet-multiplicity regions
 `nj2`, `nj3`, `nj4p` with 0 and ≥ 1 b tags, the diagnostic variables, and the auxiliary flavour templates `DY_b`,
 `DY_c`, `DY_l` in mm/ee and `TT_b`, `TT_c`, `TT_l` in em from the GenJet hadron flavour of the leading-score b-pair
-jet, booked in the nominal region; data reads no flavour column). The table is the mm data/MC of v5;
+jet, booked in the nominal region; data reads no flavour column). The table is the mm and ee data/MC of v6;
 `scripts/derive_dy_correction.py -c <dilepton run YAML> [--channels mm,ee] [--ttbar-scale em]` derives it again from
 the control shapes of a dilepton run without the correction (`hist --control --regions all`) and prints it in the
 format of `constants.py`; `--ttbar-scale em` scales the subtracted ttbar with the em data/MC of the same b-tag region. Override a switch on the command line with
