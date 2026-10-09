@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from shapesmith.config import RunConfig
-from shapesmith.model import ABCD, Analysis, Channel, DataMinus, MLExportConfig, Process, Sample, TemplateShift
+from shapesmith.model import ABCD, Analysis, Category, Channel, DataMinus, MLExportConfig, Process, Sample, TemplateShift
 
 from bbtautau_shapesmith import cuts
 from bbtautau_shapesmith.constants import ERA, LUMI_PB
@@ -13,7 +13,7 @@ from bbtautau_shapesmith.samples import sample_database, samples
 from bbtautau_shapesmith.style import style
 from bbtautau_shapesmith.switches import TauSwitches, parse
 from bbtautau_shapesmith.systematics import btag_variations, embedding_variation_sums, embedding_variations, ff_variations, lnn
-from bbtautau_shapesmith.variables import categories, control_variables
+from bbtautau_shapesmith.variables import categories, control_variables, nominal_category
 
 ML_VARIABLES = (
     "pt_1", "pt_2", "m_vis", "pt_vis", "mt_tot", "pt_tautau", "deltaR_ditaupair", "met", "n_jets", "n_bjets",
@@ -77,6 +77,12 @@ def column_variations(name: str, switches: TauSwitches) -> tuple:
     return (embedding_variations(name) if switches.embedded(name) else ()) + (ff_variations(name) if switches.jet_fakes == "ff" else ())
 
 
+def fit_categories(switches: TauSwitches) -> tuple[Category, ...]:
+    if switches.fit_categories == "control":
+        return nominal_category()
+    return categories() if switches.nn_friend else ()
+
+
 def channel(name: str, switches: TauSwitches, channel_samples: tuple[Sample, ...]) -> Channel:
     table = tau_processes(name, switches.jet_fakes, switches.embedded(name), switches.dy_correction)
     groups = {p.group for p in table}
@@ -87,7 +93,7 @@ def channel(name: str, switches: TauSwitches, channel_samples: tuple[Sample, ...
         cuts=cuts.baseline_cuts(name),
         processes=table,
         regions=cuts.regions(name, switches.jet_fakes, switches.ff_type) + (cuts.diagnostic_regions(name) if switches.control_regions else ()),
-        categories=categories() if switches.nn_friend else (),
+        categories=fit_categories(switches),
         variables=control_variables(switches.nn_friend),
         variations=btag_variations() + column_variations(name, switches),
         estimators=estimators(name, table, switches),

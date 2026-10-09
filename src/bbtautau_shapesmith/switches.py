@@ -47,6 +47,7 @@ class TauSwitches(_EmbeddedChannels, BaseModel):
     ff_type: Literal["corrected", "raw"] = "corrected"  # FF friend weight; raw: no DR->SR and non-closure corrections (needs jet_fakes: ff, shape_systematics: false)
     embedding: Embedding = False  # genuine tautau from the embedded samples instead of MC, in every tau channel or the listed ones
     nn_friend: bool = False  # NN categories from the NN friend
+    fit_categories: Literal["nn", "control"] = "nn"  # nn: the NN categories (with nn_friend); control: one category 'nominal' per channel
     control_regions: bool = False  # wider skim plus the named pass/fail control regions (needs jet_fakes: mc)
     shape_systematics: bool = True  # the embedding and fake-factor shifts (column variations)
     dy_correction: DyCorrection = "none"  # on every DY process (ZTT, ZL, ZJ)

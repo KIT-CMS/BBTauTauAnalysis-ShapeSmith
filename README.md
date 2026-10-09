@@ -73,6 +73,7 @@ Switches of the tau run YAML (typed in `switches.py`; an unknown or mistyped swi
 | `ff_type` | `corrected` (default), `raw` | the FF friend weight of `jetFakes`: corrected, or raw (no DR->SR and non-closure corrections; needs `jet_fakes: ff` and `shape_systematics: false`) |
 | `embedding` | `false` (default), `true`, a list of channels (`[et, mt]`) | genuine ττ from the embedded samples (`EMB`) instead of the T parts of the MC, in every tau channel or in the listed ones (each a channel of the run); needs the embedding inventory in `sample_lists` |
 | `nn_friend` | `false` (default), `true` | NN categories from the NN friend |
+| `fit_categories` | `nn` (default), `control` | the categories of `hist`, `datacards` and `fit`: the NN classes (with `nn_friend`), or one category `nominal` per tau channel with the nominal region in one bin (`yield`), e.g. for `fit --background-only` without NN friends |
 | `control_regions` | `false` (default), `true` | wider skim plus the named pass/fail control regions; needs `jet_fakes: mc` |
 | `shape_systematics` | `true` (default), `false` | the CROWN shifts of the embedded samples and of the fake-factor friend as shape variations |
 | `dy_correction` | `none` (default), `njets_btag` | every DY process (ZTT, ZL, ZJ) times the DY data/MC table `DY_NJETS_BTAG` (`constants.py`) of its n_bjets (0, 1, ≥ 2) and n_jets (≤ 2, 3, ≥ 4) |

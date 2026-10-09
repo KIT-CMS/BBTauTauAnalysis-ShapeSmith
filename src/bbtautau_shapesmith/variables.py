@@ -1,4 +1,4 @@
-"""The NN categories and the control variables with their binning."""
+"""The fit categories (NN classes or one nominal category) and the control variables with their binning."""
 from __future__ import annotations
 
 import numpy as np
@@ -15,6 +15,11 @@ def categories() -> tuple[Category, ...]:
         Category(name, f"({NN_CLASS_COLUMN} == {index})", Variable("NN_score", NN_SCORE_COLUMN, SIGNAL_BINNING if name == "HH2B2Tau" else STANDARD_BINNING))
         for index, name in enumerate(NN_CLASS_NAMES)
     )
+
+
+def nominal_category() -> tuple[Category, ...]:
+    """Every event of the nominal region in one bin: the fit category of a channel without NN categories."""
+    return (Category("nominal", "True", control_variables()["yield"]),)
 
 
 def _edges(values) -> tuple[float, ...]:

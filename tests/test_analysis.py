@@ -1,5 +1,5 @@
 import pytest
-from shapesmith.model import ABCD, AnalysisError, DataMinus, TemplateShift
+from shapesmith.model import ABCD, AnalysisError, DataMinus, TemplateShift, Variable
 from shapesmith.skim import needed_columns
 from shapesmith.validate import validate
 
@@ -30,6 +30,16 @@ def test_every_switch_combination_builds_and_validates(jet_fakes, embedding, nn_
     analysis = analysis_for(jet_fakes, embedding, nn_friend=nn_friend)
     for channel in analysis.channels.values():
         assert bool(channel.categories) == nn_friend
+
+
+@pytest.mark.parametrize("nn_friend", [False, True])
+def test_control_fit_categories(nn_friend):
+    """fit_categories: control gives every tau channel one category with the nominal region in one bin."""
+    analysis = analysis_for("ff", ["et", "mt"], fit_categories="control", nn_friend=nn_friend)
+    for channel in analysis.channels.values():
+        (category,) = channel.categories
+        assert (category.name, category.cut, category.variable) == ("nominal", "True", Variable("yield", "1.0", (0.5, 1.5)))
+        assert any(needed_columns(channel, sample) & NN_COLUMNS for sample in channel.samples) == nn_friend  # NN_score as a control variable
 
 
 @pytest.mark.parametrize("jet_fakes,embedding", COMBINATIONS)
