@@ -32,7 +32,7 @@ def lepton_weights(channel: str) -> dict[str, str]:
     if channel == "mt":
         return {"id": "id_wgt_mu_1", "iso": "iso_wgt_mu_1"}
     if channel == "et":
-        return {"id": "id_wgt_ele_1"}  # the MC wp90iso ID SF covers the isolation
+        return {"id": "id_wgt_ele_1", "reco": "reco_wgt_ele_1"}  # the MC wp90iso ID SF covers the isolation
     return {}
 
 

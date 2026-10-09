@@ -47,6 +47,14 @@ def test_embedding_weights_follow_the_part_a_contract(channel):
     assert {"emb_vs_mu", "emb_vs_ele", "emb_tau_id", "emb_trigger"} <= set(emb)
 
 
+def test_light_lepton_scale_factors():
+    """et: electron ID (wp90iso, covering the isolation) and reconstruction SF in MC; the embedding keeps its own
+    ID and iso SFs and has no reconstruction SF."""
+    assert weights.lepton_weights("et") == {"id": "id_wgt_ele_1", "reco": "reco_wgt_ele_1"}
+    assert weights.lepton_weights("mt") == {"id": "id_wgt_mu_1", "iso": "iso_wgt_mu_1"} and weights.lepton_weights("tt") == {}
+    assert "reco_wgt_ele_1" not in columns_of(weights.embedding_weights("et").values())
+
+
 def test_regions_replace_mc_weights_only():
     channel = analysis_for("mc", embedding=True, control_regions=True).channel("mt")
     for region_name in ("btag1_os_fail", "lepton_antiiso"):

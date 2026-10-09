@@ -1,5 +1,6 @@
-"""The stored sm2018_binned_v4 skims stay reusable: their contracts and Parquet columns (one data and one MC sample per
-channel, cut from the golden references of 2026-09-30) against the contracts the v4 run YAMLs ask for today."""
+"""The stored sm2018_binned_v4 skims stay reusable but for the changes since: their contracts and Parquet columns (one
+data and one MC sample per channel, cut from the golden references of 2026-09-30) against the contracts the v4 run
+YAMLs ask for today."""
 import json
 
 import pytest
@@ -13,6 +14,11 @@ RUN_YAML = {"et": "sm2018_binned_v4", "mt": "sm2018_binned_v4", "tt": "sm2018_bi
             "em": "sm2018_binned_v4_dilepton", "mm": "sm2018_binned_v4_dilepton", "ee": "sm2018_binned_v4_dilepton"}
 
 
+def changes(channel_name: str, kind: str) -> list[str]:
+    """Why a v4 skim needs a re-skim today: the electron reco SF of the et MC (v6, A3)."""
+    return ["columns missing: reco_wgt_ele_1"] if (channel_name, kind) == ("et", "mc") else []
+
+
 @pytest.mark.parametrize("channel_name", sorted(STORED))
 def test_v4_skims_are_reused(channel_name):
     config = load_config(REPO / "configs" / f"{RUN_YAML[channel_name]}.yaml").model_copy(update={"sample_database": DATABASE})
@@ -22,4 +28,4 @@ def test_v4_skims_are_reused(channel_name):
     samples = {s.nick: s for s in channel.samples}
     for nick, skim in stored["samples"].items():
         expected = contract(config, channel, samples[nick], needed_columns(channel, samples[nick]))
-        assert reuse_problems(skim["contract"], expected, set(skim["parquet_columns"])) == [], nick
+        assert reuse_problems(skim["contract"], expected, set(skim["parquet_columns"])) == changes(channel_name, samples[nick].kind), nick

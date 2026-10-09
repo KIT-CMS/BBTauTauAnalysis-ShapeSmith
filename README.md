@@ -131,9 +131,10 @@ mutau 2018D event count) of exactly the nicks in `inventory/`; a new inventory a
   parts and W.
 - **EMB weights** (Part-A contract): `emb_genweight`, the embedding selection SFs, the embedding lepton ID/iso SFs
   (mt `id_wgt_mu_1`, `iso_wgt_mu_1`; et `id_wgt_ele_1`, `iso_wgt_ele_1`), the vsJet SF of genuine τh, vsE/vsMu and the
-  trigger SF; no pileup and no b-tag weight. They carry their own names (`emb_…`), so regions that replace MC
-  weights (the tau-fail regions, the mt muon anti-isolation region) leave them unchanged. In the anti-isolated
-  regions genuine taus keep the Medium pass SF, as in TauFakeFactors and the legacy analysis.
+  trigger SF; no pileup, b-tag or electron reconstruction weight (the et MC carries `id_wgt_ele_1` and
+  `reco_wgt_ele_1`). They carry their own names (`emb_…`), so regions that replace MC weights (the tau-fail regions,
+  the mt muon anti-isolation region) leave them unchanged. In the anti-isolated regions genuine taus keep the Medium
+  pass SF, as in TauFakeFactors and the legacy analysis.
 - **Shifts** (`systematics.py`, only with `shape_systematics: true`). The analysis declares every CROWN shift it
   reads. For a sample kind with declared shifts the skim fails on a declared shift without a shifted branch and on an
   undeclared `c__X` branch of a needed column (main n-tuple or friend):
