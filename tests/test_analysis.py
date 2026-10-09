@@ -189,10 +189,10 @@ def test_ml_export_labels():
 
 def test_processes_of_every_channel():
     """lnN and ML labels come from the union of the channel tables: TTT is auxiliary with embedding, a background without."""
-    embedded, simulated = analysis_for("mc", embedding=True).channel("mt"), analysis_for("mc").channel("tt")
-    roles = {p.name: p.role for p in process_union([embedded, simulated])}
+    with_emb, without_emb = analysis_for("mc", embedding=True).channel("mt"), analysis_for("mc").channel("tt")
+    roles = {p.name: p.role for p in process_union([with_emb, without_emb])}
     assert roles["EMB"] == roles["ZTT"] == roles["TTT"] == "background"
-    assert [p.name for p in process_union([embedded, simulated])] == list(dict.fromkeys(p.name for p in embedded.processes + simulated.processes))
+    assert [p.name for p in process_union([with_emb, without_emb])] == list(dict.fromkeys(p.name for p in with_emb.processes + without_emb.processes))
 
 
 @pytest.mark.parametrize("switches,match", [
