@@ -44,5 +44,5 @@ web:
 
     Nominal region: opposite sign, b pair with ≥ 1 b-tag, isolated τh, mT < 70 GeV and |η(τh)| < 2.3 in et and mt.
     The diagnostic b-tag regions exist only for classic and emb, with QCD from same-sign data (et, mt) or ABCD (tt);
-    the fake-factor run has only the nominal region. DY is corrected with the mm data/MC in n_jets × n_bjets.
+    the fake-factor run has only the nominal region. DY is corrected with the mm and ee data/MC in n_jets × n_bjets.
     Plots are prefit, without systematic uncertainties.

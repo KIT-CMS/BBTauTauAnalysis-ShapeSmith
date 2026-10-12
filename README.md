@@ -50,11 +50,12 @@ shapesmith skim      -c configs/sm2018_binned_v6_ff.yaml
 shapesmith hist      -c configs/sm2018_binned_v6_ff.yaml --control --skip-systematics && shapesmith estimate -c configs/sm2018_binned_v6_ff.yaml --control
 shapesmith hist      -c configs/sm2018_binned_v6_ff.yaml --skip-systematics && shapesmith estimate -c configs/sm2018_binned_v6_ff.yaml   # categories nominal, em_tt
 shapesmith datacards -c configs/sm2018_binned_v6_ff.yaml && shapesmith fit -c configs/sm2018_binned_v6_ff.yaml --background-only   # -> datacards/background_fit.md
-# web galleries (after plot or measure; target, column and texts from the web: block of each run YAML)
-shapesmith publish   -c configs/sm2018_binned_v6.yaml                    # ~sdaigler/sm2018_binned_v6, column emb (+ title, about)
+# web galleries (after plot or measure; target, column and texts from the web: block of each run YAML), in this
+# order: the first publication fixes the order of the columns and channels
 shapesmith publish   -c configs/sm2018_binned_v6.yaml -s switches.embedding=false -s output_dir=../output/sm2018_binned_v6_noemb \
-                     -s web.variant=classic -s web.label=classic -s web.description=null   # column classic: et, mt, tt
+                     -s web.variant=classic -s web.label=classic -s web.description=null   # ~sdaigler/sm2018_binned_v6 (+ title, about), column classic: et, mt, tt
 shapesmith publish   -c configs/sm2018_binned_v6_dilepton.yaml           # column classic: em, mm, ee
+shapesmith publish   -c configs/sm2018_binned_v6.yaml                    # column emb
 shapesmith publish   -c configs/sm2018_binned_v6_ff.yaml                 # column emb ff
 shapesmith publish   -c configs/ff_sm2018_binned_v6.yaml                 # ~sdaigler/ff_sm2018_binned_v6: the FF measurement
 shapesmith publish   -c configs/ff_sm2018_binned_v6_noemb.yaml           # its cross-check column
