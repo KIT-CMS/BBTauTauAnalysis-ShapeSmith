@@ -31,8 +31,10 @@ workers: 16
 log_level: DEBUG                                          # DEBUG | INFO | WARNING | ERROR; console and <output_dir>/logs/<command>_<time>.log
 combine: {cmssw_dir: /work/sdaigler/smhtt_ul/CMSSW_14_1_9, scram_arch: el9_amd64_gcc12}
 # web gallery (shapesmith publish)
+# web gallery (shapesmith publish): et, mt and em of this run are the column "emb ff", its tt (no embedding) the column
+# "ff": --channels tt --variant ff --label ff --description "..." (README)
 web:
   dir: /web/sdaigler/public_html/sm2018_binned_v6
   variant: emb_ff
   label: emb ff
-  description: "τ-embedding in et and mt (MC genuine ττ in tt) + jet→τh fakes from the fully corrected fake factor (friend ff_v2: fractions, QCD DR→SR, non-closure corrections); em is the ttbar control channel."
+  description: "τ-embedding + jet→τh fakes from the fully corrected fake factor (friend ff_v2: fractions, QCD DR→SR, non-closure corrections); em is the ttbar control channel; et and mt only (tt has no embedding, see ff)."

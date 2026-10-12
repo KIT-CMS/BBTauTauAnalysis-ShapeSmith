@@ -36,11 +36,12 @@ web:
   dir: /web/sdaigler/public_html/sm2018_binned_v6
   variant: emb
   label: emb
-  description: "τ-embedding for genuine ττ in et and mt (MC in tt), MC jet→τh fakes, QCD from the ABCD method (also in the control regions), DY corrected in n_jets × n_bjets."
+  description: "τ-embedding for genuine ττ, MC jet→τh fakes, QCD from the ABCD method (also in the control regions), DY corrected in n_jets × n_bjets; et and mt only (tt has no embedding, see classic)."
   title: "sm2018_binned_v6 · control plots"
   about: |
     HH→bbττ 2018 (NanoAODv15), CROWN production sm2018_binned_v6; histograms and plots by ShapeSmith.
-    Columns: classic (MC genuine ττ), emb (τ-embedding in et and mt, MC genuine ττ in tt) and emb ff (fake factors ff_v2).
+    Columns: classic (MC genuine ττ, all channels), emb (τ-embedding; et, mt), emb ff (τ-embedding + fake factors ff_v2;
+    et, mt and em as the ttbar control) and ff (MC genuine ττ + fake factors ff_v2; tt). tt has no embedding.
 
     Nominal region: opposite sign, b pair with ≥ 1 b-tag, isolated τh, mT < 70 GeV and |η(τh)| < 2.3 in et and mt.
     The diagnostic b-tag regions exist only for classic and emb, with QCD from same-sign data (et, mt) or ABCD (tt);

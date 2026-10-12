@@ -55,8 +55,10 @@ shapesmith datacards -c configs/sm2018_binned_v6_ff.yaml && shapesmith fit -c co
 shapesmith publish   -c configs/sm2018_binned_v6.yaml -s switches.embedding=false -s output_dir=../output/sm2018_binned_v6_noemb \
                      -s web.variant=classic -s web.label=classic -s web.description=null   # ~sdaigler/sm2018_binned_v6 (+ title, about), column classic: et, mt, tt
 shapesmith publish   -c configs/sm2018_binned_v6_dilepton.yaml           # column classic: em, mm, ee
-shapesmith publish   -c configs/sm2018_binned_v6.yaml                    # column emb
-shapesmith publish   -c configs/sm2018_binned_v6_ff.yaml                 # column emb ff
+shapesmith publish   -c configs/sm2018_binned_v6.yaml --channels et,mt   # column emb
+shapesmith publish   -c configs/sm2018_binned_v6_ff.yaml --channels et,mt,em   # column emb ff
+shapesmith publish   -c configs/sm2018_binned_v6_ff.yaml --channels tt --variant ff --label ff \
+                     --description "MC genuine ττ + jet→τh fakes from the fully corrected fake factor (friend ff_v2); tt only, it has no embedding."   # column ff: tt
 shapesmith publish   -c configs/ff_sm2018_binned_v6.yaml                 # ~sdaigler/ff_sm2018_binned_v6: the FF measurement
 shapesmith publish   -c configs/ff_sm2018_binned_v6_noemb.yaml           # its cross-check column
 # with NN friends (nn_friend: true, fit_categories: nn, friend under ntuples.friends, re-skim):
@@ -73,6 +75,8 @@ text of the control gallery are in `sm2018_binned_v6.yaml`. Publishing a column 
 changed plots; the first publish of a column fixes its position. The classic column is the run without embedding:
 `hist`, `estimate` and `plot` of `sm2018_binned_v6.yaml` with `-s switches.embedding=false
 -s output_dir=../output/sm2018_binned_v6_noemb`; `web.description=null` keeps the description of the dilepton YAML.
+tt has no embedding, so it is only in the columns classic and ff (the tt of the fake-factor run); emb and emb ff hold
+et and mt, emb ff also the control channel em.
 
 The v5 run YAMLs (`*v5*.yaml`, galleries `sm2018_binned_v5` and `ff_sm2018_binned_v5`, run as above) share one skim
 directory between the tau and the dilepton run. With the v6 code, `hist`, `estimate` and `plot` of tt, em, mm and ee
