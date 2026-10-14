@@ -182,6 +182,12 @@ jphi_1
 jphi_2
 jpt_1
 jpt_2
+jpt_l1_1
+jpt_l1_2
+jpt_l2l3res_1
+jpt_l2l3res_2
+jpt_l2rel_1
+jpt_l2rel_2
 jpt_nano_1
 jpt_nano_2
 jpt_raw_1

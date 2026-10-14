@@ -13,6 +13,8 @@ EMBEDDING_LIST = "sm2018_embedding"
 # relative to the MC branch fixtures, until a branch fixture of a real embedding file exists.
 EMBEDDING_EXTRA = {"emb_genweight", "emb_idsel_wgt_1", "emb_idsel_wgt_2", "emb_triggersel_wgt"}
 EMBEDDING_EXTRA_ET = {"iso_wgt_ele_1"}
+# CROWN output of the v6 production (B7) that the diagnostics read, until a branch fixture of a v6 file exists
+V6_COLUMNS = {"npv_good", "rho"}
 
 
 def branches(channel: str) -> set[str]:
@@ -25,6 +27,11 @@ def embedding_branches(channel: str) -> set[str]:
     generator weights, plus the embedding weights."""
     absent = {b for b in branches(channel) if b.startswith("btag_weight_upart")} | {"puweight", "genWeight", "reco_wgt_ele_1"}
     return (branches(channel) - absent) | EMBEDDING_EXTRA | (EMBEDDING_EXTRA_ET if channel == "et" else set())
+
+
+def embedded(embedding: bool | list[str], channel: str) -> bool:
+    """The switch embedding (true/false or the embedded channels) for one channel."""
+    return channel in embedding if isinstance(embedding, list) else embedding
 
 
 def nicks(sample_list: str = "sm2018_binned_v2") -> tuple[str, ...]:

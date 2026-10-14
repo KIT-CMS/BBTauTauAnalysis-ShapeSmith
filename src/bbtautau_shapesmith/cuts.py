@@ -12,6 +12,7 @@ TRIGGER = {
     "tt": "(trg_double_tau35_mediumiso > 0.5) | (trg_double_tau35_tightiso > 0.5) | (trg_double_tau40_mediumiso > 0.5) | (trg_double_tau40_tightiso > 0.5)",
 }
 SAME_SIGN = "((q_1 * q_2) > 0)"
+B_TAGGING = "(n_bjets >= 1) & (bpair_pt_2 > 0)"  # a b pair with at least one b tag
 
 
 def isolated(leg: int) -> str:
@@ -31,7 +32,7 @@ def baseline_cuts(channel: str) -> dict[str, str]:
         "extraelec_veto": "(extraelec_veto < 0.5)",
         "extramuon_veto": "(extramuon_veto < 0.5)",
         "os": "((q_1 * q_2) < 0)",
-        "b_tagging": "(n_bjets >= 1) & (bpair_pt_2 > 0)",
+        "b_tagging": B_TAGGING,
         "against_muon": " & ".join(f"(id_tau_vsMu_{TAU_VS_MU_WP[channel]}_{leg} > 0.5)" for leg in TAU_LEGS[channel]),
         "against_electron": " & ".join(f"(id_tau_vsEle_{TAU_VS_ELE_WP[channel]}_{leg} > 0.5)" for leg in TAU_LEGS[channel]),
         "tau_iso": " & ".join(isolated(leg) for leg in TAU_LEGS[channel]),
@@ -40,6 +41,8 @@ def baseline_cuts(channel: str) -> dict[str, str]:
         cuts["dilepton_veto"] = "(dilepton_veto < 0.5)"  # not produced for tt (no light lepton in the final state)
         cuts["lepton_iso"] = "(iso_1 < 0.15)"
         cuts["mt_cut"] = "(mt_1 < 70)"
+        # EMB has hardly any tau_h beyond 2.3, where the Run-2 vsMu SFs end; tt: the trigger matching cuts at 2.1
+        cuts["tau_eta"] = "(abs(eta_2) < 2.3)"
     else:
         cuts["pt_selection"] = "(pt_1 > 40) & (pt_2 > 40)"
     cuts["trg_selection"] = TRIGGER[channel]

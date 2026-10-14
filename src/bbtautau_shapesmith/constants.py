@@ -6,6 +6,7 @@ TAU_CHANNELS = ("et", "mt", "tt")
 LT_CHANNELS = ("et", "mt")  # tau channels with a light lepton on leg 1
 TAU_LEGS = {"et": (2,), "mt": (2,), "tt": (1, 2)}  # the hadronic tau legs
 DILEPTON_CHANNELS = ("em", "mm", "ee")  # light-dilepton controls: Z+jets in ee/mm, top in em
+CONTROL_CHANNELS = ("em",)  # control channels of the tau analysis, in every fit: em constrains ttbar
 
 TAU_VS_JET_WP = "Medium"
 TAU_VS_JET_LOOSE_WP = "VVVLoose"  # lower edge of the anti-isolated region
@@ -14,6 +15,14 @@ TAU_VS_ELE_WP = {"mt": "VVLoose", "et": "Tight", "tt": "VVLoose"}
 
 # b-tag multiplicity bins of the control regions (each combined with >= 2 jets)
 BTAG_BINS = {"btag0": "n_bjets == 0", "btag1": "n_bjets == 1", "btag2": "n_bjets == 2", "btag3p": "n_bjets >= 3"}
+# jet multiplicity bins of the dilepton diagnostic regions (switch diagnostics), each with 0 and >= 1 b tags
+NJETS_BINS = {"nj2": "n_jets == 2", "nj3": "n_jets == 3", "nj4p": "n_jets >= 4"}
+
+# DY correction (switch dy_correction: njets_btag): DY data/MC in the mm and ee Z window of sm2018_binned_v6, rows
+# n_bjets 0, 1, >= 2 (measured with 2), columns n_jets <= 2, 3, >= 4 (the tau selections have >= 2 jets), the other
+# MC subtracted with ttbar times the em data/MC of the same b-tag region (0.843, 0.885, 0.980). Derived with
+# scripts/derive_dy_correction.py --ttbar-scale em.
+DY_NJETS_BTAG = {0: (0.868, 1.009, 1.291), 1: (1.090, 1.298, 1.752), 2: (0.958, 1.167, 1.674)}
 
 # NN output classes in training order: index = friend column predicted_class, datacard bin id = index + 1
 NN_CLASS_NAMES = ("HH2B2Tau", "DY", "ST", "TT", "VV", "jetFakes", "Other")
@@ -46,11 +55,10 @@ FF_SHIFTS_TT = FF_SHIFTS_LT + (
     "ttbar_subleading_non_closure_CorrStatShift", "ttbar_subleading_non_closure_CorrSystBandAsym", "ttbar_subleading_non_closure_CorrSystMCShift",
 )
 
-# Embedding tau corrections, one nuisance per measured decay-mode category: nuisance token -> the decay modes of its
-# CROWN shifts. DM10 and DM11 are one fit, which CROWN shifts per decay mode; the nuisance sums the two.
+# Embedding tau corrections (energy scale and vsJet SF, both binned in the decay mode), one nuisance per measured
+# decay-mode category: nuisance token -> the decay modes of its CROWN shifts. DM10 and DM11 are one fit, which CROWN
+# shifts per decay mode; the nuisance sums the two.
 EMBEDDING_TAU_DECAY_MODES = {"0": (0,), "1": (1,), "1011": (10, 11)}
-# vsJet pT bins; tt has no 20-40 GeV bin because its selection requires both taus above 40 GeV
-EMBEDDING_VS_JET_PT_BINS = {"et": ("20to40", "40toInf"), "mt": ("20to40", "40toInf"), "tt": ("40toInf",)}
 
 # UParT b-tag shape-correction components; columns btag_weight_upart_{up,down}_<component>
 BTAG_COMPONENTS = (

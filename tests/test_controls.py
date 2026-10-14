@@ -12,11 +12,12 @@ from shapesmith.model import AnalysisError
 from shapesmith.plotting.stack import run_plot
 from shapesmith.skim import needed_columns
 from shapesmith.store import write_skim
+from shapesmith.validate import validate
 
-from bbtautau_shapesmith.constants import DILEPTON_CHANNELS, NN_COLUMNS, TAU_CHANNELS
+from bbtautau_shapesmith.constants import DILEPTON_CHANNELS, NJETS_BINS, NN_COLUMNS, TAU_CHANNELS
 from bbtautau_shapesmith.dilepton import build
-from bbtautau_shapesmith.variables import control_variables
-from tests.helpers import DATABASE, REPO, branches, config
+from bbtautau_shapesmith.variables import DIAGNOSTIC_VARIABLES, control_variables
+from tests.helpers import DATABASE, REPO, V6_COLUMNS, branches, config
 from tests.test_analysis import analysis_for
 
 DILEPTON = "bbtautau_shapesmith.dilepton:build"
@@ -53,6 +54,33 @@ def test_btag_regions_partition_two_jet_events(channel):
     for name in ("btag0", "btag1", "btag2", "btag3p"):
         counts += mask(frame, {**definition.cuts, **definition.region(name).replace_cuts}.values())
     assert counts.tolist() == [1] * 5
+
+
+@pytest.mark.parametrize("channel", DILEPTON_CHANNELS)
+def test_diagnostic_jet_regions_partition_two_jet_events(channel):
+    definition = build(config([channel], DILEPTON, diagnostics=True)).channel(channel)
+    frame = pd.DataFrame([event(n_jets=jets, n_bjets=btags) for jets in range(2, 7) for btags in range(3)])
+    counts = np.zeros(len(frame), dtype=int)
+    for jets in NJETS_BINS:
+        for tag in ("btag0", "btag1p"):
+            counts += mask(frame, {**definition.cuts, **definition.region(f"{jets}_{tag}").replace_cuts}.values())
+    assert counts.tolist() == [1] * len(frame)
+
+
+@pytest.mark.parametrize("channel", DILEPTON_CHANNELS)
+def test_flavour_templates_read_the_flavour_of_mc_only(channel):
+    definition = build(config([channel], DILEPTON, diagnostics=True)).channel(channel)
+    group = "TT" if channel == "em" else "DY"
+    templates = [p for p in definition.processes if p.role == "auxiliary"]
+    assert [(p.name, p.group) for p in templates] == [(f"{group}_{flavour}", group) for flavour in ("b", "c", "l")]
+    frame = pd.DataFrame({"genjet_hadFlavour_1": [5, 4, 0, 21, 246]})
+    assert sum(mask(frame, p.selection.cuts.values()).astype(int) for p in templates).tolist() == [1] * 5
+    assert mask(frame, templates[0].selection.cuts.values()).tolist() == [True, False, False, False, False]
+    assert "genjet_hadFlavour_1" in needed_columns(definition, definition.samples_of(group)[0])
+    assert "genjet_hadFlavour_1" not in needed_columns(definition, definition.samples_of("data")[0])
+    assert set(DIAGNOSTIC_VARIABLES) <= set(definition.variables)
+    for sample in definition.samples:
+        assert needed_columns(definition, sample) <= branches(channel) | V6_COLUMNS | {"npartons"}, sample.nick
 
 
 def test_dilepton_data_routing_unsplit_mc_and_no_tau_estimate():
@@ -121,6 +149,20 @@ def test_raw_ff_run_config_is_the_ff_run_config_with_raw_fake_factors():
     assert (raw.ntuples, raw.channels, raw.sample_database) == (corrected.ntuples, corrected.channels, corrected.sample_database)
     assert all(getattr(raw, name) != getattr(corrected, name) for name in ("skim_dir", "output_dir", "ml_dir"))
     load_analysis(raw.model_copy(update={"sample_database": DATABASE}))
+
+
+def test_v6_run_configs():
+    configs = {name: load_config(REPO / "configs" / f"{name}.yaml") for name in (
+        "sm2018_binned_v6", "sm2018_binned_v6_dilepton", "sm2018_binned_v6_ff", "ff_sm2018_binned_v6", "ff_sm2018_binned_v6_noemb")}
+    for cfg in configs.values():
+        assert cfg.ntuples.base == "/store/user/sdaigler/CROWN/ntuples/sm2018_binned_v6/CROWNRun" and cfg.switches["sample_lists"][0] == "sm2018_binned_v6"
+        validate(load_analysis(cfg.model_copy(update={"sample_database": DATABASE})))
+    tau, dilepton, tau_ff = configs["sm2018_binned_v6"], configs["sm2018_binned_v6_dilepton"], configs["sm2018_binned_v6_ff"]
+    assert len({tau.skim_dir, dilepton.skim_dir, tau_ff.skim_dir}) == 3  # em is in the dilepton and the fake-factor run
+    assert tau_ff.channels == ["et", "mt", "tt", "em"] and all(friend.channels == ("et", "mt", "tt") for friend in tau_ff.ntuples.friends)
+    measurement, cross_check = configs["ff_sm2018_binned_v6"], configs["ff_sm2018_binned_v6_noemb"]
+    assert cross_check.switches == measurement.switches | {"embedding": False} and measurement.switches["embedding"] == tau_ff.switches["embedding"] == ["et", "mt"]
+    assert cross_check.skim_dir == measurement.skim_dir and cross_check.output_dir != measurement.output_dir
 
 
 def only(analysis, channel_name, *processes):

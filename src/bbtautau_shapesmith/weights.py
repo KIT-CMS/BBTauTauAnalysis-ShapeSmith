@@ -1,9 +1,11 @@
 """Event weights: MC scale factors, the embedded sample's weights, the fake factors (v15 branch names)."""
 from __future__ import annotations
 
-from bbtautau_shapesmith.constants import FF_COLUMNS, FF_RAW_COLUMNS, LT_CHANNELS, TAU_LEGS, TAU_VS_ELE_WP, TAU_VS_JET_WP, TAU_VS_MU_WP
+from bbtautau_shapesmith.constants import DY_NJETS_BTAG, FF_COLUMNS, FF_RAW_COLUMNS, LT_CHANNELS, TAU_LEGS, TAU_VS_ELE_WP, TAU_VS_JET_WP, TAU_VS_MU_WP
 
 TOP_PT = {"top_pt": "topPtReweightWeight"}  # only ttbar ntuples carry it
+_DY_BTAG_ROWS = {0: "(n_bjets == 0)", 1: "(n_bjets == 1)", 2: "(n_bjets >= 2)"}
+_DY_JET_COLUMNS = ("(n_jets <= 2)", "(n_jets == 3)", "(n_jets >= 4)")
 _DITAU_TRIGGERS = ("double_tau35_mediumiso", "double_tau35_tightiso", "double_tau40_mediumiso", "double_tau40_tightiso")
 
 
@@ -32,7 +34,7 @@ def lepton_weights(channel: str) -> dict[str, str]:
     if channel == "mt":
         return {"id": "id_wgt_mu_1", "iso": "iso_wgt_mu_1"}
     if channel == "et":
-        return {"id": "id_wgt_ele_1"}  # the MC wp90iso ID SF covers the isolation
+        return {"id": "id_wgt_ele_1", "reco": "reco_wgt_ele_1"}  # the MC wp90iso ID SF covers the isolation
     return {}
 
 
@@ -48,6 +50,21 @@ def tt_trigger_weight() -> str:
 
 def trigger_weight(channel: str) -> str:
     return {"mt": "trg_wgt_single_mu24", "et": "trg_wgt_single_ele32"}.get(channel) or tt_trigger_weight()
+
+
+def dy_njets_btag_weight() -> str:
+    """The DY correction DY_NJETS_BTAG of the event's n_bjets and n_jets, one term per cell."""
+    terms = [f"({_DY_BTAG_ROWS[row]} & {jets}) * {factor}" for row, factors in DY_NJETS_BTAG.items() for jets, factor in zip(_DY_JET_COLUMNS, factors)]
+    return "(" + " + ".join(terms) + ")"
+
+
+def group_weights(group: str, dy_correction: str = "none") -> dict[str, str]:
+    """Weights of one group only: the top-pT reweighting of ttbar, the DY correction (switch dy_correction)."""
+    if group == "TT":
+        return TOP_PT
+    if group == "DY" and dy_correction == "njets_btag":
+        return {"dy_correction": dy_njets_btag_weight()}
+    return {}
 
 
 def mc_weights(channel: str) -> dict[str, str]:

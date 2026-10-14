@@ -1,20 +1,24 @@
 """Light-dilepton controls: Z+jets in ee/mm and top in em with unsplit MC and no tau-fake estimate.
 
 Leg order and triggers follow CROWN's 2018 SM profile (em: electron leg 1, muon leg 2; mm/ee: leading pT first).
-A separate Analysis from the tau channels; the two share samples, style and the b-tag variations.
+A separate Analysis from the tau channels; the two share samples, style and the b-tag variations. em is also the ttbar
+control channel of the tau analysis (top_control_channel).
 """
 from __future__ import annotations
 
-from shapesmith.config import RunConfig
-from shapesmith.model import Analysis, AnalysisError, Channel, Region, Sample
+import dataclasses
 
-from bbtautau_shapesmith.constants import BTAG_BINS, DILEPTON_CHANNELS, ERA, LUMI_PB
+from shapesmith.config import RunConfig
+from shapesmith.model import Analysis, AnalysisError, Category, Channel, Region, Sample
+
+from bbtautau_shapesmith.constants import BTAG_BINS, DILEPTON_CHANNELS, ERA, LUMI_PB, NJETS_BINS
+from bbtautau_shapesmith.cuts import B_TAGGING
 from bbtautau_shapesmith.processes import SIGNAL, dilepton_processes
 from bbtautau_shapesmith.samples import sample_database, samples
 from bbtautau_shapesmith.style import style
 from bbtautau_shapesmith.switches import DileptonSwitches, parse
 from bbtautau_shapesmith.systematics import btag_variations
-from bbtautau_shapesmith.variables import control_variables
+from bbtautau_shapesmith.variables import DIAGNOSTIC_VARIABLES, control_variables
 
 PLOT_VARIABLES = (
     "yield", "pt_1", "pt_2", "eta_1", "eta_2", "phi_1", "phi_2", "iso_1", "iso_2",
@@ -40,26 +44,43 @@ def baseline_cuts(channel: str) -> dict[str, str]:
     }
 
 
-def regions() -> tuple[Region, ...]:
+def regions(diagnostics: bool = False) -> tuple[Region, ...]:
+    """The b-tag bins (>= 2 jets) and same sign; with diagnostics the jet multiplicities with 0 and >= 1 b tags."""
     btag = tuple(Region(name, replace_cuts={"jets": "n_jets >= 2", "b_tagging": cut}) for name, cut in BTAG_BINS.items())
-    return btag + (Region("same_sign", replace_cuts={"os": "(q_1 * q_2) > 0"}),)
+    result = btag + (Region("same_sign", replace_cuts={"os": "(q_1 * q_2) > 0"}),)
+    if diagnostics:
+        tags = {"btag0": "n_bjets == 0", "btag1p": "n_bjets >= 1"}
+        result += tuple(Region(f"{jets}_{tag}", replace_cuts={"jets": jet_cut, "b_tagging": tag_cut}) for jets, jet_cut in NJETS_BINS.items() for tag, tag_cut in tags.items())
+    return result
 
 
-def channel(name: str, channel_samples: tuple[Sample, ...]) -> Channel:
-    table = dilepton_processes(name)
+def channel(name: str, channel_samples: tuple[Sample, ...], dy_correction: str = "none", diagnostics: bool = False) -> Channel:
+    table = dilepton_processes(name, dy_correction, flavours=diagnostics)
     groups = {p.group for p in table}
     cuts = baseline_cuts(name)
-    variables = control_variables()
+    variables = control_variables(diagnostics=diagnostics)
     return Channel(
         name=name,
         samples=tuple(s for s in channel_samples if s.group in groups),
         skim={cut: expr for cut, expr in cuts.items() if cut != "os"},  # both charges, for the same-sign validation
         cuts=cuts,
         processes=table,
-        regions=regions(),
-        variables={variable: variables[variable] for variable in PLOT_VARIABLES},
+        regions=regions(diagnostics),
+        variables={variable: variables[variable] for variable in PLOT_VARIABLES + (DIAGNOSTIC_VARIABLES if diagnostics else ())},
         variations=btag_variations(("correlated", "uncorrelated")),  # the summary scheme, not its decomposition
         keep_columns=("event", "run", "lumi"),
+    )
+
+
+def top_control_channel(channel_samples: tuple[Sample, ...], dy_correction: str = "none") -> Channel:
+    """em as the ttbar control channel of the tau analysis: the em selection (>= 2 jets) with the b tag of the tau
+    baseline as its one category, counted in one bin, without further regions; the b-tag variations of the tau
+    channels, so that they correlate."""
+    return dataclasses.replace(
+        channel("em", channel_samples, dy_correction),
+        regions=(),
+        categories=(Category("em_tt", B_TAGGING, control_variables()["yield"]),),
+        variations=btag_variations(),
     )
 
 
@@ -73,6 +94,6 @@ def build(config: RunConfig) -> Analysis:
         era=ERA,
         lumi_pb=LUMI_PB,
         signal=SIGNAL,
-        channels={name: channel(name, by_channel[name]) for name in config.channels},
+        channels={name: channel(name, by_channel[name], switches.dy_correction, switches.diagnostics) for name in config.channels},
         style=style(),
     )

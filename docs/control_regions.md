@@ -40,8 +40,8 @@ the jet requirement preserves nominal events because `n_jets` and `n_bjets` can 
 pT thresholds. Triggers, tau anti-electron/muon requirements and lepton vetoes remain in the skim.
 
 The switch requires `jet_fakes: mc`; combining it with `jet_fakes: ff` is rejected. The dilepton
-Analysis always defines its control regions and accepts only `sample_lists` under `switches`;
-do not add `control_regions` to its YAML.
+Analysis always defines its control regions and accepts only `sample_lists`, `dy_correction` and
+`diagnostics` under `switches`; do not add `control_regions` to its YAML.
 
 The YAML switch and the command-line options have different jobs:
 
@@ -69,8 +69,8 @@ histograms of an existing `control_shapes.root`.
 
 The nominal baseline requires OS, at least one b-tag and `bpair_pt_2 > 0`, Medium vsJet ID
 on every tau leg, tau anti-electron/muon ID, trigger requirements and extra-lepton vetoes.
-In `et`/`mt`, it also requires `iso_1 < 0.15`, `mt_1 < 70` GeV and the dilepton veto;
-in `tt`, both taus must have pT > 40 GeV. The `et`/`mt` trigger selections require tau
+In `et`/`mt`, it also requires `iso_1 < 0.15`, `mt_1 < 70` GeV, tau `|eta_2| < 2.3` and the dilepton
+veto; in `tt`, both taus must have pT > 40 GeV (the trigger matching limits their |eta| to 2.1). The `et`/`mt` trigger selections require tau
 pT > 30 GeV and electron/muon pT > 33/25 GeV, respectively, plus the single-lepton trigger flag.
 
 **Tau pass/fail** refers to the vsJet ID, not the light-lepton isolation:
@@ -121,14 +121,29 @@ Unlisted baseline cuts remain unchanged.
 | `lepton_antiiso` | OS | Pass | Nominal: ≥1 b-tag, `bpair_pt_2 > 0` | <70 GeV | 0.15 ≤ `iso_1` < 0.5 | Light-lepton isolation sideband |
 | `lepton_antiiso_ss` | SS | Pass | Nominal: ≥1 b-tag, `bpair_pt_2 > 0` | <70 GeV | 0.15 ≤ `iso_1` < 0.5 | Same-sign light-lepton isolation sideband |
 
-The additional diagnostic regions are raw data/MC comparisons with **no data-driven QCD or
-jetFakes estimate**. In MC their tau-fail selections apply the passing tau-ID scale factor only to
+Without `diagnostics: true`, the additional diagnostic regions are raw data/MC comparisons with
+**no data-driven QCD or jetFakes estimate**. In MC their tau-fail selections apply the passing tau-ID scale factor only to
 passing genuine-tau legs; failed genuine taus stay uncorrected. The muon anti-isolation
 sidebands do not use the MC muon isolation scale factor. The embedded sample keeps its own weights
 in both (its iso-binned muon SF covers the sideband).
 
 Including nominal and the four existing same-sign/ABCD names, `--regions all` selects
 **25 region names in each of et/mt and 21 in tt** for the supplied MC-fakes configuration.
+
+### QCD in the diagnostic regions: `diagnostics: true`
+
+The switch `diagnostics` (it needs `control_regions: true`) estimates QCD in the diagnostic regions with the
+estimator target of ShapeSmith, after the nominal ABCD and from the same subtracted MC:
+
+| Channel | Target regions | QCD |
+|---|---|---|
+| `et`, `mt` | `btag{0,1,2,3p}_os_{pass,fail}` | data minus every MC in `btag*_ss_*` of the same tau ID, OS/SS = 1 (measurable in btag0 only), negative bins clipped |
+| `et`, `mt` | `lepton_antiiso` | the same from `lepton_antiiso_ss` |
+| `tt` | `btag{0,1,2,3p}_os_pass` | ABCD: (data − MC)(`btag*_ss_pass`) × (data − MC)(`btag*_os_fail`) / (data − MC)(`btag*_ss_fail`) |
+
+`hist` without `--regions` books these regions for every non-signal process, and `estimate --control` writes QCD
+into them. It also adds the variables `met_uncorrected`, `metphi_uncorrected` (NanoAOD PuppiMET without recoil
+correction and propagation), `npv_good` and `rho`; the last two exist from the v6 production on.
 
 ```bash
 # Requires a skim made with control_regions: true; an existing histogram file keeps its other histograms.
@@ -169,6 +184,12 @@ In `mm`/`ee`, leg 1 is the leading-pT lepton. CROWN writes every data stream int
 | `btag2` | OS | ≥2 | Exactly 2 | Baseline lepton, trigger, veto and mass cuts |
 | `btag3p` | OS | ≥2 | ≥3 | Baseline lepton, trigger, veto and mass cuts |
 | `same_sign` | SS | ≥2 in `em`; inclusive in `mm`/`ee` | Inclusive | Baseline with only the charge flipped |
+
+With `diagnostics: true` (dilepton switch) six more regions split the OS events with ≥ 2 jets in
+`n_jets` 2, 3, ≥ 4 (`nj2`, `nj3`, `nj4p`), each with 0 and ≥ 1 b tags (`nj2_btag0`, `nj2_btag1p`, ...), and the
+auxiliary flavour templates `DY_b`/`DY_c`/`DY_l` (mm, ee) and `TT_b`/`TT_c`/`TT_l` (em) split DY or ttbar by the
+GenJet hadron flavour of the leading-score b-pair jet (`genjet_hadFlavour_1` 5, 4, other) in the nominal region,
+e.g. for template fits of `bpair_btag_value_1`.
 
 The four b-tag regions partition the OS baseline events with ≥2 jets. `same_sign` provides a
 qualitative check of nonprompt backgrounds; it keeps the Z mass window in `mm`/`ee`.

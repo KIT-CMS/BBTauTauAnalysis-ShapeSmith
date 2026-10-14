@@ -13,9 +13,9 @@ from tests.helpers import EMBEDDING_LIST, branches, config, embedding_branches
 T_PARTS, L_PARTS, J_PARTS = ("ZTT", "TTT", "STT", "VVT"), ("ZL", "TTL", "STL", "VVL"), ("ZJ", "TTJ", "STJ", "VVJ")
 
 
-def measurement_analysis(embedding=False, channels=TAU_CHANNELS):
+def measurement_analysis(embedding=False, channels=TAU_CHANNELS, **switches):
     sample_lists = ["sm2018_binned_v3", EMBEDDING_LIST] if embedding else ["sm2018_binned_v3"]
-    analysis = build(config(channels, "bbtautau_shapesmith.ff_measurement:build", embedding=embedding, sample_lists=sample_lists))
+    analysis = build(config(channels, "bbtautau_shapesmith.ff_measurement:build", embedding=embedding, sample_lists=sample_lists, **switches))
     validate(analysis)
     return analysis
 
@@ -48,6 +48,16 @@ def test_the_tau_id_is_the_analysis_tau_id():
     assert region_cuts(mt, "process_fractions_ar") == {**mt.cuts, "tau_iso": cuts.anti_isolated(2)}
 
 
+def test_the_tt_fractions_in_the_application_region():
+    """tt_fraction_region: application measures the fractions of each leg where its fake factor is applied."""
+    tt = measurement_analysis(channels=("tt",), tt_fraction_region="application").channel("tt")
+    assert region_cuts(tt, "process_fractions_ar")["tau_iso"] == f"{cuts.anti_isolated(1)} & {cuts.isolated(2)}" == region_cuts(tt, "ttbar_ar")["tau_iso"]
+    assert region_cuts(tt, "process_fractions_subleading_ar")["tau_iso"] == f"{cuts.isolated(1)} & {cuts.anti_isolated(2)}"
+    assert region_cuts(tt, "process_fractions_subleading_ar") == region_cuts(tt, "ttbar_subleading_ar")
+    mt = measurement_analysis(channels=("mt",), tt_fraction_region="application").channel("mt")
+    assert region_cuts(mt, "process_fractions_ar") == region_cuts(measurement_analysis(channels=("mt",)).channel("mt"), "process_fractions_ar")
+
+
 def test_the_regions():
     analysis = measurement_analysis()
     mt, et, tt = (analysis.channel(c) for c in ("mt", "et", "tt"))
@@ -62,6 +72,8 @@ def test_the_regions():
     assert scale["lepton_vetoes"].startswith("~(") and "dilepton_veto" in scale["lepton_vetoes"] and scale["os"] == cuts.SAME_SIGN
     assert "dilepton_veto" not in region_cuts(tt, "ttbar_scale_ar_like")["lepton_vetoes"]
     assert not any("veto" in name for name in mt.skim)  # stored, not applied
+    # the analysis tau eta cut in the measurement and its skim (et, mt)
+    assert mt.cuts["tau_eta"] == mt.skim["tau_eta"] == et.cuts["tau_eta"] == "(abs(eta_2) < 2.3)" and "tau_eta" not in tt.cuts
 
 
 @pytest.mark.parametrize("embedding", [False, True])
@@ -73,6 +85,16 @@ def test_the_subtractions(embedding):
     assert leg.qcd.dr_sr.subtract == T_PARTS + fakes  # TauFakeFactors DR_SR use_embedding: false
     assert leg.ttbar.target == "TTJ" and leg.ttbar.subtract == () and leg.ttbar.scale.subtract == genuine + fakes
     assert leg.fractions.subtract == genuine + fakes and leg.fractions.ttbar == "TTJ"
+
+
+def test_embedding_per_channel():
+    """embedding: [et, mt] subtracts EMB in et and mt and the MC T parts in tt: one run for the mixed payload."""
+    analysis = measurement_analysis(["et", "mt"])
+    fakes = L_PARTS + J_PARTS + ("W",)
+    for name, genuine in (("et", ("EMB",)), ("mt", ("EMB",)), ("tt", T_PARTS)):
+        for leg in analysis.measurement.legs[name]:
+            assert leg.qcd.subtract == leg.ttbar.scale.subtract == leg.fractions.subtract == genuine + fakes, name
+    assert not any(s.kind == "embedding" for s in analysis.channel("tt").samples)
 
 
 def test_the_tables():

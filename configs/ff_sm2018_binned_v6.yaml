@@ -1,0 +1,38 @@
+# SM 2018 fake-factor measurement (`shapesmith measure`) on the sm2018_binned_v6 production: derives the production
+# payload of the friend ff_v2, with the genuine taus subtracted as embedding in et and mt and as MC in tt (one mixed
+# payload) and the tt fractions measured in the application region of each leg.
+# Switches (types and defaults in switches.py):
+#   sample_lists:       the inventories inventory/<name>.txt of the production
+#   embedding:          [et, mt] subtracts the genuine taus as EMB in et and mt, as the MC T parts in tt
+#   dy_correction:      njets_btag, as the analysis runs (on the subtracted DY)
+#   tt_fraction_region: application (each leg's fractions where its fake factor is applied; both_anti_iso is the
+#                       default and the jvoss parity)
+# The cross-check without embedding is ff_sm2018_binned_v6_noemb.yaml (same skim_dir).
+analysis: bbtautau_shapesmith.ff_measurement:build
+era: "2018"
+channels: [et, mt, tt]
+switches: {sample_lists: [sm2018_binned_v6, sm2018_embedding], embedding: [et, mt], dy_correction: njets_btag, tt_fraction_region: application}
+sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
+ntuples:
+  server: root://cmsdcache-kit-disk.gridka.de
+  base: /store/user/sdaigler/CROWN/ntuples/sm2018_binned_v6/CROWNRun
+  friends: []
+skim_dir: /ceph/sdaigler/shapesmith/ff_sm2018_binned_v6   # its own skims: both charges and the lepton vetoes stored, not applied
+output_dir: ../output/ff_sm2018_binned_v6                 # -> fake_factors/2018/
+workers: 16
+log_level: DEBUG                                          # DEBUG | INFO | WARNING | ERROR; console and <output_dir>/logs/<command>_<time>.log
+# web gallery (shapesmith publish): the plots of the measurement, one column per measurement
+web:
+  dir: /web/sdaigler/public_html/ff_sm2018_binned_v6
+  variant: ff_v2
+  label: ff_v2 (emb et, mt)
+  description: "FF measurement on sm2018_binned_v6, genuine τh subtracted with the τ-embedding in et and mt and with MC in tt, tt fractions in the application region; the payload of the friend ff_v2."
+  title: "sm2018_binned_v6 · fake factors"
+  about: |
+    Fake-factor measurement of the HH→bbττ 2018 analysis (NanoAODv15, production sm2018_binned_v6) with ShapeSmith, the TauFakeFactors method:
+    QCD fake factors from data, ttbar fake factors from MC times a global data/MC factor, the QCD and ttbar fractions,
+    the QCD DR→SR correction (measured with orthogonal fake factors) and the non-closure corrections in table order.
+    Columns: genuine τh subtracted with the τ-embedding in et and mt and with MC in tt (ff_v2), or with MC everywhere.
+
+    Each correction shows its p-value against 1; a correction with p > 0.05 is set to 1.
+    The summary lists the ttbar data/MC factors; the first ttbar non-closure (decay mode) absorbs them.

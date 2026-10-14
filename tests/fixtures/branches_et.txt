@@ -171,6 +171,12 @@ jphi_1
 jphi_2
 jpt_1
 jpt_2
+jpt_l1_1
+jpt_l1_2
+jpt_l2l3res_1
+jpt_l2l3res_2
+jpt_l2rel_1
+jpt_l2rel_2
 jpt_nano_1
 jpt_nano_2
 jpt_raw_1
@@ -220,6 +226,7 @@ puweight
 pzetamissvis
 q_1
 q_2
+reco_wgt_ele_1
 run
 tau_decaymode_1
 tau_decaymode_2

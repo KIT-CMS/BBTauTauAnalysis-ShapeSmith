@@ -25,44 +25,64 @@ and installs that checkout before installing the analysis, so a core change is p
 
 ## Running
 
-Two run configurations per production. The tau channels (gen-match splits, jet-fake estimate)
-and the light-dilepton controls (unsplit MC, no estimate) are separate Analyses. Both read the same
-ntuples and share the skim directory (their channels do not overlap); the outputs are separate.
+The tau channels (gen-match splits, jet-fake estimate) and the light-dilepton controls (unsplit MC, no estimate) are
+separate Analyses on the same ntuples, with separate outputs. From v6 on every run has its own skim directory: the
+tau control run, the fake-factor run (with em as the ttbar control channel), the dilepton run and the fake-factor
+measurement (its two runs share one).
 
 ```bash
-# tau channels et/mt/tt: nominal shapes and, with control_regions: true, the named tau control regions
-shapesmith validate  -c configs/sm2018_binned_v5.yaml
-shapesmith skim      -c configs/sm2018_binned_v5.yaml                   # once per production; --samples TT,SingleMuon for a subset
-shapesmith hist      -c configs/sm2018_binned_v5.yaml --control --skip-systematics
-shapesmith estimate  -c configs/sm2018_binned_v5.yaml --control
-shapesmith plot      -c configs/sm2018_binned_v5.yaml --control
-# light-dilepton controls em/mm/ee
-shapesmith validate  -c configs/sm2018_binned_v5_dilepton.yaml
-shapesmith skim      -c configs/sm2018_binned_v5_dilepton.yaml
-shapesmith hist      -c configs/sm2018_binned_v5_dilepton.yaml --control --regions all --skip-systematics
-shapesmith plot      -c configs/sm2018_binned_v5_dilepton.yaml --control --channels mm,ee --variables yield,m_vis,pt_vis,n_jets
-# web galleries (after plot or measure; target, column and texts from the web: block of each run YAML)
-shapesmith publish   -c configs/sm2018_binned_v5.yaml                    # ~sdaigler/sm2018_binned_v5, column emb (+ title, about)
-shapesmith publish   -c configs/sm2018_binned_v5.yaml -s switches.embedding=false -s output_dir=../output/sm2018_binned_v5_noemb \
-                     -s web.variant=classic -s web.label=classic -s web.description=null   # column classic: et, mt, tt
-shapesmith publish   -c configs/sm2018_binned_v5_dilepton.yaml           # column classic: em, mm, ee
-shapesmith publish   -c configs/sm2018_binned_v5_rawff.yaml              # column emb raw ff
-shapesmith publish   -c configs/sm2018_binned_v5_ff.yaml                 # column emb ff
-shapesmith publish   -c configs/ff_sm2018_binned_v5.yaml                 # ~sdaigler/ff_sm2018_binned_v5: the FF measurement
-# with NN friends (nn_friend: true, friend under ntuples.friends, re-skim):
-shapesmith hist      -c configs/sm2018_binned_v5.yaml && shapesmith estimate -c configs/sm2018_binned_v5.yaml
-shapesmith sync      -c configs/sm2018_binned_v5.yaml && shapesmith datacards -c configs/sm2018_binned_v5.yaml && shapesmith fit -c configs/sm2018_binned_v5.yaml
-shapesmith ml-export -c configs/sm2018_binned_v5.yaml
-shapesmith inspect   output/sm2018_binned_v5/shapes.root --unchanged   # variations equal to their nominal
+# tau channels et/mt/tt, control run: MC jet fakes + ABCD QCD, embedding in et/mt, QCD in the control regions, DY correction
+shapesmith validate  -c configs/sm2018_binned_v6.yaml
+shapesmith skim      -c configs/sm2018_binned_v6.yaml                   # once per production; --samples TT,SingleMuon for a subset
+shapesmith hist      -c configs/sm2018_binned_v6.yaml --control --skip-systematics   # nominal + the regions of the estimates
+shapesmith estimate  -c configs/sm2018_binned_v6.yaml --control
+shapesmith plot      -c configs/sm2018_binned_v6.yaml --control           # nominal; once more per --region btag0_os_pass (btag1, btag2, btag3p)
+# light-dilepton controls em/mm/ee; the DY table from mm and ee (dy_correction: none there)
+shapesmith skim      -c configs/sm2018_binned_v6_dilepton.yaml
+shapesmith hist      -c configs/sm2018_binned_v6_dilepton.yaml --control --regions all --skip-systematics
+shapesmith plot      -c configs/sm2018_binned_v6_dilepton.yaml --control --region btag1
+python scripts/derive_dy_correction.py -c configs/sm2018_binned_v6_dilepton.yaml --ttbar-scale em   # -> DY_NJETS_BTAG
+# fake-factor measurement: the mixed payload of the friend ff_v2 and the cross-check without embedding
+shapesmith skim      -c configs/ff_sm2018_binned_v6.yaml
+shapesmith measure   -c configs/ff_sm2018_binned_v6.yaml && shapesmith measure -c configs/ff_sm2018_binned_v6_noemb.yaml
+# fake-factor run (friend ff_v2) with em as the ttbar control channel: control plots, then the background-only fit
+shapesmith skim      -c configs/sm2018_binned_v6_ff.yaml
+shapesmith hist      -c configs/sm2018_binned_v6_ff.yaml --control --skip-systematics && shapesmith estimate -c configs/sm2018_binned_v6_ff.yaml --control
+shapesmith hist      -c configs/sm2018_binned_v6_ff.yaml --skip-systematics && shapesmith estimate -c configs/sm2018_binned_v6_ff.yaml   # categories nominal, em_tt
+shapesmith datacards -c configs/sm2018_binned_v6_ff.yaml && shapesmith fit -c configs/sm2018_binned_v6_ff.yaml --background-only   # -> datacards/background_fit.md
+# web galleries (after plot or measure; target, column and texts from the web: block of each run YAML), in this
+# order: the first publication fixes the order of the columns and channels
+shapesmith publish   -c configs/sm2018_binned_v6.yaml -s switches.embedding=false -s output_dir=../output/sm2018_binned_v6_noemb \
+                     -s web.variant=classic -s web.label=classic -s web.description=null   # ~sdaigler/sm2018_binned_v6 (+ title, about), column classic: et, mt, tt
+shapesmith publish   -c configs/sm2018_binned_v6_dilepton.yaml           # column classic: em, mm, ee
+shapesmith publish   -c configs/sm2018_binned_v6.yaml --channels et,mt   # column emb
+shapesmith publish   -c configs/sm2018_binned_v6_ff.yaml --channels et,mt,em   # column emb ff
+shapesmith publish   -c configs/sm2018_binned_v6_ff.yaml --channels tt --variant ff --label ff \
+                     --description "MC genuine ττ + jet→τh fakes from the fully corrected fake factor (friend ff_v2); tt only, it has no embedding."   # column ff: tt
+shapesmith publish   -c configs/ff_sm2018_binned_v6.yaml                 # ~sdaigler/ff_sm2018_binned_v6: the FF measurement
+shapesmith publish   -c configs/ff_sm2018_binned_v6_noemb.yaml           # its cross-check column
+# with NN friends (nn_friend: true, fit_categories: nn, friend under ntuples.friends, re-skim):
+shapesmith hist      -c configs/sm2018_binned_v6_ff.yaml && shapesmith estimate -c configs/sm2018_binned_v6_ff.yaml
+shapesmith sync      -c configs/sm2018_binned_v6_ff.yaml && shapesmith datacards -c configs/sm2018_binned_v6_ff.yaml && shapesmith fit -c configs/sm2018_binned_v6_ff.yaml
+shapesmith ml-export -c configs/sm2018_binned_v6_ff.yaml
+shapesmith inspect   output/sm2018_binned_v6_ff/shapes.root --unchanged   # variations equal to their nominal
 ```
 
 `publish` copies the plots of a run (for the FF measurement those in `fake_factors/2018/`) into a static web gallery
 under `/web/sdaigler/public_html/`; run it after `plot` or `measure` with the same `-s` overrides. The `web:` block of
 each run YAML sets the gallery directory, the column (`variant`), its label and description; the title and the About
-text of the control gallery are in `sm2018_binned_v5.yaml`. Publishing a column again replaces it and copies only
+text of the control gallery are in `sm2018_binned_v6.yaml`. Publishing a column again replaces it and copies only
 changed plots; the first publish of a column fixes its position. The classic column is the run without embedding:
-`hist`, `estimate` and `plot` of `sm2018_binned_v5.yaml` with `-s switches.embedding=false
--s output_dir=../output/sm2018_binned_v5_noemb`; `web.description=null` keeps the description of the dilepton YAML.
+`hist`, `estimate` and `plot` of `sm2018_binned_v6.yaml` with `-s switches.embedding=false
+-s output_dir=../output/sm2018_binned_v6_noemb`; `web.description=null` keeps the description of the dilepton YAML.
+tt has no embedding, so it is only in the columns classic and ff (the tt of the fake-factor run); emb and emb ff hold
+et and mt, emb ff also the control channel em. `publish` takes every plotted region: classic and emb have the
+diagnostic b-tag regions `btag0_os_pass` to `btag3p_os_pass` (the fake-factor run has the nominal region only).
+
+The v5 run YAMLs (`*v5*.yaml`, galleries `sm2018_binned_v5` and `ff_sm2018_binned_v5`, run as above) share one skim
+directory between the tau and the dilepton run. With the v6 code, `hist`, `estimate` and `plot` of tt, em, mm and ee
+run on their stored skims with `--skip-systematics` (the v5 embedding shifts are pT-binned, see below); the et and mt
+skims need `skim --force` (the tau |η| < 2.3 cut, the electron reconstruction SF of the et MC).
 
 Switches of the tau run YAML (typed in `switches.py`; an unknown or mistyped switch fails):
 
@@ -71,12 +91,31 @@ Switches of the tau run YAML (typed in `switches.py`; an unknown or mistyped swi
 | `sample_lists` | inventory names (required) | the samples to process, independent of the ntuple production in `ntuples.base` |
 | `jet_fakes` | `mc` (default), `ff` | MC jet fakes + ABCD QCD, or `jetFakes` from the fake-factor friend (data minus genuine and lepton fakes in `anti_iso`) |
 | `ff_type` | `corrected` (default), `raw` | the FF friend weight of `jetFakes`: corrected, or raw (no DR->SR and non-closure corrections; needs `jet_fakes: ff` and `shape_systematics: false`) |
-| `embedding` | `false` (default), `true` | genuine ττ from the embedded samples (`EMB`) instead of the T parts of the MC; needs the embedding inventory in `sample_lists` |
+| `embedding` | `false` (default), `true`, a list of channels (`[et, mt]`) | genuine ττ from the embedded samples (`EMB`) instead of the T parts of the MC, in every tau channel or in the listed ones (each a channel of the run); needs the embedding inventory in `sample_lists` |
 | `nn_friend` | `false` (default), `true` | NN categories from the NN friend |
+| `fit_categories` | `nn` (default), `control` | the categories of `hist`, `datacards` and `fit`: the NN classes (with `nn_friend`), or one category `nominal` per tau channel with the nominal region in one bin (`yield`), e.g. for `fit --background-only` without NN friends |
 | `control_regions` | `false` (default), `true` | wider skim plus the named pass/fail control regions; needs `jet_fakes: mc` |
+| `diagnostics` | `false` (default), `true` | QCD in the control regions (et/mt: same-sign data minus MC, tt: ABCD with the fail regions) and the variables `met_uncorrected`, `metphi_uncorrected`, `npv_good`, `rho` (the last two from production v6 on); needs `control_regions: true` |
 | `shape_systematics` | `true` (default), `false` | the CROWN shifts of the embedded samples and of the fake-factor friend as shape variations |
+| `dy_correction` | `none` (default), `njets_btag` | every DY process (ZTT, ZL, ZJ) times the DY data/MC table `DY_NJETS_BTAG` (`constants.py`) of its n_bjets (0, 1, ≥ 2) and n_jets (≤ 2, 3, ≥ 4) |
 
-The dilepton run YAML takes `sample_lists` only. Override a switch on the command line with
+**em as the ttbar control channel.** A tau run YAML can list `em` in `channels` (e.g. `[et, mt, tt, em]`). It is a
+control channel (`Analysis.control_channels`): `datacards` and `fit` put it into every final state, never into one of
+its own. It is the dilepton em selection (OS, isolated e and μ, ≥ 2 jets) with the unsplit MC of the dilepton
+analysis (ttbar with the top-pT weight), one category `em_tt` with the b tag of the tau baseline counted in one bin,
+no further regions, the b-tag variations of the tau channels and the lnN `eff_e`, `eff_m` and
+`CMS_eff_trigger_em_2018` (2 %); `htt_tjXsec` correlates its ttbar with that of the tau channels. The friends of the
+tau channels name them (`channels: [et, mt, tt]`), so the em skim looks for none; a tau run with em has its own
+`skim_dir` (the em skim of the dilepton run has other columns). The ML labels come from the tau channels only, and
+`ml-export` skips the control channel em.
+
+The dilepton run YAML takes `sample_lists`, `dy_correction` (on `DY`) and `diagnostics` (the jet-multiplicity regions
+`nj2`, `nj3`, `nj4p` with 0 and ≥ 1 b tags, the diagnostic variables, and the auxiliary flavour templates `DY_b`,
+`DY_c`, `DY_l` in mm/ee and `TT_b`, `TT_c`, `TT_l` in em from the GenJet hadron flavour of the leading-score b-pair
+jet, booked in the nominal region; data reads no flavour column). The table is the mm and ee data/MC of v6;
+`scripts/derive_dy_correction.py -c <dilepton run YAML> [--channels mm,ee] [--ttbar-scale em]` derives it again from
+the control shapes of a dilepton run without the correction (`hist --control --regions all`) and prints it in the
+format of `constants.py`; `--ttbar-scale em` scales the subtracted ttbar with the em data/MC of the same b-tag region. Override a switch on the command line with
 `-s switches.jet_fakes=ff`. `--skip-systematics` skips the b-tag weight variations and the CROWN shifts.
 
 Every run YAML sets `log_level: DEBUG` (every file, booking and fit); `-s log_level=INFO` gives the short log of one run. Each command
@@ -99,10 +138,16 @@ inventory (v4 uses `sm2018_binned_v2`). A run YAML names every list of its produ
 |---|---|---|
 | `sm2018_binned_v2.txt` | `sample_list/sm_2018_binned.txt` @ `f99a322` "chore: adapt to sample database update" | productions sm2018_binned_v2, v4 |
 | `sm2018_binned_v3.txt` | `sample_list/sm_2018_binned.txt` @ `85c437a` "fix: added DYJetsToLL_M-50 for events with zero LHE partons" | production sm2018_binned_v5 |
-| `sm2018_embedding.txt` | `sample_list/sm_2018_embedding.txt` @ `df97b0b` "feat: add the 2018 embedding sample list" | production sm2018_binned_v5 (et, mt, tt) |
+| `sm2018_binned_v6.txt` | `sample_list/sm_2018_binned.txt` @ `f9c14c6` "fix: drop the ttZ and ZZ double counting from the SM sample lists" | production sm2018_binned_v6 |
+| `sm2018_embedding.txt` | `sample_list/sm_2018_embedding.txt` @ `df97b0b` "feat: add the 2018 embedding sample list" | productions sm2018_binned_v5, v6 (et, mt, tt) |
 
 Check a copy with `diff <(git -C <crown>/analysis_configurations/bbtautau show <commit>:sample_list/<file>) inventory/<name>.txt`
 (the subject finds the commit again after a rebase).
+
+`sm2018_binned_v6` drops three samples counted twice: the inclusive LO `ttZJets` (ttZ is `TTZToLLNuNu_M-10`,
+`TTZToQQ` and `TTZToLL_M-1to10`), `TTZToNuNu` (contained in `TTZToLLNuNu_M-10`) and `ZZTo2Nu2Q_5f` (the process of
+`ZZTo2Q2Nu`), as the legacy analysis. `ttWJets` stays, the only ttW sample of the database. Being a subset of
+`sm2018_binned_v3`, it also serves the v5 production (hist, estimate and plot only).
 
 `sm2018_binned_v3` adds the inclusive DY M-50 amcatnloFXFX sample, of which only the `npartons == 0`
 events are kept (`SAMPLE_CUTS` in `samples.py`): the LHEFilterPtZ bins lack every zero-parton event
@@ -124,22 +169,27 @@ mutau 2018D event count) of exactly the nicks in `inventory/`; a new inventory a
 ## Embedding and fake factors
 
 - **Processes.** Gen-match splits T (genuine ττ, the lepton leg from a τ decay), L (lepton fakes), J (jet → τh) for
-  DY, TT, ST, VV, TTV and EWK. With `embedding: true`, `EMB` (genmatch T) replaces every T part; `TTT` stays as
-  an auxiliary process (booked in nominal, in no datacard or plot) for the ttbar contamination
-  `CMS_htt_emb_ttbar_2018` (EMB ± 10 % of TTT). With `jet_fakes: ff`, `jetFakes` replaces the J parts and W.
+  DY, TT, ST, VV, TTV and EWK. In an embedded channel (`embedding: true`, or the channel in the list
+  `embedding: [et, mt]`), `EMB` (genmatch T) replaces every T part; `TTT` stays as an auxiliary process (booked in
+  nominal, in no datacard or plot) for the ttbar contamination `CMS_htt_emb_ttbar_2018` (EMB ± 10 % of TTT). The
+  lnN table and the ML labels take the processes of all channels. With `jet_fakes: ff`, `jetFakes` replaces the J
+  parts and W.
 - **EMB weights** (Part-A contract): `emb_genweight`, the embedding selection SFs, the embedding lepton ID/iso SFs
   (mt `id_wgt_mu_1`, `iso_wgt_mu_1`; et `id_wgt_ele_1`, `iso_wgt_ele_1`), the vsJet SF of genuine τh, vsE/vsMu and the
-  trigger SF; no pileup and no b-tag weight. They carry their own names (`emb_…`), so regions that replace MC
-  weights (the tau-fail regions, the mt muon anti-isolation region) leave them unchanged. In the anti-isolated
-  regions genuine taus keep the Medium pass SF, as in TauFakeFactors and the legacy analysis.
+  trigger SF; no pileup, b-tag or electron reconstruction weight (the et MC carries `id_wgt_ele_1` and
+  `reco_wgt_ele_1`). They carry their own names (`emb_…`), so regions that replace MC weights (the tau-fail regions,
+  the mt muon anti-isolation region) leave them unchanged. In the anti-isolated regions genuine taus keep the Medium
+  pass SF, as in TauFakeFactors and the legacy analysis.
 - **Shifts** (`systematics.py`, only with `shape_systematics: true`). The analysis declares every CROWN shift it
   reads. For a sample kind with declared shifts the skim fails on a declared shift without a shifted branch and on an
   undeclared `c__X` branch of a needed column (main n-tuple or friend):
-  - embedding (only with `embedding: true`): `CMS_scale_t_emb_dm{0,1,1011}_<wp>_2018` (branches
-    `__CMS_scale_t_emb_DeepTau2018v2p5_DM<dm>_2018`) and `CMS_eff_t_emb_dm{0,1,1011}_pt{20to40,40toInf}_<wp>_2018`
-    (`__CMS_eff_t_emb_DeepTau2018v2p5_VSjet_DM<dm>_pt<bin>_2018`), `wp` = `vsEleTight` in et, `vsEleVVLoose` in mt and
-    tt; tt has no pt20to40 shifts. 9 nuisances in et and mt, 6 in tt. DM10 and DM11 are one fitted category, which
-    CROWN shifts per decay mode: the `dm1011` nuisances are `VariationSum`s of the DM10 and DM11 shifts (read as the
+  - embedding (only in the embedded channels): `CMS_scale_t_emb_dm{0,1,1011}_<wp>_2018` (branches
+    `__CMS_scale_t_emb_DeepTau2018v2p5_DM<dm>_2018`) and `CMS_eff_t_emb_dm{0,1,1011}_<wp>_2018`
+    (`__CMS_eff_t_emb_DeepTau2018v2p5_VSjet_DM<dm>_2018`), `wp` = `vsEleTight` in et, `vsEleVVLoose` in mt and tt;
+    6 nuisances per channel. The energy scale and the vsJet SF of the embedding are binned in the decay mode only
+    (production v6); the v5 embedding has pT-binned vsJet shifts (`..._pt{20to40,40toInf}_2018`) instead, so v5 runs
+    with embedding shifts need `--skip-systematics` or `shape_systematics: false`. DM10 and DM11 are one fitted
+    category, which CROWN shifts per decay mode: the `dm1011` nuisances are `VariationSum`s of the DM10 and DM11 shifts (read as the
     parts `<name>Up%dm10`, ...), exact in et and mt, to first order in tt, where both taus can be 3-prong.
   - fake factors (only with `jet_fakes: ff`): `CMS_ff_<key>_<channel>_2018` with branch suffix `__<key>`, for the
     17 keys of `FF_SHIFTS_LT` (et, mt) and the 34 of `FF_SHIFTS_TT` (tt, both legs), on data, MC and embedding.
@@ -160,15 +210,24 @@ mutau 2018D event count) of exactly the nicks in `inventory/`; a new inventory a
 
 ## Fake-factor measurement
 
-`configs/ff_sm2018_binned_v5.yaml` runs `bbtautau_shapesmith.ff_measurement:build`, the SM 2018 fake-factor
+`configs/ff_sm2018_binned_v6.yaml` runs `bbtautau_shapesmith.ff_measurement:build`, the SM 2018 fake-factor
 measurement in jvoss's TauFakeFactors method (QCD and ttbar fake factors, fractions, the QCD DR->SR correction and the
 non-closures), with its own skim (both charges, the lepton vetoes stored for the ttbar scale regions). It derives the
-production payload with embedding; `configs/ff_sm2018_binned_v4.yaml` is the same measurement on v4, without embedding.
+payload of the v6 friend ff_v2 (embedding in et and mt, MC in tt); `ff_sm2018_binned_v6_noemb.yaml` is its
+cross-check without embedding on the same skim. `ff_sm2018_binned_v5.yaml` (payload of ff_v1, embedding in every
+channel) and `ff_sm2018_binned_v4.yaml` (without embedding) are the earlier measurements.
 
 ```bash
-shapesmith skim    -c configs/ff_sm2018_binned_v5.yaml
-shapesmith measure -c configs/ff_sm2018_binned_v5.yaml [--suggest-binning]   # -> output/.../fake_factors/2018/
+shapesmith skim    -c configs/ff_sm2018_binned_v6.yaml
+shapesmith measure -c configs/ff_sm2018_binned_v6.yaml [--suggest-binning]   # -> output/.../fake_factors/2018/
 ```
+
+Switches of the measurement (`FakeFactorSwitches`): `sample_lists`; `embedding` as in the analysis (`false`, `true`
+or the embedded channels: genuine τh subtracted as EMB there and as the MC T parts elsewhere, so `[et, mt]` gives the
+mixed payload of v6 in one run); `dy_correction` as in the analysis, on the subtracted DY processes;
+`tt_fraction_region`: `both_anti_iso` (default, U6 and jvoss parity) measures the tt fractions of both legs with both
+taus anti-isolated, `application` those of each leg in its application region (that tau anti-isolated, the other
+isolated), where ttbar is 3-6 times more frequent (v6).
 
 The regions are built in `ff_measurement.py` from the analysis selection (`cuts.py`); every difference to jvoss's
 configuration is listed in its docstring. The binning, fits and bandwidths are `ff_tables.py`, generated once by
@@ -222,20 +281,20 @@ must follow its keys.
 |---|---|
 | produced samples (verbatim KingMaker sample lists), groups, routing, per-sample cuts, normalisation | `inventory/*.txt`, `samples.py` |
 | the switches and their checks | `switches.py` |
-| era, luminosity, channel sets, working points, b-tag bins, friend columns, class names, FF shift keys, embedding shift tables | `constants.py` |
+| era, luminosity, channel sets, working points, b-tag and jet bins, friend columns, class names, FF shift keys, embedding shift tables, the DY correction table | `constants.py` |
 | tau channels: baseline/skim selection, gen-match splits, estimation and control regions | `cuts.py` |
-| MC, embedding, fake-factor and dilepton weights, trigger chains | `weights.py` |
+| MC, embedding, fake-factor and dilepton weights, trigger chains, the DY correction weight | `weights.py` |
 | process tables (tau: gen-match split, dilepton: unsplit) | `processes.py` |
 | NN categories, control variables and binning | `variables.py` |
 | b-tag weight variations, embedding and fake-factor shifts, lnN table | `systematics.py` |
 | colours, labels, axis titles of all six channels | `style.py` |
-| tau analysis assembly, estimators, ML export | `analysis.py` |
+| tau analysis assembly (with the control channel em), estimators, ML export | `analysis.py` |
 | fake-factor measurement: regions, processes, legs; its tables | `ff_measurement.py`, `ff_tables.py` |
-| dilepton channels and analysis assembly | `dilepton.py` |
+| dilepton channels and analysis assembly; the em control channel of the tau analysis | `dilepton.py` |
 | tau-ID/ES measurement: selection, processes, ES grid, assembly; its m_vis bins; its MC shape uncertainties | `tau_id_measurement.py`, `tau_id_binning.py`, `tau_id_systematics.py` |
 
 `tests/fixtures/branches_<channel>.txt` list the branches of one ttbar ntuple per channel of the
-`sm2018_binned_v4` production (`scripts/dump_branches.py <root:// URL>`); the tests check every
+`sm2018_binned_v5` production (`scripts/dump_branches.py <root:// URL>`); the tests check every
 selection, weight and variable against them, and the embedding columns against them plus the Part-A output
 contract until a branch fixture of a real embedding file exists. `tests/fixtures/skim_contracts_v4.json` holds the
 stored contracts and Parquet columns of one data and one MC skim per channel of v4 (from the golden references of

@@ -32,6 +32,8 @@ _COMMON_AXIS_LABELS = {
     "pt_tautaubb": r"$p_T(bb\tau\tau)$ / GeV", "mass_tautaubb": r"$m(bb\tau\tau)$ / GeV", "sum_deltaR_tt_bb": r"$\Delta R(\tau\tau) + \Delta R(bb)$",
     "mass_2": r"$\tau_h$ mass / GeV", "tau_decaymode_1": "Decay mode (leg 1)", "tau_decaymode_2": r"$\tau_h$ decay mode",
     "mass_1": "Mass (leg 1) / GeV", "q_1": "Charge (leg 1)", "NN_score": "NN output", "yield": "Events",
+    "met_uncorrected": r"Uncorrected $p_T^{miss}$ / GeV", "metphi_uncorrected": r"Uncorrected $\varphi(p_T^{miss})$",
+    "npv_good": "Number of good primary vertices", "rho": r"$\rho$ / GeV",
 }
 
 
