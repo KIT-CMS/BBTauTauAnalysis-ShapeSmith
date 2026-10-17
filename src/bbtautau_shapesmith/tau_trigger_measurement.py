@@ -23,9 +23,10 @@ minus all of them; the genuine MC taus ZTT (and TTT) are auxiliary, ZTT gives ep
 VV/ST 10 %, ZL 10 %, ZJ 20 %, QCD 20 %; the fake trigger efficiency +-10 % of the pass yield of ZJ, TTJ, STJ, VVJ, W, QCD.
 Weights: those of the tau-ID measurement (tau_id_measurement.mc_weights / embedding_weights) with the Medium tau-ID SF
 in the Medium class and none in the anti-isolated one.
-Variants (switch variant; merged as uncertainties, 12.2): signal_mc (the MC genuine taus as the signal shape, the full
-change), tag_pt (the tag muon 3 GeV harder), mt30 (mT < 30), monitor (2016 without the 35 GeV object cut, 2017
-without the L1 cut; half of each change).
+Variants (switch variant; merged as uncertainties, 12.2): signal_mc (the MC genuine taus as the signal with their own
+pass and fail shapes, the full change), tag_pt (the tag muon 3 GeV harder), mt30 (mT < 30), monitor (2016 without the
+35 GeV object cut, 2017 without the L1 cut; half of each change). closure (12.7.2, not merged): the nominal method on
+MC, the MC genuine taus as the signal and the data replaced by the sum of the processes; the fit must give eps_MC.
 """
 from __future__ import annotations
 
@@ -71,7 +72,8 @@ MONITOR_FLAGS = {
 }
 MONITOR_FLAGS["2018"] = {**MONITOR_FLAGS["2017"], "hps": "trg_mon_mu24tau35_mediumiso_hps_2"}
 TRIGGER_OBJECT = {"pt": "trgobj_pt_2", "l1pt": "trgobj_l1pt_2"}
-VARIANTS = ("nominal", "signal_mc", "tag_pt", "mt30", "monitor")
+VARIANTS = ("nominal", "signal_mc", "tag_pt", "mt30", "monitor", "closure")
+MC_SIGNAL_VARIANTS = ("signal_mc", "closure")  # the MC genuine taus are the signal
 VARIANT_WEIGHTS = {"signal_mc": 1.0, "tag_pt": 0.5, "mt30": 0.5, "monitor": 0.5}  # the fraction of a variant's change taken as uncertainty
 
 NORMALISATIONS = {
@@ -179,7 +181,7 @@ def processes(wp_class: str, era: str, variant: str) -> tuple[Process, ...]:
         extra = dict(TOP_PT) if group == "TT" else {}
         return Process(name, group, role, group, Selection(cuts={"genmatch": cut} if cut else {}, weights={**mc, **extra}))
 
-    signal_mc = variant == "signal_mc"
+    signal_mc = variant in MC_SIGNAL_VARIANTS
     result = [Process("data", "data", "data", "data")]
     if not signal_mc:
         result.append(Process(EMBEDDED, EMBEDDED, "background", EMBEDDED, Selection(cuts={"genmatch": GENUINE}, weights=embedding_weights("mt", era))))
@@ -237,7 +239,7 @@ def channel(era: str, switches: TauTriggerSwitches, channel_samples, bins: tuple
     groups = {p.group for p in table}
     backgrounds = tuple(p.name for p in table if p.role == "background")
     variations, estimators = (), [DataMinus("QCD", "same_sign", backgrounds, clip_negative=True)]
-    if switches.variant != "signal_mc":
+    if switches.variant not in MC_SIGNAL_VARIANTS:
         estimators.append(TemplateShift(f"CMS_emb_ttbar_contamination_{ERA_TAG[era]}", EMBEDDED, "TTT", 0.1))
         if switches.emb_es_payload:
             factors = es_factors(switches.emb_es_payload)
@@ -261,7 +263,7 @@ def channel(era: str, switches: TauTriggerSwitches, channel_samples, bins: tuple
 
 def measurement(era: str, switches: TauTriggerSwitches, bins: tuple[Bin, ...]) -> TauTriggerMeasurement:
     year = YEAR[era]
-    signal_mc = switches.variant == "signal_mc"
+    signal_mc = switches.variant in MC_SIGNAL_VARIANTS
     table = processes(switches.wp_class, era, switches.variant)
     names = {p.name for p in table if p.role == "background"}
     templated = switches.emb_es_payload is not None and not signal_mc
@@ -280,6 +282,8 @@ def measurement(era: str, switches: TauTriggerSwitches, bins: tuple[Bin, ...]) -
         counting_regions=("counting", "counting_same_sign"),
         qcd_subtract=tuple(p.name for p in table if p.role == "background"),
         reference=switches.reference_payload,
+        split_signal_shapes=switches.variant == "signal_mc",
+        pseudo_data=switches.variant == "closure",
     )
 
 

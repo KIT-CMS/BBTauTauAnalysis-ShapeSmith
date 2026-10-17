@@ -9,8 +9,8 @@ from shapesmith.validate import validate
 from bbtautau_shapesmith import cuts, ff_measurement, ff_tables, samples as samples_module
 from bbtautau_shapesmith.analysis import build as build_tau
 from bbtautau_shapesmith.constants import FF_SHIFTS_W, LUMI_PB, TAU_CHANNELS, lumi_pb
-from tests.helpers import INVENTORY, branches, config, embedding_branches
-from tests.run2 import list_name, write
+from tests.helpers import branches, config, sample_types
+from tests.run2 import install, list_name
 
 FF = "bbtautau_shapesmith.ff_measurement:build"
 T_PARTS, L_PARTS, J_PARTS = ("ZTT", "TTT", "STT", "VVT"), ("ZL", "TTL", "STL", "VVL"), ("ZJ", "TTJ", "STJ", "VVJ")
@@ -19,9 +19,7 @@ T_PARTS, L_PARTS, J_PARTS = ("ZTT", "TTT", "STT", "VVT"), ("ZL", "TTL", "STL", "
 @pytest.fixture(scope="module")
 def run2(tmp_path_factory):
     directory = tmp_path_factory.mktemp("run2_ff")
-    for inventory in INVENTORY.glob("*.txt"):
-        (directory / inventory.name).write_bytes(inventory.read_bytes())
-    database = write(directory)
+    database = install(directory)
     patch = pytest.MonkeyPatch()
     patch.setattr(samples_module, "INVENTORY_DIR", directory)
     yield database
@@ -62,8 +60,8 @@ def test_the_w_variant_adds_w_fake_factors_in_et_and_mt(run2):
         assert region_cuts(channel, "Wjets_ar_like_ss")["os"] == cuts.SAME_SIGN and region_cuts(channel, "Wjets_ar_like_ss")["tau_iso"] == cuts.anti_isolated(2)
         assert region_cuts(channel, "Wjets_sr") == channel.cuts and region_cuts(channel, "Wjets_ar")["tau_iso"] == cuts.anti_isolated(2)
         for sample in channel.samples:
-            available = embedding_branches(name) if sample.kind == "embedding" else branches(name) | {"npartons"}
-            assert not needed_columns(channel, sample) - available, sample.nick
+            missing = needed_columns(channel, sample) - branches(name, "2018", sample_types()[sample.nick])
+            assert not missing, (sample.nick, sorted(missing))
     tt_legs = analysis.measurement.legs["tt"]
     assert all(leg.wjets is None and leg.fractions.wjets is None for leg in tt_legs) and not [r for r in analysis.channel("tt").regions if r.name.startswith("Wjets")]
 
@@ -116,7 +114,9 @@ def test_2016_is_measured_on_both_halves_with_their_luminosity(run2):
             assert sample.lumi_scale == pytest.approx(LUMI_PB[sample.era] / 36330.0)
         else:
             assert sample.lumi_scale == 1.0
-    assert set(by_era) == {"2016preVFP", "2016postVFP"} and len(by_era["2016preVFP"]) == len(by_era["2016postVFP"])
+    assert set(by_era) == {"2016preVFP", "2016postVFP"}
+    for half in by_era:  # exactly the samples of the run of the half
+        assert sorted(s.nick for s in by_era[half]) == sorted(s.nick for s in measurement(run2, era=half, channels=("mt",), embedding=["mt"]).channel("mt").samples)
     assert {s.group for s in by_era["2016preVFP"] if s.kind == "data"} == {"data"}
     assert "hem_veto" not in mt.cuts and mt.cuts["trg_selection"] == cuts.baseline_cuts("mt", "2016preVFP")["trg_selection"]
     assert analysis.measurement.placeholder_edges.startswith("60 quantities have no edges of 2016")
@@ -128,7 +128,7 @@ def test_a_combined_era_takes_only_its_halves_and_borrows_nothing(run2):
     with pytest.raises(AnalysisError, match="a 2017 sample in a 2016 \\(2016preVFP \\+ 2016postVFP\\) run"):
         measurement(run2, era="2016", eras=("2016preVFP", "2017"))
     with pytest.raises(AnalysisError, match="a run of the combined era 2016 borrows nothing"):
-        ff_measurement.build(config(("mt",), FF, era="2016", database=run2, sample_lists=[list_name("binned", "2016postVFP"), "run2_2016postVFP_borrowed"]))
+        ff_measurement.build(config(("mt",), FF, era="2016", database=run2, sample_lists=[list_name("binned", "2016postVFP"), list_name("borrowed", "2016postVFP")]))
 
 
 def test_the_tau_analysis_shifts_the_w_keys_of_the_friend(run2):

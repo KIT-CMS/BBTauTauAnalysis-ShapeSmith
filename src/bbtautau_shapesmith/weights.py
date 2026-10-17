@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from shapesmith.model import AnalysisError
 
-from bbtautau_shapesmith.constants import DY_NJETS_BTAG, FF_COLUMNS, FF_RAW_COLUMNS, LT_CHANNELS, PREFIRING_WEIGHT, TAU_LEGS, TAU_VS_ELE_WP, TAU_VS_JET_WP, TAU_VS_MU_WP
+from bbtautau_shapesmith.constants import COMBINED_ERAS, DY_NJETS_BTAG, FF_COLUMNS, FF_RAW_COLUMNS, LT_CHANNELS, LUMI_PB, PREFIRING_WEIGHT, TAU_LEGS, TAU_VS_ELE_WP, TAU_VS_JET_WP, TAU_VS_MU_WP, member_eras
 from bbtautau_shapesmith.triggers import TRIGGER
 
 TOP_PT = {"top_pt": "topPtReweightWeight"}  # only ttbar ntuples carry it
@@ -58,11 +58,23 @@ def embedding_trigger_weights(channel: str, era: str) -> dict[str, str]:
     return {"trigger": trigger.embedding_weight, **({"zvtx": trigger.zvtx} if trigger.zvtx else {})}
 
 
+def dy_table(era: str) -> dict[int, tuple[float, ...]]:
+    """The DY table of an era; for a combined era (the 2016 fake-factor measurement) the luminosity-weighted mean of
+    the tables of its members, which the weight of one process over the samples of both halves cannot tell apart."""
+    if era in DY_NJETS_BTAG:
+        return DY_NJETS_BTAG[era]
+    members = member_eras(era)
+    if era in COMBINED_ERAS and all(member in DY_NJETS_BTAG for member in members):
+        total = sum(LUMI_PB[member] for member in members)
+        return {row: tuple(round(sum(LUMI_PB[member] * DY_NJETS_BTAG[member][row][column] for member in members) / total, 4) for column in range(len(_DY_JET_COLUMNS)))
+                for row in _DY_BTAG_ROWS}
+    missing = ", ".join(member for member in members if member not in DY_NJETS_BTAG)
+    raise AnalysisError(f"dy_correction njets_btag: no DY table for {missing} (constants.DY_NJETS_BTAG has {', '.join(DY_NJETS_BTAG)})")
+
+
 def dy_njets_btag_weight(era: str) -> str:
-    """The DY correction DY_NJETS_BTAG of the era for the event's n_bjets and n_jets, one term per cell."""
-    if era not in DY_NJETS_BTAG:
-        raise AnalysisError(f"dy_correction njets_btag: no DY table for {era} (constants.DY_NJETS_BTAG has {', '.join(DY_NJETS_BTAG)})")
-    terms = [f"({_DY_BTAG_ROWS[row]} & {jets}) * {factor}" for row, factors in DY_NJETS_BTAG[era].items() for jets, factor in zip(_DY_JET_COLUMNS, factors)]
+    """The DY correction DY_NJETS_BTAG of the era (dy_table) for the event's n_bjets and n_jets, one term per cell."""
+    terms = [f"({_DY_BTAG_ROWS[row]} & {jets}) * {factor}" for row, factors in dy_table(era).items() for jets, factor in zip(_DY_JET_COLUMNS, factors)]
     return "(" + " + ".join(terms) + ")"
 
 

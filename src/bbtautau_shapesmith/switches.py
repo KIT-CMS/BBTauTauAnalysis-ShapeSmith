@@ -137,7 +137,7 @@ class TauTriggerSwitches(BaseModel):
     sample_lists: SampleLists = Field(min_length=1)
     wp_class: Literal["Medium", "VVVLoose_not_Medium"] = "Medium"  # the isolation class of the probe tau
     # the selection: nominal, or a variation whose change is an uncertainty of the merged payload
-    variant: Literal["nominal", "signal_mc", "tag_pt", "mt30", "monitor"] = "nominal"
+    variant: Literal["nominal", "signal_mc", "tag_pt", "mt30", "monitor", "closure"] = "nominal"
     emb_es_payload: str | None = None  # the tau-ID/ES payload of the era (5.4): the energy scale of the embedded taus
     dm1011: bool = False  # decay modes 10 and 11 in one bin (the anti-isolated class, where single fits do not converge)
     reference_payload: str | None = None  # a payload with tau_trigger (the POG tau.json.gz) drawn in the plots

@@ -1,0 +1,31 @@
+# Tau-leg efficiency of the di-tau trigger for the tt embedding (tau_trigger_measurement.py; E33, variant A,
+# v7_tt_emb_trigger 12.2-12.5): mu-tau_h tag and probe on the tau-ID production smrun2_tau_id_v1 (P1), per era and 2016
+# half, isolation class and selection variant. One YAML for every era:
+#   shapesmith skim -c configs/smrun2_tau_id_v1_trigger.yaml -s era=<era>
+#   for cls in Medium VVVLoose_not_Medium; do for variant in nominal signal_mc tag_pt mt30 monitor; do   # no monitor in 2018
+#     shapesmith measure -c configs/smrun2_tau_id_v1_trigger.yaml -s era=<era> -s switches.wp_class=$cls -s switches.variant=$variant; done; done
+#   shapesmith measure -c configs/smrun2_tau_id_v1_trigger.yaml -s era=<era> --merge
+# -> <output_dir>/tau_trigger/<era>/<class>/<variant>/ and the payload ditau_trigger_DeepTau2018v2p5_embedding<era>UL.json.gz
+# (CROWN C12 reads it as trg_effdata_emb_{Medium,AntiMedium}_{1,2}). --suggest-binning gives the pT edges
+# (TRIGGER_PT_EDGES); the closure on pseudo-data is -s switches.variant=closure (not merged).
+# Switches (types and defaults in switches.py):
+#   sample_lists:      the tau-ID inventory of the era
+#   wp_class:          Medium | VVVLoose_not_Medium, the isolation class of the probe tau (dm1011: true merges DM 10 and 11)
+#   variant:           nominal | signal_mc | tag_pt | mt30 | monitor | closure
+#   emb_es_payload:    the tau-ID/ES payload of the era (smrun2_tau_id_v1_id_es.yaml --merge; the build refuses a missing
+#                      file, -s switches.emb_es_payload=null measures without the energy scale of the embedded taus)
+#   reference_payload: the TAU POG payload of the era, its eff_data and eff_mc drawn in the plots
+analysis: bbtautau_shapesmith.tau_trigger_measurement:build
+era: "2018"
+channels: [mt]
+switches: {sample_lists: ["sm_{era}_tau_id_measurement"], wp_class: Medium, variant: nominal, emb_es_payload: "/ceph/sdaigler/shapesmith/smrun2_tau_id_v1/output/tau_id_es/{era}/DeepTau2018v2p5_id_es_embedding{era}UL.json.gz", reference_payload: "/cvmfs/cms-griddata.cern.ch/cat/metadata/TAU/Run2-{era}-UL-NanoAODv15/2025-11-27/tau.json.gz"}
+sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
+ntuples:
+  server: root://cmsdcache-kit-disk.gridka.de
+  base: /store/user/sdaigler/CROWN/ntuples/smrun2_tau_id_v1/CROWNRun
+  friends: []
+skim_dir: /ceph/sdaigler/shapesmith/smrun2_tau_id_v1/skims/tau_trigger/{era}    # both classes and charges, every variant
+output_dir: /ceph/sdaigler/shapesmith/smrun2_tau_id_v1/output                   # -> tau_trigger/<era>/
+workers: 8                                                                       # at most 24 on portal2
+log_level: DEBUG
+combine: {cmssw_dir: /work/sdaigler/tau_id_es/CMSSW_14_1_0_pre4, scram_arch: el9_amd64_gcc12}

@@ -12,7 +12,13 @@ process an extra lnN (systematics.BORROWED_LNN).
 
 A run of a combined era (constants.COMBINED_ERAS, the 2016 fake-factor measurement, E18) takes the samples of every
 member era: each sample reads the n-tuples of its database era and is normalised to its luminosity
-(Sample.lumi_scale = its era's share of the combined luminosity). It borrows nothing.
+(Sample.lumi_scale = its era's share of the combined luminosity). It borrows nothing. A sample list named with the
+combined era (`sm_2016_binned`, from `sm_{era}_binned` of a run YAML) stands for the lists of its member eras
+(`sm_2016preVFP_binned`, `sm_2016postVFP_binned`) when no inventory of that name exists.
+
+The v7 inventories are named as the KingMaker lists (`sm_<era>_binned`, `_binned_mc`, `_embedding`,
+`_tau_id_measurement`); `sm_<era>_borrowed` holds the borrowed lines of an era (empty where it borrows nothing), so a
+run YAML lists `sm_{era}_borrowed` in every era.
 """
 from __future__ import annotations
 
@@ -122,6 +128,16 @@ def cut_of(nick: str, nicks: list[str]) -> str | None:
     return None
 
 
+def inventory_names(sample_list: str, era: str) -> tuple[str, ...]:
+    """The inventories of a sample list in a run of `era`: the list itself, or, in a combined era without an inventory
+    of that name, the lists of its member eras with the era token replaced (`sm_2016_binned` -> `sm_2016preVFP_binned`,
+    `sm_2016postVFP_binned`)."""
+    tokens = sample_list.split("_")
+    if era in COMBINED_ERAS and era in tokens and not (INVENTORY_DIR / f"{sample_list}.txt").exists():
+        return tuple("_".join(member if token == era else token for token in tokens) for member in member_eras(era))
+    return (sample_list,)
+
+
 def parse_entry(line: str) -> tuple[str, str | None]:
     """An inventory line: (nick, None), or (nick, source era) for a borrowed sample `<source era>/<nick>`."""
     source, separator, nick = line.partition("/")
@@ -160,12 +176,15 @@ def _stand_in(chosen: list[Sample]) -> list[Sample]:
 def samples(database: Path, sample_lists: list[str], channels: list[str], era: str) -> dict[str, tuple[Sample, ...]]:
     """The samples of every channel of a run in `era`, in sample-list order; a nick listed twice, a nick of another era
     and a borrowing BORROWED does not allow raise."""
-    entries = [parse_entry(line) for name in sample_lists for line in read_sample_list(inventory_path(name))]
+    names = [member for name in sample_lists for member in inventory_names(name, era)]
+    if names != list(sample_lists):
+        logger.info(f"sample lists of the combined era {era}: {', '.join(names)}")
+    entries = [parse_entry(line) for name in names for line in read_sample_list(inventory_path(name))]
     nicks = [nick for nick, _ in entries]
     repeated = sorted(nick for nick, count in Counter(nicks).items() if count > 1)
     if repeated:
-        raise AnalysisError(f"nicks in more than one of the sample lists {sample_lists}:\n" + "\n".join(repeated))
-    logger.info(f"{len(nicks)} nicks from the sample lists {', '.join(sample_lists)}, normalisation from {database}")
+        raise AnalysisError(f"nicks in more than one of the sample lists {names}:\n" + "\n".join(repeated))
+    logger.info(f"{len(nicks)} nicks from the sample lists {', '.join(names)}, normalisation from {database}")
     values = normalisation(database, nicks)
     problems, chosen = [], []
     for nick, source in entries:
@@ -183,7 +202,7 @@ def samples(database: Path, sample_lists: list[str], channels: list[str], era: s
             logger.info(f"{nick}: borrowed from {source}, normalised with the {era} luminosity")
         chosen.append((sample, routed))
     if problems:
-        raise AnalysisError(f"sample lists {', '.join(sample_lists)} of the {era} run:\n" + "\n".join(problems))
+        raise AnalysisError(f"sample lists {', '.join(names)} of the {era} run:\n" + "\n".join(problems))
     standing_in = _stand_in([sample for sample, _ in chosen])
     result = {channel: [] for channel in channels}
     for sample, (_, routed) in zip(standing_in, chosen):

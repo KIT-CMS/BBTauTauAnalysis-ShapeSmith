@@ -15,8 +15,8 @@ from shapesmith.validate import validate
 
 from bbtautau_shapesmith import samples as samples_module, tau_trigger_measurement as module
 from bbtautau_shapesmith.tau_trigger_measurement import MONITOR_FLAGS, TRIGGER_OBJECT, build, pass_cut
-from tests.helpers import INVENTORY, branches, config, embedding_branches
-from tests.run2 import ERAS, list_name, write
+from tests.helpers import config, sample_types, tau_id_branches
+from tests.run2 import ERAS, install, list_name
 
 YEAR = {"2016preVFP": "2016", "2016postVFP": "2016", "2017": "2017", "2018": "2018"}
 TRIGGER = "bbtautau_shapesmith.tau_trigger_measurement:build"
@@ -25,9 +25,7 @@ TRIGGER = "bbtautau_shapesmith.tau_trigger_measurement:build"
 @pytest.fixture(scope="module")
 def run2(tmp_path_factory):
     directory = tmp_path_factory.mktemp("run2_trigger")
-    for inventory in INVENTORY.glob("*.txt"):
-        (directory / inventory.name).write_bytes(inventory.read_bytes())
-    database = write(directory)
+    database = install(directory)
     patch = pytest.MonkeyPatch()
     patch.setattr(samples_module, "INVENTORY_DIR", directory)
     yield database
@@ -51,10 +49,11 @@ def test_the_measurement_builds_in_every_era_and_reads_only_produced_columns(run
     assert measurement.signal == "EMB" and measurement.mc_process == "ZTT" and measurement.counting_regions == ("counting", "counting_same_sign")
     assert set(measurement.systematic_variants) == ({"signal_mc", "tag_pt", "mt30"} | ({"monitor"} if era != "2018" else set()))
     channel = analysis.channel("mt")
-    monitor = set(MONITOR_FLAGS[YEAR[era]].values()) | set(TRIGGER_OBJECT.values())
-    for sample in channel.samples:
-        available = (embedding_branches("mt", era) if sample.kind == "embedding" else branches("mt", era)) | monitor | {"trg_single_mu27", "trg_wgt_single_mu27"}
-        assert not needed_columns(channel, sample) - available, sample.nick
+    assert set(MONITOR_FLAGS[YEAR[era]].values()) | set(TRIGGER_OBJECT.values()) <= tau_id_branches("mt", era, "data")  # 12.4, C13
+    types = sample_types()
+    for sample in channel.samples:  # the columns of the tau-ID production (P1) of the sample's type
+        missing = needed_columns(channel, sample) - tau_id_branches("mt", era, types[sample.nick])
+        assert not missing, (sample.nick, sorted(missing))
     assert channel.skim["tau_iso"] == "(id_tau_vsJet_VVVLoose_2 > 0.5)" and "os" not in channel.skim  # both classes and charges
 
 
@@ -97,7 +96,9 @@ def test_variants(run2):
     signal_mc = trigger(run2, "2018", variant="signal_mc")
     assert signal_mc.measurement.signal == "ZTT" and signal_mc.measurement.monitor_process is None and "EMB" not in {p.name for p in signal_mc.channel("mt").processes}
     assert signal_mc.channel("mt").process("ZTT").role == "background" and signal_mc.channel("mt").process("TTT").role == "background"
-    assert "ZTT" in signal_mc.measurement.qcd_subtract
+    assert "ZTT" in signal_mc.measurement.qcd_subtract and signal_mc.measurement.split_signal_shapes and not signal_mc.measurement.pseudo_data
+    closure = trigger(run2, "2018", variant="closure").measurement
+    assert closure.signal == "ZTT" and closure.pseudo_data and not closure.split_signal_shapes and "closure" not in closure.systematic_variants
     with pytest.raises(AnalysisError, match="the variant monitor applies to 2016"):
         trigger(run2, "2018", variant="monitor")
     monitor = trigger(run2, "2017", variant="monitor").channel("mt")

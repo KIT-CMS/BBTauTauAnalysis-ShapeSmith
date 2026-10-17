@@ -4,12 +4,13 @@ import dataclasses
 import numpy as np
 import pytest
 from shapesmith.histogram import INCLUSIVE, NOMINAL_VARIATION, HistKey, Histogram, HistogramSet
+from shapesmith.model import AnalysisError
 
 from bbtautau_shapesmith import dilepton, samples as samples_module
 from bbtautau_shapesmith.constants import DILEPTON_CHANNELS
 from bbtautau_shapesmith.dy_correction import BTAG_ROWS, derive, table_line
-from tests.helpers import INVENTORY, config
-from tests.run2 import list_name, write
+from tests.helpers import config
+from tests.run2 import install, list_name
 
 EDGES = (1.5, 2.5, 3.5, 4.5, 10.5)  # n_jets 2, 3, 4, 5-10: the columns 2, 3 and >= 4
 
@@ -17,9 +18,7 @@ EDGES = (1.5, 2.5, 3.5, 4.5, 10.5)  # n_jets 2, 3, 4, 5-10: the columns 2, 3 and
 @pytest.fixture(scope="module")
 def analysis_2017(tmp_path_factory):
     directory = tmp_path_factory.mktemp("run2_dy")
-    for inventory in INVENTORY.glob("*.txt"):
-        (directory / inventory.name).write_bytes(inventory.read_bytes())
-    database = write(directory)
+    database = install(directory)
     patch = pytest.MonkeyPatch()
     patch.setattr(samples_module, "INVENTORY_DIR", directory)
     yield dilepton.build(config(DILEPTON_CHANNELS, "bbtautau_shapesmith.dilepton:build", era="2017", database=database, sample_lists=[list_name("binned", "2017")]))
@@ -61,3 +60,20 @@ def test_the_table_is_per_era(analysis_2017):
         derive(histograms(analysis_2017), dataclasses.replace(analysis_2017, era="2016"), ["mm"], 1.0)
     with pytest.raises(KeyError, match="fill the b-tag regions first"):
         derive(HistogramSet(), analysis_2017, ["mm"], 1.0)
+
+
+def test_the_combined_2016_takes_the_luminosity_weighted_mean_of_its_halves(monkeypatch):
+    """The 2016 fake-factor measurement weights the DY of both halves with one expression: the mean of the tables of
+    2016preVFP and 2016postVFP weighted with their luminosity; without both tables it fails."""
+    from bbtautau_shapesmith import constants, weights
+
+    with pytest.raises(AnalysisError, match="no DY table for 2016preVFP, 2016postVFP"):
+        weights.dy_table("2016")
+    tables = {**constants.DY_NJETS_BTAG, "2016preVFP": {0: (1.0, 1.0, 1.0), 1: (1.2, 1.2, 1.2), 2: (2.0, 2.0, 2.0)},
+              "2016postVFP": {0: (2.0, 2.0, 2.0), 1: (1.2, 1.2, 1.2), 2: (1.0, 1.0, 1.0)}}
+    monkeypatch.setattr(weights, "DY_NJETS_BTAG", tables)
+    share = 19520.0 / 36330.0
+    table = weights.dy_table("2016")
+    assert table[0] == pytest.approx((share + 2 * (1 - share),) * 3, abs=1e-4) and table[1] == (1.2, 1.2, 1.2)
+    assert table[2] == pytest.approx((2 * share + (1 - share),) * 3, abs=1e-4) and weights.dy_table("2016preVFP") is tables["2016preVFP"]
+    assert "(n_bjets == 0) & (n_jets <= 2)) * 1.4627" in weights.dy_njets_btag_weight("2016")

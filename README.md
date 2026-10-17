@@ -79,6 +79,62 @@ tt has no embedding, so it is only in the columns classic and ff (the tt of the 
 et and mt, emb ff also the control channel em. `publish` takes every plotted region: classic and emb have the
 diagnostic b-tag regions `btag0_os_pass` to `btag3p_os_pass` (the fake-factor run has the nominal region only).
 
+**v7 (Run 2).** One run YAML per run type serves every era: `-s era=<2016preVFP | 2016postVFP | 2017 | 2018>` fills
+`{era}` in the sample lists, paths and web texts (ShapeSmith core). Productions: P1 `smrun2_tau_id_v1` (tau-ID
+measurement and tt trigger), P3 `smrun2_binned_v7` with the friends `fastmtt`, `ff_v7` and `ff_v7_w`; skims, outputs
+and ML folds under `/ceph/sdaigler/shapesmith/<tag>/{skims,output,ml}/<run>/<era>`; galleries per era
+`~sdaigler/smrun2_binned_v7/<era>` (columns classic, emb, emb ff, emb ff with W) and `~sdaigler/ff_smrun2_binned_v7/<era>`.
+
+| Run YAML | Run type | Notes |
+|---|---|---|
+| `smrun2_binned_v7.yaml` | tau control, column emb | MC jet fakes, ABCD QCD, embedding in et, mt, tt, control regions |
+| `smrun2_binned_v7_noemb.yaml` | tau control without embedding, column classic | the skims of `smrun2_binned_v7.yaml` |
+| `smrun2_binned_v7_dilepton.yaml` | em, mm, ee, column classic | source of the DY table of the era |
+| `ff_smrun2_binned_v7.yaml`, `ff_smrun2_binned_v7_w.yaml` | FF measurement, QCD + ttbar and QCD + W+jets + ttbar | one skim; `-s era=2016` measures both halves together |
+| `smrun2_binned_v7_ff.yaml`, `smrun2_binned_v7_ff_w.yaml` | FF run (friend ff_v7 / ff_v7_w) with em, datacards, columns emb ff / emb ff with W | `shapesmith combine ... --era` per era |
+| `smrun2_tau_id_v1_id_es.yaml` | tau-ID/ES measurement of the embedded taus | four WP runs, then `--merge` |
+| `smrun2_tau_id_v1_trigger.yaml` | tau-leg trigger efficiency of the tt embedding (E33) | needs the tau-ID/ES payload of the era |
+
+```bash
+E=2017; S="-s era=$E"                              # the same for 2016preVFP, 2016postVFP, 2018
+# P1: tau-ID/ES (spec 5.4), then the tt-trigger efficiency (E33)
+shapesmith skim    -c configs/smrun2_tau_id_v1_id_es.yaml $S
+for jet in Medium Tight; do for ele in VVLoose Tight; do
+  shapesmith measure -c configs/smrun2_tau_id_v1_id_es.yaml $S -s switches.vsjet_wp=$jet -s switches.vsele_wp=$ele; done; done
+shapesmith measure -c configs/smrun2_tau_id_v1_id_es.yaml $S --merge
+shapesmith skim    -c configs/smrun2_tau_id_v1_trigger.yaml $S
+for cls in Medium VVVLoose_not_Medium; do for variant in nominal signal_mc tag_pt mt30 monitor; do   # no monitor in 2018
+  shapesmith measure -c configs/smrun2_tau_id_v1_trigger.yaml $S -s switches.wp_class=$cls -s switches.variant=$variant; done; done
+shapesmith measure -c configs/smrun2_tau_id_v1_trigger.yaml $S --merge
+# P3: dilepton controls and the DY table of the era (constants.DY_NJETS_BTAG)
+D=configs/smrun2_binned_v7_dilepton.yaml
+shapesmith skim -c $D $S && shapesmith hist -c $D $S --control --regions all --skip-systematics && shapesmith plot -c $D $S --control
+python scripts/derive_dy_correction.py -c $D $S --ttbar-scale em
+# tau control runs, columns emb and classic (one skim)
+T=configs/smrun2_binned_v7.yaml; N=configs/smrun2_binned_v7_noemb.yaml
+shapesmith skim -c $T $S
+for C in $T $N; do shapesmith hist -c $C $S --control --regions all --skip-systematics && shapesmith estimate -c $C $S --control && shapesmith plot -c $C $S --control; done
+# fake factors, both variants (2016: -s era=2016, both halves; the halves alone are the cross-check)
+shapesmith skim    -c configs/ff_smrun2_binned_v7_w.yaml $S
+shapesmith measure -c configs/ff_smrun2_binned_v7_w.yaml $S --suggest-binning   # edges -> ff_tables.PER_ERA_EDGES
+shapesmith measure -c configs/ff_smrun2_binned_v7.yaml $S && shapesmith measure -c configs/ff_smrun2_binned_v7_w.yaml $S
+# FF runs (after the friends ff_v7, ff_v7_w), datacards, background-only fit, then the Run-2 combination
+for F in configs/smrun2_binned_v7_ff.yaml configs/smrun2_binned_v7_ff_w.yaml; do
+  shapesmith skim -c $F $S
+  shapesmith hist -c $F $S --control --skip-systematics && shapesmith estimate -c $F $S --control && shapesmith plot -c $F $S --control
+  shapesmith hist -c $F $S --skip-systematics && shapesmith estimate -c $F $S && shapesmith datacards -c $F $S && shapesmith fit -c $F $S --background-only
+done
+shapesmith combine -c configs/smrun2_binned_v7_ff.yaml --era 2016preVFP --era 2016postVFP --era 2017 --era 2018 \
+                   -o /ceph/sdaigler/shapesmith/smrun2_binned_v7/combination/ff --background-only --validate
+# galleries of the era, in this order (the first publication fixes the order of the columns and channels)
+for C in $N $D $T configs/smrun2_binned_v7_ff.yaml configs/smrun2_binned_v7_ff_w.yaml configs/ff_smrun2_binned_v7.yaml configs/ff_smrun2_binned_v7_w.yaml; do
+  shapesmith publish -c $C $S; done
+```
+
+Until the era has its DY table (`constants.DY_NJETS_BTAG`; 2018 has one), the runs with `dy_correction: njets_btag` need
+`-s switches.dy_correction=none`; the 2016 FF measurement takes the luminosity-weighted mean of the tables of both
+halves. `--workers` stays at most 24 on portal2.
+
 The v5 run YAMLs (`*v5*.yaml`, galleries `sm2018_binned_v5` and `ff_sm2018_binned_v5`, run as above) share one skim
 directory between the tau and the dilepton run. With the v6 code, `hist`, `estimate` and `plot` of tt, em, mm and ee
 run on their stored skims with `--skip-systematics` (the v5 embedding shifts are pT-binned, see below); the et and mt
@@ -145,6 +201,27 @@ inventory (v4 uses `sm2018_binned_v2`). A run YAML names every list of its produ
 Check a copy with `diff <(git -C <crown>/analysis_configurations/bbtautau show <commit>:sample_list/<file>) inventory/<name>.txt`
 (the subject finds the commit again after a rebase).
 
+v7 (spec 3.2, 6.11) keeps the names of the KingMaker lists: `inventory/sm_<era>_binned.txt` (data and MC),
+`sm_<era>_binned_mc.txt` (the MC of the b-tag probe production P2), `sm_<era>_embedding.txt` and
+`sm_<era>_tau_id_measurement.txt` are byte-identical copies of CROWN `sample_list/` (bbtautau `feat-v7-run2`
+`0be6596` "feat: add the v7 sample lists of all four Run-2 eras"; `tests/test_inventory.py` compares them with the CROWN
+checkout of the workspace when it exists). `sm_<era>_borrowed.txt` is ShapeSmith's own: the lines
+`<source era>/<nick>` an era borrows (2016postVFP: ZH, W⁺H and W⁻H → ττ of 2016preVFP, spec 3.3), empty in the other
+eras, so that one run YAML lists `sm_{era}_borrowed` in every era.
+
+| Era | binned (data) | binned_mc | embedding | tau_id_measurement | borrowed |
+|---|---|---|---|---|---|
+| 2016preVFP | 84 (15) | 69 | 15 | 30 | 0 |
+| 2016postVFP | 75 (9) | 66 | 9 | 24 | 3 |
+| 2017 | 84 (15) | 69 | 15 | 30 | 0 |
+| 2018 | 81 (12) | 69 | 12 | 27 | 0 |
+
+The list rules (`tests/test_inventory.py`): data of the era's streams (SingleElectron in 2016 and 2017, EGamma in 2018;
+no 2016B ver1), DY in the six pT(Z) bins plus the inclusive M-50 (`npartons == 0`) and M-10to50, W 0J/1J/2J, the
+powheg signal κλ = 1 and node_SM, VH → ττ (not in 2016postVFP), exactly one ZZ → 2ν2q sample (ZZTo2Nu2Q_5f, 2018
+ZZTo2Q2Nu), TTWJets instead of ttWJets, no ZH → bb with Z → bb (in ZToQQ); embedding: the three tau final states of
+every run period; tau-ID lists with W 0J/1J/2J (E17).
+
 `sm2018_binned_v6` drops three samples counted twice: the inclusive LO `ttZJets` (ttZ is `TTZToLLNuNu_M-10`,
 `TTZToQQ` and `TTZToLL_M-1to10`), `TTZToNuNu` (contained in `TTZToLLNuNu_M-10`) and `ZZTo2Nu2Q_5f` (the process of
 `ZZTo2Q2Nu`), as the legacy analysis. `ttWJets` stays, the only ttW sample of the database. Being a subset of
@@ -164,8 +241,11 @@ holds only the samples of its processes. The skim contract records `nevents` for
 corrected count, and re-skim a skim made with the old one once with
 `shapesmith skim --force --samples EmbeddingRun2018D_cwinter-embedding_2018UL_mutau`.
 
-`tests/fixtures/datasets.json` holds the database entries (`KingMaker_sample_database` `94bd5a0f`, with the corrected
-mutau 2018D event count) of exactly the nicks in `inventory/`; a new inventory adds its entries in the same change.
+`tests/fixtures/datasets.json` holds the database entries of exactly the nicks in `inventory/`, taken from the sibling
+checkout `KingMaker_sample_database` at `v7-run2-registration` `0de63ebe` (the v7 registration and the HH-WG 2026 / YR4
+mH = 125.00 cross sections; `tests/test_inventory.py` compares them with the sibling checkout when it exists); a new
+inventory adds its entries in the same change. The v2-v6 run YAMLs read the same sibling checkout, so their single-Higgs
+and HH cross sections are now those of v7 (HH 0.002221 pb instead of 0.002246 pb).
 
 ## Run 2 (v7)
 
@@ -217,7 +297,8 @@ nuisances they share are named so. Spec: `docs/v7_spec.md` of the workspace, sec
   DR; the DR->SR correction (from no to >= 1 b tag and from high to low mT) from W MC in mt_1 of the baseline;
   fractions QCD, W+jets and ttbar. The tau analysis with `ff_processes: [QCD, Wjets, ttbar]` declares the W+jets keys
   of the friend (`FF_SHIFTS_W`) in et and mt. 2016 is one measurement of both halves (`era: "2016"`, the lists of both
-  halves; every sample reads the n-tuples of its half and is normalised to its luminosity, `Sample.lumi_scale`), one
+  halves, where a list named with 2016, e.g. `sm_2016_binned` from `sm_{era}_binned`, stands for those of both halves,
+  `samples.inventory_names`; the DY table is the luminosity-weighted mean of theirs; every sample reads the n-tuples of its half and is normalised to its luminosity, `Sample.lumi_scale`), one
   payload `…/2016/`; a run per half with the same tables is the cross-check. Tables per era: the 2018 tables with the
   equipopulated bin counts of `PER_ERA_OVERRIDES` (2018 counts times the luminosity ratio) and the edges of
   `PER_ERA_EDGES`, entered from the JSON line of `measure --suggest-binning` of the era; until an era (and the W+jets
@@ -245,10 +326,12 @@ nuisances they share are named so. Spec: `docs/v7_spec.md` of the workspace, sec
 - **Combination** (spec 6.9): `shapesmith combine -c <run of each era> ... -o <dir> [--background-only]` combines the
   cards of a final state of every era with `combineCards.py` and runs the limits or the background-only fit;
   `nuisances.md` flags nuisances that end in another era's token.
-- **Tests**: `tests/test_run2.py` builds every Analysis in every era on per-era lists (`tests/run2.py`: the 2018
-  fixture lists renamed per era plus powheg and VH → ττ), and checks every column against the v7 CROWN contract per
-  era (`tests/helpers.py`: `branches(channel, era)`); `tests/test_ff_variants.py`, `tests/test_tau_trigger_measurement.py`
-  and `tests/test_dy_correction.py` the fake-factor variants and eras, the trigger measurement and the DY table.
+- **Tests**: `tests/test_run2.py` builds every Analysis in every era on the v7 inventories (`tests/run2.py`) and checks
+  every column of every sample against the branch fixture of its era and sample type (`tests/helpers.py`:
+  `branches(channel, era, sample_type)`, `tau_id_branches(...)`); `tests/test_inventory.py` the v7 lists per era and
+  their copies; `tests/test_v7_runs.py` every v7 run YAML in every era, its paths, productions and gallery column;
+  `tests/test_ff_variants.py`, `tests/test_tau_trigger_measurement.py` and `tests/test_dy_correction.py` the
+  fake-factor variants and eras, the trigger measurement and the DY table.
 
 ## Embedding and fake factors
 
@@ -383,11 +466,18 @@ must follow its keys.
 | dilepton channels and analysis assembly; the em control channel of the tau analysis | `dilepton.py` |
 | tau-ID/ES measurement: selection, processes, ES grid, assembly; its m_vis bins; its MC shape uncertainties | `tau_id_measurement.py`, `tau_id_binning.py`, `tau_id_systematics.py` |
 
-`tests/fixtures/branches_<channel>.txt` list the branches of one ttbar ntuple per channel of the
-`sm2018_binned_v5` production (`scripts/dump_branches.py <root:// URL>`); the tests check every
-selection, weight and variable against them with the v7 changes of each era (`tests/helpers.py`, `branches(channel,
-era)`: the trigger columns of the era, prefiring, the [T, M] b-tag variations, the 2018 HEM flag), and the embedding
-columns against them plus the Part-A output contract until branch fixtures of real v7 files exist.
+`tests/fixtures/branches/<era>.json` hold, per era, configuration (`sm_config`, `sm_tau_id_measurement_config`),
+scope and sample type, the branches CROWN's generated program writes (`scripts/branches_from_crown.py` over the
+generate.py dry run of CROWN bbtautau `feat-v7-run2` cfcca94; the programs the branch cannot generate yet, 2016 tt and
+the embedding and tau-ID production outside 2018, from a copy with the C8 dict and the era guards patched; ttbar in
+full, the other sample types as differences). For 2018 ttbar they are the branches of real `sm2018_binned_v2` files
+(`tests/fixtures/branches/sm2018_binned_v2/<channel>.txt`, `scripts/dump_branches.py`) plus the six v6 columns. The tests
+check every selection, weight and variable of every sample against the fixture of its era and sample type plus the v7
+CROWN output that branch does not write yet (`tests/helpers.py`, `branches(channel, era, sample_type)` and
+`tau_id_branches(...)`: the trigger columns of the era, prefiring, the [T, M] b-tag variations, the 2018 HEM flag, the
+tt embedding's di-tau efficiencies, the trigger monitoring columns of the tau-ID production; the `V7_*` sets, the
+counterpart of the CROWN tests' PENDING items). With the CROWN parts C6-C8, C11-C14, C20 merged, the fixtures are
+written again and the `V7_*` sets shrink to nothing; with the first v7 files `dump_branches.py` checks them.
 `tests/fixtures/skim_contracts_v4.json` holds the stored contracts and Parquet columns of one data and one MC skim per
 channel of v4 (from the golden references of 2026-09-30); `tests/test_contracts_v4.py` checks that the v4 run YAMLs
 differ from them by exactly the changes since (so a v4 skim needs `skim --force`).

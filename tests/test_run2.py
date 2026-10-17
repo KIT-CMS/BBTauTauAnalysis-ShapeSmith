@@ -1,4 +1,5 @@
-"""Run 2 (v7 spec 6.1-6.7): every analysis in every era, on the per-era fixtures of tests/run2.py."""
+"""Run 2 (v7 spec 6.1-6.7): every analysis in every era, on the v7 inventories (tests/run2.py) and the per-era branch
+fixtures (tests/helpers.py)."""
 import numpy as np
 import pandas as pd
 import pytest
@@ -20,8 +21,8 @@ from bbtautau_shapesmith.systematics import btag_variations
 from bbtautau_shapesmith.tau_id_systematics import crown_shifts, unused_shifts, weight_shifts
 from bbtautau_shapesmith.triggers import TRIGGER
 from bbtautau_shapesmith.weights import embedding_weights, mc_weights
-from tests.helpers import DATABASE, INVENTORY, branches, config, embedding_branches
-from tests.run2 import ERAS, POWHEG, VH_TAUTAU as VH_PRIMARIES, list_name, mc_nick, sample_lists, write
+from tests.helpers import DATABASE, branches, config, embedding_branches, sample_types, tau_id_branches
+from tests.run2 import ERAS, POWHEG, VH_TAUTAU as VH_PRIMARIES, install, list_name, nick, sample_lists
 
 YEAR = {"2016preVFP": "2016", "2016postVFP": "2016", "2017": "2017", "2018": "2018"}
 DILEPTON = "bbtautau_shapesmith.dilepton:build"
@@ -58,11 +59,9 @@ LUMI = {  # spec 6.6
 
 @pytest.fixture(scope="module")
 def run2(tmp_path_factory):
-    """The per-era lists next to copies of the inventories; the database of their nicks."""
+    """Copies of the inventories (a test adds a list there); the fixture database of their nicks."""
     directory = tmp_path_factory.mktemp("run2")
-    for inventory in INVENTORY.glob("*.txt"):
-        (directory / inventory.name).write_bytes(inventory.read_bytes())
-    database = write(directory)
+    database = install(directory)
     patch = pytest.MonkeyPatch()
     patch.setattr(samples_module, "INVENTORY_DIR", directory)
     yield database
@@ -123,13 +122,28 @@ def test_the_luminosity_and_its_label():
 
 @pytest.mark.parametrize("era", ERAS)
 def test_every_needed_column_is_in_the_v7_contract(run2, era):
-    """The columns of every sample of the tau, dilepton and fake-factor analyses are those CROWN writes in v7."""
+    """The columns of every sample of the tau, dilepton and fake-factor analyses are those CROWN writes in v7 for the
+    sample type of the sample."""
     friends = NN_COLUMNS | set(FF_COLUMNS.values())
+    types = sample_types()
     for analysis in (tau(run2, era, nn_friend=True), controls(run2, era, diagnostics=True), fake_factors(run2, era)):
         for name, channel in analysis.channels.items():
             for sample in channel.samples:
-                available = embedding_branches(name, era) if sample.kind == "embedding" else branches(name, era) | {"npartons", "npv_good", "rho"}
-                assert not needed_columns(channel, sample) - available - friends, (analysis.name, name, sample.nick)
+                missing = needed_columns(channel, sample) - branches(name, era, types[sample.nick]) - friends
+                assert not missing, (analysis.name, name, sample.nick, sorted(missing))
+
+
+@pytest.mark.parametrize("era", ERAS)
+def test_the_tau_id_measurement_reads_the_columns_of_the_tau_id_production(run2, era):
+    """The nominal columns of every sample of the tau-ID measurement are those of the tau-ID production (P1) of its
+    sample type; the shifted ones come with the MC shifts of P1 (E34)."""
+    types = sample_types()
+    for vsjet, vsele in (("Medium", "VVLoose"), ("Tight", "Tight")):
+        analysis = tau_id(run2, era, vsjet_wp=vsjet, vsele_wp=vsele, shape_systematics=False)
+        for name, channel in analysis.channels.items():
+            for sample in channel.samples:
+                missing = needed_columns(channel, sample) - tau_id_branches(name, era, types[sample.nick])
+                assert not missing, (name, sample.nick, sorted(missing))
 
 
 @pytest.mark.parametrize("era", ERAS)
@@ -351,7 +365,7 @@ def test_vh_tautau_of_2016postVFP_is_borrowed_from_2016preVFP(run2):
     """3.3: the 2016preVFP n-tuples, normalised with the 2016postVFP luminosity, plus an lnN 1.05."""
     analysis = tau(run2, "2016postVFP")
     vh = analysis.channel("mt").samples_of(VH_TAUTAU)
-    assert sorted(s.nick for s in vh) == sorted(mc_nick(primary, "2016preVFP") for primary in VH_PRIMARIES)
+    assert sorted(s.nick for s in vh) == sorted(nick(prefix, "2016preVFP") for prefix in VH_PRIMARIES)
     assert all(s.era == "2016preVFP" for s in vh) and analysis.lumi_pb == LUMI_PB["2016postVFP"]
     assert LnN("CMS_htt_borrowed_VH_htt_2016postVFP", (VH_TAUTAU,), 1.05) in analysis.lnn
     for era in ("2016preVFP", "2017", "2018"):
@@ -363,11 +377,11 @@ def test_vh_tautau_of_2016postVFP_is_borrowed_from_2016preVFP(run2):
 def test_borrowing_is_checked(run2, tmp_path):
     assert parse_entry("2016preVFP/ZHToTauTau_X") == ("ZHToTauTau_X", "2016preVFP") and parse_entry("ZHToTauTau_X") == ("ZHToTauTau_X", None)
     with pytest.raises(AnalysisError, match="the 2017 run does not borrow VH_htt from 2016preVFP"):
-        samples(run2, ["run2_2016postVFP_borrowed"], ["mt"], "2017")
+        samples(run2, [list_name("borrowed", "2016postVFP")], ["mt"], "2017")
     with pytest.raises(AnalysisError, match="a 2017 sample in a 2018 run"):
         samples(run2, [list_name("binned", "2017")], ["mt"], "2018")
     wrong = samples_module.INVENTORY_DIR / "run2_wrong_borrowing.txt"
-    wrong.write_text(f"2016preVFP/{mc_nick(VH_PRIMARIES[0], '2017')}\n2015/{mc_nick(VH_PRIMARIES[1], '2016preVFP')}\n")
+    wrong.write_text(f"2016preVFP/{nick(VH_PRIMARIES[0], '2017')}\n2015/{nick(VH_PRIMARIES[1], '2016preVFP')}\n")
     with pytest.raises(AnalysisError, match=r"the database has it as a 2017 sample\n.*the 2016postVFP run does not borrow VH_htt from 2015"):
         samples(run2, ["run2_wrong_borrowing"], ["mt"], "2016postVFP")
 
@@ -375,17 +389,17 @@ def test_borrowing_is_checked(run2, tmp_path):
 def test_the_signal_and_the_new_samples_are_routed(run2):
     """6.3: powheg kappa_lambda = 1 is the signal, node_SM its auxiliary cross-check, the other kappa_lambda points have
     no process; SingleElectron data, VH -> tautau, ttW, WZTo4Q and ZZTo2Nu2Q_5f."""
-    assert route(mc_nick(POWHEG["1p00"], "2017")) == (SIGNAL, None) and route(mc_nick(POWHEG["0p00"], "2017")) == ("HH2B2Tau_kl", None)
+    assert route(nick(POWHEG["1p00"], "2017")) == (SIGNAL, None) and route(f"{POWHEG['0p00']}_RunIISummer20UL17NanoAODv15") == ("HH2B2Tau_kl", None)
     assert route("GluGluToHHTo2B2Tau_TuneCP5_PSWeights_node_SM_13TeV-madgraph-pythia8_RunIISummer20UL17") == (NODE_SM, None)
     assert route("SingleElectron_Run2016F-HIPM_UL2016_NanoAODv15") == ("data", ("et", "ee"))
     for primary in VH_PRIMARIES:
         assert route(primary) == (VH_TAUTAU, None)
     assert route("WplusH_HToBB_WToLNu_M-125_TuneCP5_13TeV-powheg-pythia8") == ("VH", None) and route("ZH_HToBB_ZToLL_M-125") == ("VH", None)
-    for nick, group in (("TTWJetsToLNu_TuneCP5_13TeV-amcatnloFXFX-madspin-pythia8", "TTV"), ("TTWJetsToQQ_TuneCP5_13TeV-amcatnloFXFX-madspin-pythia8", "TTV"),
+    for listed, group in (("TTWJetsToLNu_TuneCP5_13TeV-amcatnloFXFX-madspin-pythia8", "TTV"), ("TTWJetsToQQ_TuneCP5_13TeV-amcatnloFXFX-madspin-pythia8", "TTV"),
                         ("WZTo4Q_4f_TuneCP5_13TeV_amcatnloFXFX_pythia8", "VV"), ("ZZTo2Nu2Q_5f_TuneCP5_13TeV-amcatnloFXFX-pythia8", "VV")):
-        assert route(nick) == (group, None)
+        assert route(listed) == (group, None)
     mt = tau(run2, "2017").channel("mt")
-    assert [s.nick for s in mt.samples_of(SIGNAL)] == [mc_nick(POWHEG["1p00"], "2017")]
+    assert [s.nick for s in mt.samples_of(SIGNAL)] == [nick(POWHEG["1p00"], "2017")]
     assert mt.process(NODE_SM).role == "auxiliary" and len(mt.samples_of(NODE_SM)) == 1
     assert not mt.samples_of("HH2B2Tau_kl") and NODE_SM not in tau(run2, "2017").ml.processes
     et = tau(run2, "2017").channel("et")
