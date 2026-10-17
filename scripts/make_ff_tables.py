@@ -8,6 +8,7 @@ where /work/jvoss/FF_Updated is readable (LCG_108 has ROOT and ruamel.yaml):
 
 The only change against the configuration: the et/mt fraction split uses the n_jets edges [-0.5, 2.5, 22.5] of its
 categories <=2 and >=3 (user decision U4; jvoss's edges [-0.5, 1.5, 22.5] route n_jets = 2 to the >=3 fractions).
+The hand-written part of ff_tables.py below the MARKER line (the W+jets tables and the per-era tables) is kept.
 """
 import ast
 import hashlib
@@ -19,6 +20,7 @@ FF_UPDATED = Path("/work/jvoss/FF_Updated")
 CONFIG_DIR = FF_UPDATED / "configs" / "non_res_HH" / "2018"
 OUTPUT = Path(__file__).resolve().parents[1] / "src" / "bbtautau_shapesmith" / "ff_tables.py"
 CHANNELS = ("et", "mt", "tt")
+MARKER = "# --- hand-written below this line; scripts/make_ff_tables.py keeps it ---"
 FRACTION_EDGES = {"et": (-0.5, 2.5, 22.5), "mt": (-0.5, 2.5, 22.5)}  # U4
 
 
@@ -128,7 +130,9 @@ def main() -> None:
     ]
     for channel in CHANNELS:
         lines += channel_table(functions, ff_functions, channel)
-    OUTPUT.write_text("\n".join(lines + ["}", ""]))
+    previous = OUTPUT.read_text() if OUTPUT.exists() else ""
+    tail = ["", "", MARKER + previous.split(MARKER, 1)[1].rstrip("\n")] if MARKER in previous else []
+    OUTPUT.write_text("\n".join(lines + ["}", *tail, ""]))
     print(f"wrote {OUTPUT}")
 
 

@@ -8,7 +8,8 @@ from shapesmith.histogram import part_of
 from shapesmith.model import ColumnVariation, LnN, Process, VariationSum, WeightVariation
 
 from bbtautau_shapesmith.constants import (
-    BTAG_COMPONENTS, EMBEDDING_TAU_DECAY_MODES, FF_SHIFTS_LT, FF_SHIFTS_TT, LT_CHANNELS, PREFIRING_NUISANCE, PREFIRING_VARIATIONS, TAU_VS_ELE_WP, YEAR,
+    BTAG_COMPONENTS, EMBEDDING_TAU_DECAY_MODES, FF_SHIFTS_LT, FF_SHIFTS_TT, FF_SHIFTS_W, LT_CHANNELS, PREFIRING_NUISANCE, PREFIRING_VARIATIONS, TAU_VS_ELE_WP,
+    YEAR,
 )
 from bbtautau_shapesmith.correlations import nuisance
 from bbtautau_shapesmith.processes import EMBEDDED, SIGNAL, VH_TAUTAU
@@ -89,10 +90,10 @@ def embedding_ttbar_nuisance(era: str) -> str:
     return nuisance("CMS_htt_emb_ttbar", "embedding", era)
 
 
-def ff_variations(channel: str, era: str) -> tuple[ColumnVariation, ...]:
+def ff_variations(channel: str, era: str, wjets: bool = False) -> tuple[ColumnVariation, ...]:
     """The fake-factor friend shifts, per channel and year (2016 is measured on both halves); in tt a key shifts only
-    the fake factor of its leg."""
-    keys = FF_SHIFTS_TT if channel == "tt" else FF_SHIFTS_LT
+    the fake factor of its leg. With W+jets fake factors (ff_processes) et and mt add the W+jets keys."""
+    keys = FF_SHIFTS_TT if channel == "tt" else FF_SHIFTS_LT + (FF_SHIFTS_W if wjets else ())
     return tuple(variation for key in keys for variation in _shifts(nuisance(f"CMS_ff_{key}_{channel}", "fake_factors", era), f"__{key}", ("data", "mc", "embedding")))
 
 

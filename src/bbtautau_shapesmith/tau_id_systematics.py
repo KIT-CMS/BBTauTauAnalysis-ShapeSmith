@@ -16,8 +16,9 @@ SF, electron -> tau ES, JER, electron ES) are filled under their own name, so th
 branch; the datacards ignore them. The electron ES and resolution are correlated between the eras (EGM, K4), so their
 names have no era.
 
-The top-pT shape (K9, TOP recommendation): with against without the reweighting, the nominal being with it; the
-predecessor took the weight squared as Up.
+The top-pT shape (K9, TOP recommendation): the difference between with (the nominal) and without the reweighting,
+symmetrised: Down is without the weight, Up the mirror 2 w - 1 of it around the nominal. The predecessor took the
+weight squared as Up (1 - 2d + d^2 for w = 1 - d, against 1 - 2d now).
 
 The vsJet SF: the predecessor's CMS_eff_t_dm{0,1,10,11} shapes equal the nominal (its CROWN shift evaluated the
 nominal SF), and the payload was fitted so; they stay no-ops here, and the production has no vsJet SF shifts.
@@ -28,6 +29,8 @@ from shapesmith.histogram import part_of
 from shapesmith.model import ColumnVariation, VariationSum, WeightVariation
 
 from bbtautau_shapesmith.constants import ERAS, PREFIRING_NUISANCE, YEAR
+
+TOP_PT_WEIGHT = "topPtReweightWeight"
 
 ERA_TAG = {era: f"Run{era}" for era in ERAS}
 DIRECTIONS = ("Up", "Down")
@@ -87,10 +90,10 @@ def unused_shifts(era: str) -> tuple[tuple[str, str], ...]:
 def weight_shifts(era: str) -> tuple[tuple[str, str, str, str], ...]:
     """(datacard name, weight name, Up expression, Down expression): the weight's carriers get the variation. The jet
     fake rate varies by max(1 - 0.002 pT, 0.6) and min(1 + 0.002 pT, 1.4), both constant from 200 GeV; the top-pT shape
-    is with (Up, the nominal) against without (Down) the reweighting (K9)."""
+    is the difference with against without the reweighting (K9), Down without it and Up its mirror around the nominal."""
     return (
         (f"CMS_fake_j_{ERA_TAG[era]}", "jet_fake", "(1.0 - pt_2 * 0.002) * (pt_2 < 200) + 0.6 * (pt_2 >= 200)", "(1.0 + pt_2 * 0.002) * (pt_2 < 200) + 1.4 * (pt_2 >= 200)"),
-        ("CMS_htt_ttbarShape", "top_pt", "topPtReweightWeight", "1.0"),
+        ("CMS_htt_ttbarShape", "top_pt", f"(2.0 * {TOP_PT_WEIGHT} - 1.0)", "1.0"),
     )
 
 

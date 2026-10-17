@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from bbtautau_shapesmith.constants import ERAS, TAU_VS_JET_WP, YEAR
+from bbtautau_shapesmith.constants import COMBINED_ERAS, ERAS, TAU_VS_JET_WP, year
 
 
 @dataclass(frozen=True)
@@ -136,4 +136,4 @@ def _year_table(year: str) -> dict[str, Trigger]:
     }
 
 
-TRIGGER = {era: _year_table(YEAR[era]) for era in ERAS}
+TRIGGER = {era: _year_table(year(era)) for era in (*ERAS, *COMBINED_ERAS)}  # a combined era (2016) has the table of its year

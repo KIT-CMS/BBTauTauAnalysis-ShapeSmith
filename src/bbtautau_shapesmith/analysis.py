@@ -92,7 +92,7 @@ def column_variations(name: str, era: str, switches: TauSwitches) -> tuple:
     if not switches.shape_systematics:
         return ()
     embedding = embedding_variations(name, era) if switches.embedded(name) and switches.crown_shifts else ()
-    return embedding + (ff_variations(name, era) if switches.jet_fakes == "ff" else ())
+    return embedding + (ff_variations(name, era, switches.wjets) if switches.jet_fakes == "ff" else ())
 
 
 def fit_categories(switches: TauSwitches) -> tuple[Category, ...]:

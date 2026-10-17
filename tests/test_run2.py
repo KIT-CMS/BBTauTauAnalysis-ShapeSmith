@@ -105,10 +105,12 @@ def test_every_analysis_builds_in_every_era(run2, era):
 
 @pytest.mark.parametrize("analysis", ["bbtautau_shapesmith.analysis:build", DILEPTON, FF, TAU_ID])
 def test_an_unknown_era_is_rejected(run2, analysis):
+    """Only the fake-factor measurement takes the combined era 2016 (both halves, E18)."""
     module, _, function = analysis.partition(":")
     builder = getattr(__import__(module, fromlist=[function]), function)
-    for era in ("2022", "2016", "Run2"):
-        with pytest.raises(AnalysisError, match=f"unknown era '{era}'; the analysis supports 2016preVFP, 2016postVFP, 2017, 2018"):
+    expected = "the measurement supports 2016preVFP, 2016postVFP, 2017, 2018 and 2016 \\(2016preVFP \\+ 2016postVFP\\)" if analysis == FF else "the analysis supports 2016preVFP, 2016postVFP, 2017, 2018"
+    for era in ("2022", "Run2") if analysis == FF else ("2022", "2016", "Run2"):
+        with pytest.raises(AnalysisError, match=f"unknown era '{era}'; {expected}"):
             builder(config(("mt",), analysis, era=era, database=run2))
 
 
@@ -414,7 +416,7 @@ def test_the_tau_id_systematics_per_era(run2, era):
     assert shifts[f"CMS_scale_j_Absolute_{tag}"] == f"CMS_scale_j_Absolute_{era}" and shifts["CMS_PileUp"] == f"CMS_pileup_{era}"
     assert not [name for name in shifts if "HEM" in name] and not [shift for shift in shifts.values() if "HEM" in shift]
     assert dict(unused_shifts(era))["CMS_scale_e"] == f"CMS_scale_e_{era}" and dict(unused_shifts(era))["CMS_res_e"] == f"CMS_res_e_{era}"
-    assert ("CMS_htt_ttbarShape", "top_pt", "topPtReweightWeight", "1.0") in weight_shifts(era)
+    assert ("CMS_htt_ttbarShape", "top_pt", "(2.0 * topPtReweightWeight - 1.0)", "1.0") in weight_shifts(era)  # K9: mirror of without
     channel = tau_id(run2, era).channel("mt")
     suffixes = {v.name: v.suffix for v in channel.variations if isinstance(v, ColumnVariation) and v.suffix}
     assert suffixes["CMS_prefiringUp"] == f"__CMS_ecal_prefiring_{YEAR[era]}Up" and suffixes[f"CMS_fake_m_WH1_{tag}Down"] == f"__CMS_fake_t_DeepTau2018v2p5_VSmu_wheel1_{era}Down"

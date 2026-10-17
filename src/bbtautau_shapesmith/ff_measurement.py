@@ -1,6 +1,20 @@
 """The SM fake-factor measurement of one era (`shapesmith measure`): QCD and ttbar fake factors of every hadronic tau,
 their fractions, the QCD DR->SR correction and the non-closures, in the method of jvoss's TauFakeFactors
-configuration FF_Updated configs/non_res_HH/2018 (tables in ff_tables.py).
+configuration FF_Updated configs/non_res_HH/2018 (tables in ff_tables.py). Two payload variants (v7 spec E18, 6.8;
+switch ff_processes): QCD + ttbar (output fake_factors/<era>/) and QCD + W + ttbar (fake_factors_w/<era>/).
+
+W+jets (et and mt, the variant QCD + W + ttbar): fake factors from data in the DR mt_1 > 70, no b tag (>= 2 jets),
+isolated lepton, opposite sign, minus every MC but W and minus QCD from the same-sign version of each region (data
+minus every MC, TauFakeFactors' QCD_SS_estimate); the non-closures in the DR; the DR->SR correction from W MC (the
+orthogonal fake factors from W MC in the DR, the correction in mt_1 from the baseline, i.e. from no to at least one b
+tag and from high to low mT, the main uncertainty); three-process fractions QCD (data minus every MC), W+jets and
+ttbar (both MC). tt has no W+jets fake factors.
+
+Eras: every era, and the combined era 2016 (constants.COMBINED_ERAS): one measurement of both 2016 halves, each sample
+normalised to the luminosity of its half, one payload fake_factors(_w)/2016/; a run per half (2016preVFP,
+2016postVFP) with the same tables is the cross-check. The tables of an era come from ff_tables.tables(era): outside
+2018 (and for W+jets in every era) their edges are placeholders until `measure --suggest-binning` gives them; until
+then `measure` refuses.
 
 Regions: named cut replacements on the measurement baseline, which is the analysis baseline (cuts.baseline_cuts) with
 its lepton vetoes combined into one cut, so that the ttbar scale regions invert them at once. The tau ID is
@@ -44,20 +58,21 @@ Differences to jvoss's configuration:
 from __future__ import annotations
 
 from shapesmith.config import RunConfig
-from shapesmith.measurements.fake_factors import DataScale, DrSr, FakeFactorMeasurement, Fractions, Leg, ProcessFF
+from shapesmith.measurements.fake_factors import DataScale, DrSr, FakeFactorMeasurement, Fractions, Leg, ProcessFF, SameSignQCD
 from shapesmith.model import Analysis, AnalysisError, Channel, Process, Region, Sample, Selection
 
-from bbtautau_shapesmith import cuts
-from bbtautau_shapesmith.constants import LT_CHANNELS, LUMI_PB, TAU_CHANNELS, TAU_LEGS, check_era
-from bbtautau_shapesmith.ff_tables import TABLES
+from bbtautau_shapesmith import cuts, ff_tables
+from bbtautau_shapesmith.constants import LT_CHANNELS, TAU_CHANNELS, TAU_LEGS, check_measurement_era, lumi_pb
 from bbtautau_shapesmith.processes import EMBEDDED, SPLITS, PLOT_GROUP
 from bbtautau_shapesmith.samples import sample_database, samples
-from bbtautau_shapesmith.switches import FakeFactorSwitches, parse
+from bbtautau_shapesmith.switches import FF_VARIANTS, FakeFactorSwitches, parse
 from bbtautau_shapesmith.weights import embedding_weights, group_weights, mc_weights
 
 GROUPS = ("DY", "TT", "ST", "VV")  # split into T, L and J
 VETO_CUTS = ("extraelec_veto", "extramuon_veto", "dilepton_veto")
 JETS = "(n_jets >= 2)"
+W_DR = {"mt_cut": "(mt_1 > 70)", "b_tagging": "(n_bjets == 0) & (n_jets >= 2)"}  # the W+jets determination region
+W_MC = "W"  # the W+jets MC process
 LEPTON_SIDEBAND = {  # jvoss's DR->SR lepton isolation (U5): the complement of his orthogonal window, below his n-tuples' 0.4
     "mt": "(~((iso_1 >= 0.05) & (iso_1 <= 0.15))) & (iso_1 < 0.4)",
     "et": "(~((iso_1 >= 0.02) & (iso_1 <= 0.15))) & (iso_1 < 0.4)",
@@ -100,8 +115,9 @@ def tau_id(channel: str, anti_isolated: tuple[int, ...]) -> str:
     return " & ".join(cuts.anti_isolated(leg) if leg in anti_isolated else cuts.isolated(leg) for leg in TAU_LEGS[channel])
 
 
-def leg_regions(channel: str, era: str, leg: int, suffix: str, tt_fraction_region: str = "both_anti_iso") -> dict[str, dict[str, str]]:
-    """The cut replacements of the regions of one leg, by region name."""
+def leg_regions(channel: str, era: str, leg: int, suffix: str, tt_fraction_region: str = "both_anti_iso", wjets: bool = False) -> dict[str, dict[str, str]]:
+    """The cut replacements of the regions of one leg, by region name (with `wjets` in et and mt also those of the
+    W+jets fake factors)."""
     lt = channel in LT_CHANNELS
     other = tuple(t for t in TAU_LEGS[channel] if t != leg)
     fraction_legs = (leg,) if lt or tt_fraction_region == "application" else TAU_LEGS[channel]
@@ -123,14 +139,32 @@ def leg_regions(channel: str, era: str, leg: int, suffix: str, tt_fraction_regio
     for sign, charge in (("", {}), ("_ss", {"os": cuts.SAME_SIGN})):
         regions[f"ttbar{suffix}_scale_sr_like{sign}"] = {**inverted, **charge}
         regions[f"ttbar{suffix}_scale_ar_like{sign}"] = {**inverted, **charge, "tau_iso": tau_id(channel, (leg,))}
+    if wjets and lt:
+        for sign, charge in (("", {}), ("_ss", {"os": cuts.SAME_SIGN})):
+            regions[f"Wjets_sr_like{sign}"] = {**W_DR, **charge}
+            regions[f"Wjets_ar_like{sign}"] = {**W_DR, **charge, "tau_iso": tau_id(channel, (leg,))}
+        regions["Wjets_sr"] = {}  # the DR->SR correction from W MC: the baseline
+        regions["Wjets_ar"] = {"tau_iso": tau_id(channel, (leg,))}
     return regions
 
 
-def legs(channel: str, embedding: bool) -> tuple[Leg, ...]:
-    """The measurement of every hadronic tau, with the region names of leg_regions."""
+def wjets_process(table: dict, genuine: tuple[str, ...], fakes: tuple[str, ...]) -> ProcessFF:
+    """The W+jets fake factors of an lt leg: from data minus every MC but W and minus the same-sign QCD in the DR, the
+    DR->SR correction from W MC."""
+    every_mc = genuine + fakes
+    qcd = SameSignQCD({"Wjets_sr_like": "Wjets_sr_like_ss", "Wjets_ar_like": "Wjets_ar_like_ss"}, every_mc)
+    dr_sr = DrSr("Wjets_sr_like", "Wjets_ar_like", "Wjets_sr", "Wjets_ar", (), table["dr_sr"], table["dr_sr_non_closures"], target=W_MC)
+    return ProcessFF("Wjets", "data", tuple(p for p in every_mc if p != W_MC), "Wjets_sr_like", "Wjets_ar_like", table["split"], table["fake_factors"],
+                     table["non_closures"], dr_sr, qcd=qcd)
+
+
+def legs(channel: str, embedding: bool, tables: dict | None = None, wjets: bool = False) -> tuple[Leg, ...]:
+    """The measurement of every hadronic tau, with the region names of leg_regions; `tables` of the era (default the
+    2018 ones), with `wjets` the W+jets fake factors in et and mt."""
     genuine = (EMBEDDED,) if embedding else parts("T")
-    fakes = parts("L") + parts("J") + ("W",)
-    tables = TABLES[channel]
+    fakes = parts("L") + parts("J") + (W_MC,)
+    tables = (tables or ff_tables.tables("2018", wjets)[0])[channel]
+    with_w = wjets and channel in LT_CHANNELS
     result = []
     for leg, suffix in zip(TAU_LEGS[channel], ("", "_subleading")):
         qcd_table, ttbar_table = tables[f"QCD{suffix}"], tables[f"ttbar{suffix}"]
@@ -151,8 +185,8 @@ def legs(channel: str, embedding: bool) -> tuple[Leg, ...]:
             scale=scale,
         )
         fractions_table = tables[f"process_fractions{suffix}"]
-        fractions = Fractions(f"process_fractions{suffix}_ar", genuine + fakes, "TTJ", fractions_table["split"], fractions_table["binned"])
-        result.append(Leg(suffix, qcd, ttbar, fractions))
+        fractions = Fractions(f"process_fractions{suffix}_ar", genuine + fakes, "TTJ", fractions_table["split"], fractions_table["binned"], wjets=W_MC if with_w else None)
+        result.append(Leg(suffix, qcd, ttbar, fractions, wjets_process(tables["Wjets"], genuine, fakes) if with_w else None))
     return tuple(result)
 
 
@@ -161,7 +195,7 @@ def channel(name: str, era: str, switches: FakeFactorSwitches, channel_samples: 
     groups = {p.group for p in table}
     regions = {}
     for leg, suffix in zip(TAU_LEGS[name], ("", "_subleading")):
-        regions.update(leg_regions(name, era, leg, suffix, switches.tt_fraction_region))
+        regions.update(leg_regions(name, era, leg, suffix, switches.tt_fraction_region, switches.wjets))
     return Channel(
         name=name,
         samples=tuple(s for s in channel_samples if s.group in groups),
@@ -173,18 +207,31 @@ def channel(name: str, era: str, switches: FakeFactorSwitches, channel_samples: 
     )
 
 
+def placeholder_note(era: str, placeholders: list[str], channels: list[str]) -> str | None:
+    """Why the edges of the run's channels are not yet the era's own (FakeFactorMeasurement.placeholder_edges)."""
+    missing = [name for name in placeholders if name.split(" ", 1)[0] in channels]
+    if not missing:
+        return None
+    return f"{len(missing)} quantities have no edges of {ff_tables.TABLE_ERA[era]} in ff_tables.PER_ERA_EDGES, e.g. {', '.join(missing[:3])}"
+
+
 def build(config: RunConfig) -> Analysis:
-    era = check_era(config.era)
+    era = check_measurement_era(config.era)
     switches = parse(FakeFactorSwitches, config.switches)
     if not config.channels or set(config.channels) - set(TAU_CHANNELS):
         raise AnalysisError(f"the fake-factor measurement supports the channels {', '.join(TAU_CHANNELS)}")
     switches.check_embedding(config.channels)
-    measurement = FakeFactorMeasurement({name: legs(name, switches.embedded(name)) for name in config.channels})
+    tables, placeholders = ff_tables.tables(era, switches.wjets)
+    measurement = FakeFactorMeasurement(
+        {name: legs(name, switches.embedded(name), tables, switches.wjets) for name in config.channels},
+        name=FF_VARIANTS[tuple(switches.ff_processes)],
+        placeholder_edges=placeholder_note(era, placeholders, config.channels),
+    )
     by_channel = samples(sample_database(config), switches.sample_lists, config.channels, era)
     return Analysis(
         name=f"hh_bbtautau_{era}_v15_fake_factors",
         era=era,
-        lumi_pb=LUMI_PB[era],
+        lumi_pb=lumi_pb(era),
         signal=None,
         channels={name: channel(name, era, switches, by_channel[name], measurement) for name in config.channels},
         measurement=measurement,

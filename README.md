@@ -190,7 +190,9 @@ nuisances they share are named so. Spec: `docs/v7_spec.md` of the workspace, sec
   `CMS_prefiring` from the nominal-tree columns `L1PreFiringWeight_Up/Dn`, written as lnN (the varied over the
   nominal yield per bin and process, `Analysis.lnn_variations`). The b-tag weight variations follow the [T, M]
   scheme: `CMS_btag_fixedWP_{bc,light}_correlated` and `..._uncorrelated_<era>` (columns
-  `btag_weight_upart_{up,down}_{bc,light}_{correlated,uncorrelated}`). `DY_NJETS_BTAG` exists for 2018 only.
+  `btag_weight_upart_{up,down}_{bc,light}_{correlated,uncorrelated}`). `DY_NJETS_BTAG` is per era and 2016 half
+  (E19, spec 6.10); it has 2018 only until the v7 dilepton runs give the others: `scripts/derive_dy_correction.py -c
+  <dilepton run> -s era=<era> --ttbar-scale em` (`dy_correction.py`) prints the entry of the era.
 - **Samples**: SingleElectron data (2016, 2017) go to et and ee; the powheg `GluGluToHHTo2B2T_kl-1p00` is the signal,
   the other κλ points have no process, node_SM is the auxiliary process `HH2B2Tau_nodeSM` (the cross-check) or, in a
   list without powheg (the 2018 productions up to v6), the signal; `ZHToTauTau`, `W±HToTauTau` are the process
@@ -208,9 +210,45 @@ nuisances they share are named so. Spec: `docs/v7_spec.md` of the workspace, sec
   `jetFakesNorm_<channel>_<year>`; `CMS_htt_emb_ttbar_<era>`; HH theory per E26 (`QCDscale_HH` +7.25/−21.12 %,
   `PDF_alphas_HH` 2.47 %). The families of CROWN shifts (TES, JES, JER, MET, recoil, the MC vsJet/VSe/VSmu components,
   the shared EMB/MC parts of TES and the tt trigger) come with the shift production; `correlations.py` names them.
+- **Fake factors** (spec 6.8, E18; `ff_measurement.py`, `ff_tables.py`): two payload variants, switch
+  `ff_processes`: `[QCD, ttbar]` (output `fake_factors/<era>/`, as v6) and `[QCD, Wjets, ttbar]` (`fake_factors_w/<era>/`).
+  The W+jets fake factors (et, mt) are measured from data in the DR mt_1 > 70, no b tag, >= 2 jets, isolated lepton,
+  opposite sign, minus every other MC and minus QCD from the same-sign version of each region; the non-closures in the
+  DR; the DR->SR correction (from no to >= 1 b tag and from high to low mT) from W MC in mt_1 of the baseline;
+  fractions QCD, W+jets and ttbar. The tau analysis with `ff_processes: [QCD, Wjets, ttbar]` declares the W+jets keys
+  of the friend (`FF_SHIFTS_W`) in et and mt. 2016 is one measurement of both halves (`era: "2016"`, the lists of both
+  halves; every sample reads the n-tuples of its half and is normalised to its luminosity, `Sample.lumi_scale`), one
+  payload `…/2016/`; a run per half with the same tables is the cross-check. Tables per era: the 2018 tables with the
+  equipopulated bin counts of `PER_ERA_OVERRIDES` (2018 counts times the luminosity ratio) and the edges of
+  `PER_ERA_EDGES`, entered from the JSON line of `measure --suggest-binning` of the era; until an era (and the W+jets
+  tables in every era) has its edges, `measure` refuses and only `--suggest-binning` runs.
+- **Tau-leg trigger efficiency** (E33; `tau_trigger_measurement.py`, core `shapesmith.measurements.tau_trigger`):
+  ε_data of the tau leg of the tt trigger for the tt embedding, μτh tag and probe on the tau-ID production P1, per era,
+  isolation class (`wp_class`: `Medium`, `VVVLoose_not_Medium`), decay mode (0, 1, 10, 11, all; `dm1011` merges 10 and
+  11) and pT bin ([40, 45, 50, 60, 80, 120, ∞), or `TRIGGER_PT_EDGES` from `--suggest-binning`): pass/fail m_vis fit
+  with the efficiency as POI (1D profile scan), counting cross-check (mT < 30, 40 < m_vis < 90), ε_MC and ε_EMB^mon.
+  The pass definition follows the tt paths leg by leg with the monitoring columns `trg_mon_*_2`, `trgobj_pt_2`,
+  `trgobj_l1pt_2` of CROWN C13/12.4. The embedded taus carry the energy scale of the era's tau-ID/ES payload
+  (`emb_es_payload`, its ±1σ a shape nuisance). Variants (`variant`: `signal_mc`, `tag_pt`, `mt30`, `monitor`) are
+  merged as uncertainties; `--merge` writes `ditau_trigger_DeepTau2018v2p5_embedding<era>UL.json.gz` (`tau_trigger`,
+  the KIT/POG schema, flow clamp):
+
+  ```bash
+  for cls in Medium VVVLoose_not_Medium; do for variant in nominal signal_mc tag_pt mt30 monitor; do   # no monitor in 2018
+    shapesmith measure -c <run YAML> -s era=2017 -s switches.wp_class=$cls -s switches.variant=$variant; done; done
+  shapesmith measure -c <run YAML> -s era=2017 --merge
+  ```
+- **Tau-ID/ES** (spec 5.4, U11): best value and 1σ interval of each POI from its profile, rescans on a widened range,
+  the singles fit as a cross-check (`report.md` flags deviations > 20 % of the width), postfit at the profile minima;
+  `shapesmith measure --refit` repeats the fits from the stored `synced/` shapes; the payload's pT-binned ES changes
+  linearly across 36-42 GeV (no gap in the corrected pT at 40 GeV).
+- **Combination** (spec 6.9): `shapesmith combine -c <run of each era> ... -o <dir> [--background-only]` combines the
+  cards of a final state of every era with `combineCards.py` and runs the limits or the background-only fit;
+  `nuisances.md` flags nuisances that end in another era's token.
 - **Tests**: `tests/test_run2.py` builds every Analysis in every era on per-era lists (`tests/run2.py`: the 2018
   fixture lists renamed per era plus powheg and VH → ττ), and checks every column against the v7 CROWN contract per
-  era (`tests/helpers.py`: `branches(channel, era)`).
+  era (`tests/helpers.py`: `branches(channel, era)`); `tests/test_ff_variants.py`, `tests/test_tau_trigger_measurement.py`
+  and `tests/test_dy_correction.py` the fake-factor variants and eras, the trigger measurement and the DY table.
 
 ## Embedding and fake factors
 
@@ -276,8 +314,9 @@ taus anti-isolated, `application` those of each leg in its application region (t
 isolated), where ttbar is 3-6 times more frequent (v6).
 
 The regions are built in `ff_measurement.py` from the analysis selection (`cuts.py`); every difference to jvoss's
-configuration is listed in its docstring. The binning, fits and bandwidths are `ff_tables.py`, generated once by
-`scripts/make_ff_tables.py` from TauFakeFactors' resolved configuration (do not edit by hand). `scripts/ff_parity.py`
+configuration is listed in its docstring. The binning, fits and bandwidths are `ff_tables.py`: the 2018 tables generated once by
+`scripts/make_ff_tables.py` from TauFakeFactors' resolved configuration (do not edit them by hand), below its marker line
+the hand-written W+jets tables and the per-era tables (v7, see Run 2), which the script keeps. `scripts/ff_parity.py`
 is the algorithm parity with TauFakeFactors: it runs the measurement on jvoss's preselection files with his regions
 and weights and compares every payload value, edge and fitted curve with his payload and his pickled fits, and
 `--suggest-binning` with his `adjust_binning.py`. One explained difference is by decision (U13): the SystMCShiftDown
@@ -317,8 +356,8 @@ must follow its keys.
   wheels) are VariationSums of the finer CROWN shifts; the jet energy scale is the regrouped set (no HEM since v7);
   `CMS_prefiring` from the CROWN shift `CMS_ecal_prefiring_<year>`; the names carry `Run<era>`. Produced shifts without a
   shape in MorphingTauID2017 (vsEle SF, electron -> tau ES, JER, electron ES as `CMS_scale_e`/`CMS_res_e`) are filled
-  under their own name and ignored by the datacards. `CMS_htt_ttbarShape` is with (Up, the nominal) against without
-  (Down) the top-pT weight (K9). The vsJet SF families `CMS_eff_t_dm*` equal the nominal, as in the predecessor.
+  under their own name and ignored by the datacards. `CMS_htt_ttbarShape` is the difference with (the nominal)
+  against without the top-pT weight (K9): Down without it, Up the mirror 2 w - 1 around the nominal. The vsJet SF families `CMS_eff_t_dm*` equal the nominal, as in the predecessor.
 - **CMSSW**: MorphingTauID2017 exists only with jvoss's local changes plus the regrouped JES declaration, versioned in
   `patches/`; it needs an own area built with the patch (see `patches/README.md`).
 
@@ -338,7 +377,9 @@ must follow its keys.
 | b-tag weight variations, embedding and fake-factor shifts, lnN table | `systematics.py` |
 | colours, labels, axis titles of all six channels | `style.py` |
 | tau analysis assembly (with the control channel em), estimators, ML export | `analysis.py` |
-| fake-factor measurement: regions, processes, legs; its tables | `ff_measurement.py`, `ff_tables.py` |
+| fake-factor measurement: regions, processes, legs (QCD, W+jets, ttbar); its tables per era | `ff_measurement.py`, `ff_tables.py` |
+| tau-leg trigger efficiency for the tt embedding: selection, pass definition, bins, ES, variants | `tau_trigger_measurement.py` |
+| the DY table of an era from its dilepton run | `dy_correction.py`, `scripts/derive_dy_correction.py` |
 | dilepton channels and analysis assembly; the em control channel of the tau analysis | `dilepton.py` |
 | tau-ID/ES measurement: selection, processes, ES grid, assembly; its m_vis bins; its MC shape uncertainties | `tau_id_measurement.py`, `tau_id_binning.py`, `tau_id_systematics.py` |
 

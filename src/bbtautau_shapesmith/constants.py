@@ -6,6 +6,9 @@ ERAS = ("2016preVFP", "2016postVFP", "2017", "2018")
 # 2018 with the new normtag; Run 2 = 137.96 fb-1, labelled 138 fb-1
 LUMI_PB = {"2016preVFP": 19520.0, "2016postVFP": 16810.0, "2017": 42070.0, "2018": 59560.0}
 YEAR = {"2016preVFP": "2016", "2016postVFP": "2016", "2017": "2017", "2018": "2018"}  # the calendar year of an era
+# eras measured together (v7 spec E18, 6.8): one fake-factor measurement and payload of 2016 on both halves, every
+# sample normalised to the luminosity of its own half
+COMBINED_ERAS = {"2016": ("2016preVFP", "2016postVFP")}
 TAU_CHANNELS = ("et", "mt", "tt")
 LT_CHANNELS = ("et", "mt")  # tau channels with a light lepton on leg 1
 TAU_LEGS = {"et": (2,), "mt": (2,), "tt": (1, 2)}  # the hadronic tau legs
@@ -22,10 +25,11 @@ BTAG_BINS = {"btag0": "n_bjets == 0", "btag1": "n_bjets == 1", "btag2": "n_bjets
 # jet multiplicity bins of the dilepton diagnostic regions (switch diagnostics), each with 0 and >= 1 b tags
 NJETS_BINS = {"nj2": "n_jets == 2", "nj3": "n_jets == 3", "nj4p": "n_jets >= 4"}
 
-# DY correction (switch dy_correction: njets_btag) per era: DY data/MC in the mm and ee Z window, rows n_bjets 0, 1,
-# >= 2 (measured with 2), columns n_jets <= 2, 3, >= 4 (the tau selections have >= 2 jets), the other MC subtracted with
-# ttbar times the em data/MC of the same b-tag region. Derived with scripts/derive_dy_correction.py --ttbar-scale em.
-# 2018: sm2018_binned_v6 (ttbar scale 0.843, 0.885, 0.980); the other eras follow from their dilepton runs (spec 6.10).
+# DY correction (switch dy_correction: njets_btag) per era and 2016 half (E19, spec 6.10): DY data/MC in the mm and ee Z
+# window, rows n_bjets 0, 1, >= 2 (measured with 2), columns n_jets <= 2, 3, >= 4 (the tau selections have >= 2 jets),
+# the other MC subtracted with ttbar times the em data/MC of the same b-tag region. Derived per era with
+# scripts/derive_dy_correction.py --ttbar-scale em (dy_correction.py), which prints the entry of the era.
+# 2018: sm2018_binned_v6 (ttbar scale 0.843, 0.885, 0.980); the other eras follow from their v7 dilepton runs.
 DY_NJETS_BTAG = {"2018": {0: (0.868, 1.009, 1.291), 1: (1.090, 1.298, 1.752), 2: (0.958, 1.167, 1.674)}}
 
 # event selections and weights of the POG cross-check (v7 spec 6.2, 6.4)
@@ -58,6 +62,13 @@ FF_SHIFTS_LT = (
     "ttbarStatShift", "ttbarSystBandAsym", "ttbarSystMCShift",
     "ttbar_non_closure_CorrStatShift", "ttbar_non_closure_CorrSystBandAsym", "ttbar_non_closure_CorrSystMCShift",
 )
+# the W+jets keys of a payload with W+jets fake factors (switch ff_processes, et and mt; v7 spec 6.8, C15)
+FF_SHIFTS_W = (
+    "WjetsStatShift", "WjetsSystBandAsym", "WjetsSystMCShift",
+    "Wjets_DR_SR_CorrStatShift", "Wjets_DR_SR_CorrSystBandAsym", "Wjets_DR_SR_CorrSystMCShift",
+    "Wjets_non_closure_CorrStatShift", "Wjets_non_closure_CorrSystBandAsym", "Wjets_non_closure_CorrSystMCShift",
+    "process_fractionsfrac_Wjets",
+)
 FF_SHIFTS_TT = FF_SHIFTS_LT + (
     "QCD_subleadingStatShift", "QCD_subleadingSystBandAsym", "QCD_subleadingSystMCShift",
     "QCD_subleading_DR_SR_CorrStatShift", "QCD_subleading_DR_SR_CorrSystBandAsym", "QCD_subleading_DR_SR_CorrSystMCShift",
@@ -82,3 +93,29 @@ def check_era(era: str) -> str:
     if era not in ERAS:
         raise AnalysisError(f"unknown era {era!r}; the analysis supports {', '.join(ERAS)}")
     return era
+
+
+def check_measurement_era(era: str) -> str:
+    """The era of a measurement that can span several eras: one of ERAS or of COMBINED_ERAS."""
+    if era not in ERAS and era not in COMBINED_ERAS:
+        combined = ", ".join(f"{name} ({' + '.join(members)})" for name, members in COMBINED_ERAS.items())
+        raise AnalysisError(f"unknown era {era!r}; the measurement supports {', '.join(ERAS)} and {combined}")
+    return era
+
+
+def member_eras(era: str) -> tuple[str, ...]:
+    """The eras an era consists of: itself, or the members of a combined era."""
+    return COMBINED_ERAS.get(era, (era,))
+
+
+def lumi_pb(era: str) -> float:
+    """The luminosity of an era or of a combined era (the sum of its members)."""
+    return sum(LUMI_PB[member] for member in member_eras(era))
+
+
+def year(era: str) -> str:
+    """The calendar year of an era or of a combined era (one year)."""
+    years = {YEAR[member] for member in member_eras(era)}
+    if len(years) != 1:
+        raise AnalysisError(f"era {era} spans the years {sorted(years)}")
+    return years.pop()

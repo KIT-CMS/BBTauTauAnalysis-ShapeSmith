@@ -9,6 +9,10 @@ A borrowed sample (v7 spec 3.3, 6.3) is the line `<source era>/<nick>` of an inv
 source era, it is normalised with the luminosity of the run. Only the borrowings of BORROWED are accepted: VH -> tautau
 has no UL16 (postVFP) NanoAODv15 sample, so the 2016postVFP run takes the 2016preVFP ones; the datacards give the
 process an extra lnN (systematics.BORROWED_LNN).
+
+A run of a combined era (constants.COMBINED_ERAS, the 2016 fake-factor measurement, E18) takes the samples of every
+member era: each sample reads the n-tuples of its database era and is normalised to its luminosity
+(Sample.lumi_scale = its era's share of the combined luminosity). It borrows nothing.
 """
 from __future__ import annotations
 
@@ -21,7 +25,7 @@ from shapesmith.config import RunConfig
 from shapesmith.model import AnalysisError, Sample
 from shapesmith.samples import normalisation, read_sample_list
 
-from bbtautau_shapesmith.constants import ERAS
+from bbtautau_shapesmith.constants import COMBINED_ERAS, ERAS, LUMI_PB, lumi_pb, member_eras
 from bbtautau_shapesmith.processes import NODE_SM, SIGNAL, VH_TAUTAU
 
 INVENTORY_DIR = Path(__file__).resolve().parents[2] / "inventory"
@@ -130,7 +134,12 @@ def inventory_nicks(sample_list: str) -> tuple[str, ...]:
 
 
 def _era_problems(nick: str, group: str, source: str | None, database_era: str | None, era: str) -> list[str]:
-    """A nick must be a sample of the run's era, a borrowed one a sample of its source era that BORROWED allows."""
+    """A nick must be a sample of the run's era (of a member era in a combined era), a borrowed one a sample of its
+    source era that BORROWED allows."""
+    if era in COMBINED_ERAS:
+        if source is not None:
+            return [f"{source}/{nick}: a run of the combined era {era} borrows nothing"]
+        return [] if database_era in member_eras(era) else [f"{nick}: a {database_era} sample in a {era} ({' + '.join(member_eras(era))}) run"]
     if source is None:
         return [] if database_era in (None, era) else [f"{nick}: a {database_era} sample in a {era} run"]
     if source not in ERAS or BORROWED.get(era, {}).get(group) != source:
@@ -163,7 +172,10 @@ def samples(database: Path, sample_lists: list[str], channels: list[str], era: s
         group, routed = route(nick)
         row = values[nick]
         problems += _era_problems(nick, group, source, row.get("era"), era)
-        sample = Sample(nick, group, row["kind"], float(row["xsec"]), int(row["nevents"]), float(row["generator_weight"]), cut=cut_of(nick, nicks), era=source)
+        own_era, lumi_scale = source, 1.0
+        if era in COMBINED_ERAS and row.get("era") in member_eras(era):
+            own_era, lumi_scale = row["era"], (LUMI_PB[row["era"]] / lumi_pb(era) if row["kind"] == "mc" else 1.0)
+        sample = Sample(nick, group, row["kind"], float(row["xsec"]), int(row["nevents"]), float(row["generator_weight"]), cut=cut_of(nick, nicks), era=own_era, lumi_scale=lumi_scale)
         logger.debug(f"{nick}: group {group}, {row['kind']}, channels {', '.join(routed) if routed else 'all'}, xsec {sample.xsec:g} pb, {sample.nevents} events, generator weight {sample.generator_weight:g}")
         if sample.cut is not None:
             logger.info(f"{nick}: skim-time cut {sample.cut}")
