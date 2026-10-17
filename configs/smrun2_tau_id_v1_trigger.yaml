@@ -15,10 +15,13 @@
 #   emb_es_payload:    the tau-ID/ES payload of the era (smrun2_tau_id_v1_id_es.yaml --merge; the build refuses a missing
 #                      file, -s switches.emb_es_payload=null measures without the energy scale of the embedded taus)
 #   reference_payload: the TAU POG payload of the era, its eff_data and eff_mc drawn in the plots
+#   kit_reference_payload: the KIT embedding file of the era (CROWN data/embedding, DeepTau2017v2p1), its eff_data and
+#                      eff_emb drawn in the plots (12.5)
+# --merge refuses to write the payload unless both classes have a nominal measurement (CROWN books both).
 analysis: bbtautau_shapesmith.tau_trigger_measurement:build
 era: "2018"
 channels: [mt]
-switches: {sample_lists: ["sm_{era}_tau_id_measurement"], wp_class: Medium, variant: nominal, emb_es_payload: "/ceph/sdaigler/shapesmith/smrun2_tau_id_v1/output/tau_id_es/{era}/DeepTau2018v2p5_id_es_embedding{era}UL.json.gz", reference_payload: "/cvmfs/cms-griddata.cern.ch/cat/metadata/TAU/Run2-{era}-UL-NanoAODv15/2025-11-27/tau.json.gz"}
+switches: {sample_lists: ["sm_{era}_tau_id_measurement"], wp_class: Medium, variant: nominal, emb_es_payload: "/ceph/sdaigler/shapesmith/smrun2_tau_id_v1/output/tau_id_es/{era}/DeepTau2018v2p5_id_es_embedding{era}UL.json.gz", reference_payload: "/cvmfs/cms-griddata.cern.ch/cat/metadata/TAU/Run2-{era}-UL-NanoAODv15/2025-11-27/tau.json.gz", kit_reference_payload: "/work/sdaigler/bbtautau/KingMaker/CROWN/data/embedding/tau_trigger{era}_UL.json.gz"}
 sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
 ntuples:
   server: root://cmsdcache-kit-disk.gridka.de

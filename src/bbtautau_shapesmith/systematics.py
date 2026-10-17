@@ -132,8 +132,9 @@ def lnn(processes: tuple[Process, ...], jet_fakes_output: str, era: str, borrowe
         LnN(trigger("CMS_eff_m_trigger_emb"), emb, TRIGGER_LNN, channels=("mt",)),
         LnN(trigger("CMS_eff_e_trigger"), mc, TRIGGER_LNN, channels=("et",)),
         LnN(trigger("CMS_eff_e_trigger_emb"), emb, TRIGGER_LNN, channels=("et",)),
-        LnN(tau("eff_t_vsLep_$CHANNEL"), mc, 1.01, channels=LT_CHANNELS),
-        LnN(tau("eff_t_vsLep_$CHANNEL"), mc, 1.0201, channels=("tt",)),
+        # VSe and VSmu together (K6: the 2016 eras, whose VSe and VSmu payloads are 2018 copies, share the 2018 nuisance)
+        LnN(nuisance("eff_t_vsLep_$CHANNEL", "tau_vslep", era), mc, 1.01, channels=LT_CHANNELS),
+        LnN(nuisance("eff_t_vsLep_$CHANNEL", "tau_vslep", era), mc, 1.0201, channels=("tt",)),
         LnN(tau("eff_t_vsJet_$CHANNEL"), mc, 1.02, channels=LT_CHANNELS),
         LnN(tau("eff_t_vsJet_$CHANNEL"), mc, 1.0404, channels=("tt",)),
         LnN("htt_zjXsec", group("DY"), 1.02),

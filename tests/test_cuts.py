@@ -50,12 +50,25 @@ def test_embedding_weights_follow_the_part_a_contract(channel):
 
 
 @pytest.mark.parametrize("channel", TAU_CHANNELS)
-def test_tau_eta_in_et_and_mt(channel):
-    expected = "(abs(eta_2) < 2.3)" if channel in LT_CHANNELS else None
+def test_tau_eta_per_channel(channel):
+    expected = "(abs(eta_2) < 2.3)" if channel in LT_CHANNELS else "(abs(eta_1) < 2.1) & (abs(eta_2) < 2.1)"
     for selection in (cuts.baseline_cuts(channel, "2018"), cuts.skim_cuts(channel, "2018"), cuts.skim_cuts(channel, "2018", control_regions=True)):
         assert selection.get("tau_eta") == expected
     frame = pd.DataFrame({"eta_2": [-2.31, -2.29, 2.29, 2.3]})
     assert mask(frame, [cuts.baseline_cuts("mt", "2018")["tau_eta"]]).tolist() == [False, True, True, False]
+
+
+@pytest.mark.parametrize("era", ("2016preVFP", "2016postVFP", "2017", "2018"))
+def test_tt_keeps_the_trigger_acceptance_for_the_untriggered_embedding(era):
+    """E7, E33: the tt embedding has no trigger requirement, so the baseline cuts both taus to |eta| < 2.1, the
+    acceptance of the di-tau trigger matching of data and MC and the range of the measured eps_data."""
+    selection = cuts.baseline_cuts("tt", era)
+    passing = {name: 1.0 for name in columns_of(selection.values())}
+    passing |= {"q_1": 1.0, "q_2": -1.0, "extraelec_veto": 0.0, "extramuon_veto": 0.0, "hem_veto": 0.0, "is_data": 0.0, "is_mc": 0.0,
+                "pt_1": 50.0, "pt_2": 45.0, "eta_1": 0.3, "eta_2": -1.0, "n_bjets": 1.0, "bpair_pt_2": 30.0}
+    passing |= {name: 0.0 for name in passing if name.startswith("trg_")}  # no trigger flag fired
+    events = pd.DataFrame([passing, passing | {"eta_1": 2.3}, passing | {"eta_2": -2.15}, passing | {"is_embedding": 0.0}])
+    assert mask(events, list(selection.values())).tolist() == [True, False, False, False]  # the last: no flag, no embedding
 
 
 def test_dy_correction_weight_takes_the_table_value_of_each_cell():

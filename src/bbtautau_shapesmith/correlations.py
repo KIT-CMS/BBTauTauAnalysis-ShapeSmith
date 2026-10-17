@@ -9,7 +9,9 @@ Every nuisance name is built as nuisance(name, family, era): the family's scheme
 - J: per year, the 2016 halves shared (one 2016 measurement or file).
 The lumi uncertainty has its own scheme (systematics.LUMI, spec 6.6). In v7 (nominal only, E34) the datacards carry
 the lnN and the weight variations of the nominal tree; the families of CROWN shifts (TES, JES, JER, MET, recoil, the
-tau vsJet/VSe/VSmu components) follow with the shift production, with the names this module gives them.
+tau vsJet/VSe/VSmu components) follow with the shift production, with the names this module gives them. Until then the
+flat lnN eff_t_vsLep stands for VSe and VSmu together: the 2016 eras, where both are 2018 copies, take the 2018 token;
+2017 keeps its own, since its VSe payload is its own (a flat lnN cannot share only its VSmu part).
 """
 from __future__ import annotations
 
@@ -21,6 +23,7 @@ FAMILIES = {
     "tau_mc": E,  # MC tau ID (stat, syst_<era>, syst_TES_<era>_dm<DM>), TES and mu->tau ES per DM, the flat MC tau-ID lnN
     "tau_vse": E,  # VSe SF of e->tau fakes (POG)
     "tau_vsmu": E,  # VSmu SF of mu->tau fakes (POG)
+    "tau_vslep": E,  # the flat VSe + VSmu lnN of the nominal v7 cards (eff_t_vsLep), the stand-in for both components
     "tau_e_es": E,  # e->tau energy scale (POG)
     "embedding": E,  # embedding tau ID/ES, embedding normalisation, ttbar contamination of the embedded sample
     "trigger": E,  # e, mu and di-tau triggers, MC and embedding
@@ -48,6 +51,8 @@ PLACEHOLDER_ERAS = {
     "tau_vsmu": ("2016preVFP", "2016postVFP", "2017"),
     "tau_e_es": ("2016preVFP", "2016postVFP"),
 }
+# the flat VSe + VSmu lnN is a copy where both components are: 2016; in 2017 only VSmu is, so it keeps the 2017 token
+PLACEHOLDER_ERAS["tau_vslep"] = tuple(era for era in PLACEHOLDER_ERAS["tau_vse"] if era in PLACEHOLDER_ERAS["tau_vsmu"])
 JES_YEAR_TOKEN = {"2016preVFP": "2016APV", "2016postVFP": "2016", "2017": "2017", "2018": "2018"}  # JME payload names
 
 

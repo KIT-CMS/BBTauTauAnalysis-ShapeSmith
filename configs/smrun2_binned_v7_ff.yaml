@@ -10,6 +10,9 @@
 #   jet_fakes:         ff (jetFakes from the FF friend ff_v7: data minus genuine and lepton fakes in anti_iso)
 #   embedding:         [et, mt, tt], as the FF measurement of the payload (E33; [et, mt] if tt keeps MC)
 #   crown_shifts:      false (nominal only, E34); the FF friend shifts and the b-tag and prefiring weight variations stay
+# P5: the friend ff_v7 must carry its FF shift keys (CROWN shifts of the friend, friend_common.py), so produce it
+#   with --shifts all as ff_v2 in v6, not with the --shifts None of spec E34 (P2-P5): the skim refuses a declared FF
+#   shift without its shifted branch. Without them: -s switches.shape_systematics=false (no FF shapes in the cards).
 #   fit_categories:    control (one category 'nominal' per tau channel and em_tt in em, without NN friends)
 #   dy_correction:     njets_btag (needs the DY table of the era)
 #   ff_processes:      [QCD, ttbar], the payload of ff_v7 (smrun2_binned_v7_ff_w.yaml: QCD, W+jets, ttbar)

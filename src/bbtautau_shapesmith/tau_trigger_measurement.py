@@ -11,7 +11,11 @@ sign), mT < 65 GeV, the lepton vetoes, the 2018 HEM veto (E29).
 Pass: the monitoring mu tau path of the era fired with the probe matched to its tau-leg filters (the CROWN columns
 trg_mon_*_2 of C13/12.4), mirroring the tt OR leg by leg (12.2): 2016 MediumIso (data also MediumCombinedIso) with the
 matched object above 35 GeV; 2017 Tight35_TightID or (Medium35_TightID or Tight35) above 40 GeV, L1 >= 32 GeV; 2018
-the 2017 paths (data before run 317509, without the L1 cut) or the HPS path.
+data before run 317509 (HPS_FIRST_RUN) the 2017 paths without the L1 cut, the data from run 317509 on, MC and embedding
+the HPS path. The split follows the di-tau trigger of the data, which is HPS only from run 317509, not the monitoring
+path: the HPS mu tau monitoring path fires from the first 2018 run (315357), and legs or HPS raised the pass fraction of
+2018A data from 0.555 to 0.581 (smrun2_test_tm_v7a). MC and embedding have the HPS path only; the embedding keeps the
+run number of its data event, so the split asks for is_data.
 Bins: per decay mode (0, 1, 10, 11 and all, dm -1; with dm1011 10 and 11 together) and pT ([40, 45, 50, 60, 80, 120,
 inf) or the edges of TRIGGER_PT_EDGES for the era and class, from `measure --suggest-binning`), each a pass and a fail
 category in m_vis with ten equal-data bins in 30-160 GeV from the data of the bin (pass + fail), so that the embedded
@@ -27,6 +31,13 @@ Variants (switch variant; merged as uncertainties, 12.2): signal_mc (the MC genu
 pass and fail shapes, the full change), tag_pt (the tag muon 3 GeV harder), mt30 (mT < 30), monitor (2016 without the
 35 GeV object cut, 2017 without the L1 cut; half of each change). closure (12.7.2, not merged): the nominal method on
 MC, the MC genuine taus as the signal and the data replaced by the sum of the processes; the fit must give eps_MC.
+The signal shapes are the ES nuisance (a column variation) and the ttbar contamination (a template shift, an estimator
+output). eps_EMB^mon (the embedded taus counted with the monitoring flags) only in 2016 and 2017
+(EMBEDDING_MONITOR_YEARS): the 2018 mu tau embedding has no monitoring-path decisions (the HPS paths fire in none of
+1.34M events of 2018A, its tau trigger objects carry only the bits 1, 22 and 23), so its pass categories stay empty and
+the measurement has no monitor process there; the fit does not need them (the signal is one template, pass + fail).
+Plots: eps(pT) with the POG v15 eff_data and eff_mc (switch reference_payload) and the KIT embedding file's eff_data
+and eff_emb (kit_reference_payload). --merge needs a nominal measurement of both classes (CROWN books both).
 """
 from __future__ import annotations
 
@@ -34,7 +45,7 @@ import logging
 from pathlib import Path
 
 from shapesmith.config import RunConfig
-from shapesmith.measurements.tau_trigger import Bin, TauTriggerMeasurement
+from shapesmith.measurements.tau_trigger import Bin, Reference, TauTriggerMeasurement
 from shapesmith.model import Analysis, AnalysisError, Category, Channel, ColumnVariation, DataMinus, EqualData, Process, Region, Selection, TemplateShift, Variable
 
 from bbtautau_shapesmith.constants import LUMI_PB, YEAR, check_era
@@ -58,7 +69,29 @@ TAG_PT_VARIATION = 3.0  # GeV, the variant tag_pt
 PROBE = {"tau_pt": "(pt_2 >= 40)", "tau_eta": "(abs(eta_2) < 2.1)"}
 PT_EDGES = (40.0, 45.0, 50.0, 60.0, 80.0, 120.0)  # the last bin open above
 # era -> wp_class -> decay-mode group -> pT edges (the last bin open above), entered from `measure --suggest-binning`
-TRIGGER_PT_EDGES: dict[str, dict[str, dict[str, tuple[float, ...]]]] = {}
+# on smrun2_tau_id_v1 (statistical error of eps_data at most 0.03, counted with mT < 30 GeV and 40 < m_vis < 90 GeV).
+# The anti-isolated class reaches it in no bin, so each of its decay-mode groups is one bin from 40 GeV.
+SINGLE_BIN = {group: (40.0,) for group in ("DMall", "DM0", "DM1", "DM10", "DM11", "DM1011")}
+TRIGGER_PT_EDGES: dict[str, dict[str, dict[str, tuple[float, ...]]]] = {
+    "2016preVFP": {
+        "Medium": {"DMall": PT_EDGES, "DM0": (40.0, 50.0, 80.0), "DM1": (40.0, 45.0, 50.0, 60.0, 80.0), "DM10": (40.0, 45.0, 50.0, 60.0), "DM11": (40.0, 60.0)},
+        "VVVLoose_not_Medium": SINGLE_BIN,
+    },
+    "2016postVFP": {
+        "Medium": {"DMall": PT_EDGES, "DM0": (40.0, 50.0, 80.0), "DM1": (40.0, 45.0, 50.0, 60.0, 80.0), "DM10": (40.0, 45.0, 50.0, 60.0), "DM11": (40.0, 45.0, 80.0)},
+        "VVVLoose_not_Medium": SINGLE_BIN,
+    },
+    "2017": {
+        "Medium": {"DMall": PT_EDGES, "DM0": (40.0, 45.0), "DM1": (40.0, 45.0, 50.0, 60.0, 80.0), "DM10": (40.0, 45.0, 50.0, 80.0), "DM11": (40.0, 50.0)},
+        "VVVLoose_not_Medium": SINGLE_BIN,
+    },
+    "2018": {
+        "Medium": {"DMall": PT_EDGES, "DM0": (40.0, 45.0, 80.0), "DM1": PT_EDGES, "DM10": (40.0, 45.0, 50.0, 80.0, 120.0), "DM11": (40.0, 50.0)},
+        "VVVLoose_not_Medium": SINGLE_BIN,
+    },
+}
+COUNTING_WINDOW = (40.0, 90.0)  # GeV of m_vis, the counting cross-check (with mT < 30 GeV) and --suggest-binning
+MAX_ERROR = 0.03  # the largest statistical error of eps_data per bin (absolute), --suggest-binning
 M_VIS = EqualData(10, 30.0, 160.0)  # as tau_id_binning.M_VIS_BINNING, from the data of the bin (pass + fail)
 EMBEDDED = "EMB"
 GENUINE_MC = "ZTT"  # the MC genuine taus: eps_MC, the signal of the variant signal_mc
@@ -72,6 +105,8 @@ MONITOR_FLAGS = {
 }
 MONITOR_FLAGS["2018"] = {**MONITOR_FLAGS["2017"], "hps": "trg_mon_mu24tau35_mediumiso_hps_2"}
 TRIGGER_OBJECT = {"pt": "trgobj_pt_2", "l1pt": "trgobj_l1pt_2"}
+HPS_FIRST_RUN = 317509  # 2018 data: the di-tau trigger is HPS from this run on, before it the 2017 paths (12.2)
+EMBEDDING_MONITOR_YEARS = ("2016", "2017")  # eps_EMB^mon: the 2018 mu tau embedding has no monitoring-path decisions
 VARIANTS = ("nominal", "signal_mc", "tag_pt", "mt30", "monitor", "closure")
 MC_SIGNAL_VARIANTS = ("signal_mc", "closure")  # the MC genuine taus are the signal
 VARIANT_WEIGHTS = {"signal_mc": 1.0, "tag_pt": 0.5, "mt30": 0.5, "monitor": 0.5}  # the fraction of a variant's change taken as uncertainty
@@ -85,6 +120,16 @@ NORMALISATIONS = {
     "CMS_tauTrg_norm_QCD": (("QCD",), 1.2),
 }
 FAKES = ("ZJ", "TTJ", "STJ", "VVJ", "W", "QCD")
+# the plotted references (12.5): the POG file of the era and the KIT embedding file (DeepTau2017v2p1; its eff_mc is the
+# efficiency of the embedded taus, eff_emb)
+POG_LABELS = {"eff_data": "POG v15 eff_data", "eff_mc": "POG v15 eff_mc"}
+KIT_CORRECTION, KIT_LABELS = "tauTriggerSF", {"eff_data": "KIT eff_data (2017v2p1)", "eff_mc": "KIT eff_emb"}
+
+
+def references(switches: TauTriggerSwitches) -> tuple[Reference, ...]:
+    pog = (Reference(switches.reference_payload, labels=POG_LABELS),) if switches.reference_payload else ()
+    kit = (Reference(switches.kit_reference_payload, KIT_CORRECTION, KIT_LABELS),) if switches.kit_reference_payload else ()
+    return pog + kit
 
 
 def fired(flag: str) -> str:
@@ -93,7 +138,8 @@ def fired(flag: str) -> str:
 
 def pass_cut(year: str, variant: str = "nominal") -> str:
     """The probe passes the monitoring leg (12.2); in 2016 the data take MediumIso or MediumCombinedIso, MC and
-    embedding MediumIso only (E7, D9)."""
+    embedding MediumIso only (E7, D9); in 2018 the data before run HPS_FIRST_RUN the 2017 legs without the L1 cut, the
+    rest (later data, MC, embedding) the HPS path."""
     flags, obj = MONITOR_FLAGS[year], TRIGGER_OBJECT
     if year == "2016":
         data = f"((is_data > 0.5) & ({fired(flags['iso'])} | {fired(flags['combined_iso'])}))"
@@ -103,7 +149,8 @@ def pass_cut(year: str, variant: str = "nominal") -> str:
     legs = f"({fired(flags['tight_tightid'])} | (({fired(flags['medium_tightid'])} | {fired(flags['tight'])}) & ({obj['pt']} > 40)))"
     if year == "2017":
         return legs if variant == "monitor" else f"({legs} & ({obj['l1pt']} >= 32))"
-    return f"({legs} | {fired(flags['hps'])})"
+    before_hps = f"((is_data > 0.5) & (run < {HPS_FIRST_RUN}))"
+    return f"(({before_hps} & {legs}) | (~{before_hps} & {fired(flags['hps'])}))"
 
 
 def decay_mode_groups(dm1011: bool) -> dict[str, tuple[int, ...]]:
@@ -278,10 +325,18 @@ def measurement(era: str, switches: TauTriggerSwitches, bins: tuple[Bin, ...]) -
         normalisations={name: (tuple(p for p in group if p in names), kappa) for name, (group, kappa) in NORMALISATIONS.items()},
         fake_processes=FAKES,
         mc_process=GENUINE_MC,
-        monitor_process=None if signal_mc else EMBEDDED,
+        monitor_process=EMBEDDED if not signal_mc and year in EMBEDDING_MONITOR_YEARS else None,
         counting_regions=("counting", "counting_same_sign"),
+        counting_window=COUNTING_WINDOW,
+        # --suggest-binning (12.2): merge from the top until the statistical error of eps_data is at most 0.03, counted
+        # where the counting cross-check counts (the whole mT < 65 GeV region inflates it by the background subtraction)
+        suggest_regions=("counting", "counting_same_sign"),
+        suggest_window=COUNTING_WINDOW,
+        max_error=MAX_ERROR,
+        relative_max_error=False,
         qcd_subtract=tuple(p.name for p in table if p.role == "background"),
-        reference=switches.reference_payload,
+        references=references(switches),
+        wp_classes=tuple(WP_CLASSES),  # CROWN books both classes (trg_effdata_emb_{Medium,AntiMedium}_<leg>)
         split_signal_shapes=switches.variant == "signal_mc",
         pseudo_data=switches.variant == "closure",
     )
@@ -296,6 +351,8 @@ def build(config: RunConfig) -> Analysis:
         raise AnalysisError("the variant monitor applies to 2016 (object pT > 35 GeV) and 2017 (L1 >= 32 GeV) only")
     if switches.emb_es_payload is not None and not Path(switches.emb_es_payload).exists():
         raise AnalysisError(f"emb_es_payload {switches.emb_es_payload} does not exist")
+    if YEAR[era] not in EMBEDDING_MONITOR_YEARS and switches.variant not in MC_SIGNAL_VARIANTS:
+        logger.info(f"tau_trigger {era}: the mu tau embedding has no monitoring-path decisions, eps_EMB^mon is not measured")
     bins = trigger_bins(era, switches.wp_class, switches.dm1011)
     by_channel = samples(sample_database(config), switches.sample_lists, ["mt"], era)
     return Analysis(

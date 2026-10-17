@@ -13,8 +13,7 @@
 #   crown_shifts:      false (nominal-only production, E34: no embedding tau shifts; b-tag and prefiring weight
 #                      variations and the FF friend shifts stay)
 #   control_regions:   true (wider skim plus the named control regions), diagnostics: true (QCD there, npv_good, rho, ...)
-#   dy_correction:     njets_btag (DY_NJETS_BTAG of the era; 2018 has one, the other eras get theirs from the dilepton
-#                      run, step 6 of spec 10; until then -s switches.dy_correction=none)
+#   dy_correction:     njets_btag (DY_NJETS_BTAG of the era, from its dilepton run smrun2_binned_v7_dilepton.yaml)
 analysis: bbtautau_shapesmith.analysis:build
 era: "2018"
 channels: [et, mt, tt]

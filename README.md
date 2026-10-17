@@ -131,9 +131,14 @@ for C in $N $D $T configs/smrun2_binned_v7_ff.yaml configs/smrun2_binned_v7_ff_w
   shapesmith publish -c $C $S; done
 ```
 
-Until the era has its DY table (`constants.DY_NJETS_BTAG`; 2018 has one), the runs with `dy_correction: njets_btag` need
-`-s switches.dy_correction=none`; the 2016 FF measurement takes the luminosity-weighted mean of the tables of both
-halves. `--workers` stays at most 24 on portal2.
+The FF runs keep the friend shifts as shape variations (`shape_systematics: true`, E34: the FF variations stay in the
+nominal cards). They are CROWN shifts of the friend (`friend_common.py`), so P5 (`ff_v7`, `ff_v7_w`) must be produced
+with `--shifts all` as `ff_v2` in v6, not with the `--shifts None` that spec E34 names for P2-P5: the skim refuses a
+declared FF shift without its shifted branch (`-s switches.shape_systematics=false` runs without them).
+
+Every era and 2016 half has its DY table (`constants.DY_NJETS_BTAG`, from its `smrun2_binned_v7_dilepton.yaml` run);
+the 2016 FF measurement takes the luminosity-weighted mean of the tables of both halves. `--workers` stays at most 24
+on portal2; the dilepton `hist` needs up to ~45 GB per worker for the DY and data samples of 2017 and 2018.
 
 The v5 run YAMLs (`*v5*.yaml`, galleries `sm2018_binned_v5` and `ff_sm2018_binned_v5`, run as above) share one skim
 directory between the tau and the dilepton run. With the v6 code, `hist`, `estimate` and `plot` of tt, em, mm and ee
@@ -264,15 +269,17 @@ nuisances they share are named so. Spec: `docs/v7_spec.md` of the workspace, sec
   (`trg_effdata_emb_{Medium,AntiMedium}_{1,2}`, E33). The tau-ID measurement takes the muon trigger of the era
   (2018: IsoMu24 or IsoMu27 from 25 GeV, as before).
 - **Selections**: |η| < 2.1 of the light lepton in et and mt (`lepton_eta`) and of the muon in the tau-ID measurement
-  (`muon_eta`), every era (E31, the embedding acceptance); in 2018 `hem_veto < 0.5` in every channel of every
+  (`muon_eta`), every era (E31, the embedding acceptance); |η| < 2.1 of both taus in tt (`tau_eta`, the acceptance
+  of the di-tau trigger matching, which the untriggered tt embedding lacks: about 3 % of its events had a tau at
+  2.1 < |η| < 2.5, outside the range of its measured ε_data); in 2018 `hem_veto < 0.5` in every channel of every
   Analysis (E29; the HEM nuisance is gone).
 - **Weights**: `prefiring_wgt` on the MC of every era (E11; 2018 is the muon part), not on data or embedding;
   `CMS_prefiring` from the nominal-tree columns `L1PreFiringWeight_Up/Dn`, written as lnN (the varied over the
   nominal yield per bin and process, `Analysis.lnn_variations`). The b-tag weight variations follow the [T, M]
   scheme: `CMS_btag_fixedWP_{bc,light}_correlated` and `..._uncorrelated_<era>` (columns
   `btag_weight_upart_{up,down}_{bc,light}_{correlated,uncorrelated}`). `DY_NJETS_BTAG` is per era and 2016 half
-  (E19, spec 6.10); it has 2018 only until the v7 dilepton runs give the others: `scripts/derive_dy_correction.py -c
-  <dilepton run> -s era=<era> --ttbar-scale em` (`dy_correction.py`) prints the entry of the era.
+  (E19, spec 6.10), each from the v7 dilepton run of the era: `scripts/derive_dy_correction.py -c <dilepton run>
+  -s era=<era> --ttbar-scale em` (`dy_correction.py`) prints the entry of the era.
 - **Samples**: SingleElectron data (2016, 2017) go to et and ee; the powheg `GluGluToHHTo2B2T_kl-1p00` is the signal,
   the other κλ points have no process, node_SM is the auxiliary process `HH2B2Tau_nodeSM` (the cross-check) or, in a
   list without powheg (the 2018 productions up to v6), the signal; `ZHToTauTau`, `W±HToTauTau` are the process
@@ -286,7 +293,8 @@ nuisances they share are named so. Spec: `docs/v7_spec.md` of the workspace, sec
   shared). lnN: the LUM POG Cholesky set `lumi_13TeV_1516_l` / `_151617_l` / `_15161718_l` of the year (MC only);
   `eff_e`, `eff_m` 2 % on MC and, on the embedded sample, 1 % under the same name plus `eff_e_emb`, `eff_m_emb` 1.7 %
   (E27); the single-lepton triggers `CMS_eff_{m,e}_trigger[_emb]_<era>` 2 % on MC and embedding (the KIT SFs have no
-  variations); `eff_t_vs{Lep,Jet}_<channel>_<era>`; the fake-factor shifts `CMS_ff_<key>_<channel>_<year>` and
+  variations); `eff_t_vsJet_<channel>_<era>` and `eff_t_vsLep_<channel>_<era>` (VSe and VSmu together; 2018 token in
+  both 2016 halves, whose VSe and VSmu payloads are 2018 copies, K6); the fake-factor shifts `CMS_ff_<key>_<channel>_<year>` and
   `jetFakesNorm_<channel>_<year>`; `CMS_htt_emb_ttbar_<era>`; HH theory per E26 (`QCDscale_HH` +7.25/−21.12 %,
   `PDF_alphas_HH` 2.47 %). The families of CROWN shifts (TES, JES, JER, MET, recoil, the MC vsJet/VSe/VSmu components,
   the shared EMB/MC parts of TES and the tt trigger) come with the shift production; `correlations.py` names them.
@@ -306,13 +314,22 @@ nuisances they share are named so. Spec: `docs/v7_spec.md` of the workspace, sec
 - **Tau-leg trigger efficiency** (E33; `tau_trigger_measurement.py`, core `shapesmith.measurements.tau_trigger`):
   ε_data of the tau leg of the tt trigger for the tt embedding, μτh tag and probe on the tau-ID production P1, per era,
   isolation class (`wp_class`: `Medium`, `VVVLoose_not_Medium`), decay mode (0, 1, 10, 11, all; `dm1011` merges 10 and
-  11) and pT bin ([40, 45, 50, 60, 80, 120, ∞), or `TRIGGER_PT_EDGES` from `--suggest-binning`): pass/fail m_vis fit
-  with the efficiency as POI (1D profile scan), counting cross-check (mT < 30, 40 < m_vis < 90), ε_MC and ε_EMB^mon.
+  11) and pT bin (`TRIGGER_PT_EDGES` per era and class from `--suggest-binning` on [40, 45, 50, 60, 80, 120, ∞):
+  merged from the top until the statistical error of ε_data, counted with mT < 30 GeV and 40 < m_vis < 90 GeV, is
+  at most 0.03; the anti-isolated class is one bin per decay mode): pass/fail m_vis fit
+  with the efficiency as POI (1D profile scan), counting cross-check (mT < 30, 40 < m_vis < 90), ε_MC and ε_EMB^mon
+  (2016 and 2017 only: the 2018 μτh embedding has no monitoring-path decisions, so 2018 has no monitor process).
   The pass definition follows the tt paths leg by leg with the monitoring columns `trg_mon_*_2`, `trgobj_pt_2`,
-  `trgobj_l1pt_2` of CROWN C13/12.4. The embedded taus carry the energy scale of the era's tau-ID/ES payload
-  (`emb_es_payload`, its ±1σ a shape nuisance). Variants (`variant`: `signal_mc`, `tag_pt`, `mt30`, `monitor`) are
-  merged as uncertainties; `--merge` writes `ditau_trigger_DeepTau2018v2p5_embedding<era>UL.json.gz` (`tau_trigger`,
-  the KIT/POG schema, flow clamp):
+  `trgobj_l1pt_2` of CROWN C13/12.4; in 2018 the data before run 317509 pass with the non-HPS legs, the later data, MC
+  and embedding with the HPS path (the HPS monitoring path fires in the data from the first 2018 run). The embedded
+  taus carry the energy scale of the era's tau-ID/ES payload (`emb_es_payload`, its ±1σ a shape nuisance). Variants
+  (`variant`: `signal_mc`, `tag_pt`, `mt30`, `monitor`) are merged as uncertainties; `--merge` writes
+  `ditau_trigger_DeepTau2018v2p5_embedding<era>UL.json.gz` (`tau_trigger`, the KIT/POG schema, flow clamp), only
+  with a nominal measurement of both classes, which CROWN books, and after evaluating eff_data of both for every decay
+  mode and syst. The signal shapes are the ES nuisance and the ttbar
+  contamination `CMS_emb_ttbar_contamination_Run<era>` (a template shift, which the core check accepts as an estimator
+  output). The ε(pT) plots draw the POG v15 eff_data and eff_mc (`reference_payload`) and the KIT embedding file's
+  eff_data and eff_emb (`kit_reference_payload`, CROWN `data/embedding/tau_trigger<era>_UL.json.gz`, DeepTau2017v2p1):
 
   ```bash
   for cls in Medium VVVLoose_not_Medium; do for variant in nominal signal_mc tag_pt mt30 monitor; do   # no monitor in 2018
@@ -441,8 +458,10 @@ must follow its keys.
   shape in MorphingTauID2017 (vsEle SF, electron -> tau ES, JER, electron ES as `CMS_scale_e`/`CMS_res_e`) are filled
   under their own name and ignored by the datacards. `CMS_htt_ttbarShape` is the difference with (the nominal)
   against without the top-pT weight (K9): Down without it, Up the mirror 2 w - 1 around the nominal. The vsJet SF families `CMS_eff_t_dm*` equal the nominal, as in the predecessor.
-- **CMSSW**: MorphingTauID2017 exists only with jvoss's local changes plus the regrouped JES declaration, versioned in
-  `patches/`; it needs an own area built with the patch (see `patches/README.md`).
+- **CMSSW**: MorphingTauID2017 exists only with jvoss's local changes plus the regrouped JES declaration and the v7
+  changes (no HEM, `CMS_prefiring` in every era, the Cholesky lumi total), versioned in `patches/`; it needs an own
+  area built with the patch (see `patches/README.md`). `tests/test_tau_id_patch.py` checks per era that every shape the
+  patched file declares is produced.
 
 ## Where things are defined
 

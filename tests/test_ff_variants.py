@@ -6,7 +6,7 @@ from shapesmith.model import AnalysisError
 from shapesmith.skim import needed_columns
 from shapesmith.validate import validate
 
-from bbtautau_shapesmith import cuts, ff_measurement, ff_tables, samples as samples_module
+from bbtautau_shapesmith import cuts, ff_measurement, ff_tables, samples as samples_module, weights
 from bbtautau_shapesmith.analysis import build as build_tau
 from bbtautau_shapesmith.constants import FF_SHIFTS_W, LUMI_PB, TAU_CHANNELS, lumi_pb
 from tests.helpers import branches, config, sample_types
@@ -120,8 +120,10 @@ def test_2016_is_measured_on_both_halves_with_their_luminosity(run2):
     assert {s.group for s in by_era["2016preVFP"] if s.kind == "data"} == {"data"}
     assert "hem_veto" not in mt.cuts and mt.cuts["trg_selection"] == cuts.baseline_cuts("mt", "2016preVFP")["trg_selection"]
     assert analysis.measurement.placeholder_edges.startswith("60 quantities have no edges of 2016")
-    with pytest.raises(AnalysisError, match="no DY table for 2016"):
-        measurement(run2, era="2016", eras=("2016preVFP", "2016postVFP"), dy_correction="njets_btag")
+    # the DY of both halves with the luminosity-weighted mean of their tables (weights.dy_table)
+    corrected = measurement(run2, era="2016", eras=("2016preVFP", "2016postVFP"), dy_correction="njets_btag").channel("mt")
+    dy = [p for p in corrected.processes if p.group == "DY"]
+    assert dy and all(p.selection.weights["dy_correction"] == weights.dy_njets_btag_weight("2016") for p in dy)
 
 
 def test_a_combined_era_takes_only_its_halves_and_borrows_nothing(run2):

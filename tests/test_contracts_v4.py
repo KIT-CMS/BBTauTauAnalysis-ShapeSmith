@@ -18,12 +18,13 @@ TT_TRIGGER = ("((is_embedding > 0.5) | ((trg_double_tau35_mediumiso > 0.5) | (tr
 
 def selection_changes(channel_name: str) -> dict[str, str]:
     """The skim cuts added or changed since v4: the tau eta cut in et and mt (v6, A5); v7: the HEM veto of 2018 (E29),
-    the light-lepton eta in et and mt (E31), the tt trigger cut without requirement for the embedded sample (E33)."""
+    the light-lepton eta in et and mt (E31), the tt trigger cut without requirement for the embedded sample and the
+    tt tau eta of the trigger acceptance (E33, E7)."""
     changes = {"hem_veto": "(hem_veto < 0.5)"}
     if channel_name in ("et", "mt"):
         changes |= {"tau_eta": "(abs(eta_2) < 2.3)", "lepton_eta": "(abs(eta_1) < 2.1)"}
     if channel_name == "tt":
-        changes["trg_selection"] = TT_TRIGGER
+        changes |= {"trg_selection": TT_TRIGGER, "tau_eta": "(abs(eta_1) < 2.1) & (abs(eta_2) < 2.1)"}
     return changes
 
 

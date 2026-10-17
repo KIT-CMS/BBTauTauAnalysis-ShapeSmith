@@ -29,8 +29,15 @@ NJETS_BINS = {"nj2": "n_jets == 2", "nj3": "n_jets == 3", "nj4p": "n_jets >= 4"}
 # window, rows n_bjets 0, 1, >= 2 (measured with 2), columns n_jets <= 2, 3, >= 4 (the tau selections have >= 2 jets),
 # the other MC subtracted with ttbar times the em data/MC of the same b-tag region. Derived per era with
 # scripts/derive_dy_correction.py --ttbar-scale em (dy_correction.py), which prints the entry of the era.
-# 2018: sm2018_binned_v6 (ttbar scale 0.843, 0.885, 0.980); the other eras follow from their v7 dilepton runs.
-DY_NJETS_BTAG = {"2018": {0: (0.868, 1.009, 1.291), 1: (1.090, 1.298, 1.752), 2: (0.958, 1.167, 1.674)}}
+# Every era from its smrun2_binned_v7 dilepton run (configs/smrun2_binned_v7_dilepton.yaml); ttbar scale of em per row:
+# 2016preVFP 0.897, 0.939, 1.001; 2016postVFP 0.939, 0.961, 1.057; 2017 0.904, 0.917, 0.988; 2018 0.863, 0.906, 1.003
+# (v6: 0.843, 0.885, 0.980).
+DY_NJETS_BTAG = {
+    "2016preVFP": {0: (0.899, 1.063, 1.397), 1: (1.078, 1.327, 1.868), 2: (0.978, 1.186, 1.630)},
+    "2016postVFP": {0: (0.934, 1.111, 1.486), 1: (1.115, 1.339, 1.900), 2: (1.012, 1.230, 1.803)},
+    "2017": {0: (0.889, 1.043, 1.349), 1: (1.072, 1.309, 1.731), 2: (0.940, 1.136, 1.626)},
+    "2018": {0: (0.885, 1.033, 1.331), 1: (1.120, 1.338, 1.809), 2: (0.983, 1.201, 1.716)},
+}
 
 # event selections and weights of the POG cross-check (v7 spec 6.2, 6.4)
 HEM_ERAS = ("2018",)  # E29: veto of the events with a jet in the HEM 15/16 region, column hem_veto (CROWN, 2018 only)

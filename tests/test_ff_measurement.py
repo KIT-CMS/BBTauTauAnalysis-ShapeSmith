@@ -73,8 +73,9 @@ def test_the_regions():
     assert "dilepton_veto" not in region_cuts(tt, "ttbar_scale_ar_like")["lepton_vetoes"]
     assert not {"extraelec_veto", "extramuon_veto", "dilepton_veto"} & set(mt.skim)  # stored, not applied
     assert mt.skim["hem_veto"] == mt.cuts["hem_veto"] == "(hem_veto < 0.5)"  # the 2018 HEM veto is no lepton veto
-    # the analysis tau eta cut in the measurement and its skim (et, mt)
-    assert mt.cuts["tau_eta"] == mt.skim["tau_eta"] == et.cuts["tau_eta"] == "(abs(eta_2) < 2.3)" and "tau_eta" not in tt.cuts
+    # the analysis tau eta cut in the measurement and its skim (et, mt; tt the trigger acceptance of both taus)
+    assert mt.cuts["tau_eta"] == mt.skim["tau_eta"] == et.cuts["tau_eta"] == "(abs(eta_2) < 2.3)"
+    assert tt.cuts["tau_eta"] == tt.skim["tau_eta"] == "(abs(eta_1) < 2.1) & (abs(eta_2) < 2.1)"
 
 
 @pytest.mark.parametrize("embedding", [False, True])

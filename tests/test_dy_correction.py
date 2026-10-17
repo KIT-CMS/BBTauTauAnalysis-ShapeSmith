@@ -67,9 +67,14 @@ def test_the_combined_2016_takes_the_luminosity_weighted_mean_of_its_halves(monk
     2016preVFP and 2016postVFP weighted with their luminosity; without both tables it fails."""
     from bbtautau_shapesmith import constants, weights
 
+    others = {era: table for era, table in constants.DY_NJETS_BTAG.items() if not era.startswith("2016")}
+    monkeypatch.setattr(weights, "DY_NJETS_BTAG", others)
     with pytest.raises(AnalysisError, match="no DY table for 2016preVFP, 2016postVFP"):
         weights.dy_table("2016")
-    tables = {**constants.DY_NJETS_BTAG, "2016preVFP": {0: (1.0, 1.0, 1.0), 1: (1.2, 1.2, 1.2), 2: (2.0, 2.0, 2.0)},
+    monkeypatch.setattr(weights, "DY_NJETS_BTAG", {**others, "2016postVFP": constants.DY_NJETS_BTAG["2018"]})
+    with pytest.raises(AnalysisError, match="no DY table for 2016preVFP "):
+        weights.dy_table("2016")
+    tables = {**others, "2016preVFP": {0: (1.0, 1.0, 1.0), 1: (1.2, 1.2, 1.2), 2: (2.0, 2.0, 2.0)},
               "2016postVFP": {0: (2.0, 2.0, 2.0), 1: (1.2, 1.2, 1.2), 2: (1.0, 1.0, 1.0)}}
     monkeypatch.setattr(weights, "DY_NJETS_BTAG", tables)
     share = 19520.0 / 36330.0
@@ -77,3 +82,20 @@ def test_the_combined_2016_takes_the_luminosity_weighted_mean_of_its_halves(monk
     assert table[0] == pytest.approx((share + 2 * (1 - share),) * 3, abs=1e-4) and table[1] == (1.2, 1.2, 1.2)
     assert table[2] == pytest.approx((2 * share + (1 - share),) * 3, abs=1e-4) and weights.dy_table("2016preVFP") is tables["2016preVFP"]
     assert "(n_bjets == 0) & (n_jets <= 2)) * 1.4627" in weights.dy_njets_btag_weight("2016")
+
+
+def test_every_era_and_2016_half_has_its_table():
+    """E19, spec 6.10: one table per era and 2016 half, rows n_bjets 0, 1, >= 2 with the n_jets columns <= 2, 3, >= 4;
+    the 2016 FF measurement weights its halves."""
+    from bbtautau_shapesmith import constants, weights
+
+    assert set(constants.DY_NJETS_BTAG) == set(constants.ERAS)
+    for era, table in constants.DY_NJETS_BTAG.items():
+        assert sorted(table) == [0, 1, 2], era
+        assert all(len(factors) == 3 and all(0.5 < f < 2.5 for f in factors) for factors in table.values()), era
+        assert weights.dy_njets_btag_weight(era).count("*") == 9
+    combined = weights.dy_table("2016")
+    for row, factors in combined.items():
+        for column, factor in enumerate(factors):
+            halves = [constants.DY_NJETS_BTAG[era][row][column] for era in ("2016preVFP", "2016postVFP")]
+            assert min(halves) <= factor <= max(halves)

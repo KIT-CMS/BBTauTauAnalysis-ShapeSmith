@@ -9,6 +9,7 @@ from shapesmith.combination import run_card
 from shapesmith.config import load_analysis, load_config
 from shapesmith.model import AnalysisError
 
+from bbtautau_shapesmith import weights
 from bbtautau_shapesmith.constants import DY_NJETS_BTAG, LUMI_PB
 from bbtautau_shapesmith.samples import inventory_names, inventory_path
 from tests.helpers import DATABASE, ERAS, REPO
@@ -71,6 +72,7 @@ def test_every_run_yaml_serves_every_era(name, era):
     if name == "smrun2_tau_id_v1_trigger":
         assert config.switches["emb_es_payload"] == f"/ceph/sdaigler/shapesmith/{P1}/output/tau_id_es/{era}/DeepTau2018v2p5_id_es_embedding{era}UL.json.gz"
         assert Path(config.switches["reference_payload"]).name == "tau.json.gz" and f"Run2-{era}-UL-NanoAODv15" in config.switches["reference_payload"]
+        assert config.switches["kit_reference_payload"].endswith(f"/CROWN/data/embedding/tau_trigger{era}_UL.json.gz")
         overrides.append("switches.emb_es_payload=null")  # the payload of the tau-ID measurement comes first
     analysis = load_analysis(load(name, era, *overrides))
     assert analysis.era == era and analysis.lumi_pb == LUMI_PB[era]
@@ -85,8 +87,9 @@ def test_the_2016_fake_factors_are_measured_on_both_halves(name):
         list_name(kind, half) for kind in ("binned", "embedding") for half in ("2016preVFP", "2016postVFP")]
     analysis = load_analysis(config)
     assert analysis.era == "2016" and {s.era for s in analysis.channel("mt").samples} == {"2016preVFP", "2016postVFP"}
-    with pytest.raises(AnalysisError, match="no DY table for 2016preVFP, 2016postVFP"):
-        load_analysis(load(name, "2016"))
+    # the DY of both halves carries the luminosity-weighted mean of their tables (weights.dy_table)
+    dy = [p for p in load_analysis(load(name, "2016")).channel("mt").processes if p.group == "DY"]
+    assert dy and all(p.selection.weights["dy_correction"] == weights.dy_njets_btag_weight("2016") for p in dy)
     assert inventory_names("sm_2017_binned", "2016") == ("sm_2017_binned",) and inventory_names("sm_2016_binned", "2017") == ("sm_2016_binned",)
 
 

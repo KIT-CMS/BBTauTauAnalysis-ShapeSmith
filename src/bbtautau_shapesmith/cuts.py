@@ -1,6 +1,7 @@
 """Tau channels: baseline and skim selection per era, gen-match splits, estimation and control regions (v15 branch
 names). The trigger of the era and channel comes from triggers.TRIGGER (v7 spec 6.2); every era cuts the light lepton
-of et and mt to |eta| < 2.1 (E31), 2018 vetoes the HEM 15/16 events (E29)."""
+of et and mt to |eta| < 2.1 (E31) and both taus of tt to |eta| < 2.1 (E7, E33: the embedding has no trigger matching),
+2018 vetoes the HEM 15/16 events (E29)."""
 from __future__ import annotations
 
 from shapesmith.model import Region
@@ -12,6 +13,7 @@ from bbtautau_shapesmith.triggers import TRIGGER
 from bbtautau_shapesmith.weights import fail_tau_weights, fake_factor_weight
 
 SAME_SIGN = "((q_1 * q_2) > 0)"
+TT_TAU_ETA = "(abs(eta_1) < 2.1) & (abs(eta_2) < 2.1)"
 B_TAGGING = "(n_bjets >= 1) & (bpair_pt_2 > 0)"  # a b pair with at least one b tag
 
 
@@ -46,11 +48,14 @@ def baseline_cuts(channel: str, era: str) -> dict[str, str]:
         cuts["dilepton_veto"] = "(dilepton_veto < 0.5)"  # not produced for tt (no light lepton in the final state)
         cuts["lepton_iso"] = "(iso_1 < 0.15)"
         cuts["mt_cut"] = "(mt_1 < 70)"
-        # EMB has hardly any tau_h beyond 2.3, where the Run-2 vsMu SFs end; tt: the trigger matching cuts at 2.1
+        # EMB has hardly any tau_h beyond 2.3, where the Run-2 vsMu SFs end
         cuts["tau_eta"] = "(abs(eta_2) < 2.3)"
         cuts["lepton_eta"] = LEPTON_ETA
     else:
         cuts["pt_selection"] = "(pt_1 > 40) & (pt_2 > 40)"
+        # the acceptance of the di-tau trigger (E7): data and MC have it from the trigger matching, the untriggered
+        # embedding (E33) needs the cut, as its eps_data is measured for |eta| < 2.1
+        cuts["tau_eta"] = TT_TAU_ETA
     cuts["trg_selection"] = TRIGGER[era][channel].cut
     return {**cuts, **era_cuts(era)}
 

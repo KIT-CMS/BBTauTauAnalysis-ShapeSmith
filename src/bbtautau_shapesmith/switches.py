@@ -141,6 +141,7 @@ class TauTriggerSwitches(BaseModel):
     emb_es_payload: str | None = None  # the tau-ID/ES payload of the era (5.4): the energy scale of the embedded taus
     dm1011: bool = False  # decay modes 10 and 11 in one bin (the anti-isolated class, where single fits do not converge)
     reference_payload: str | None = None  # a payload with tau_trigger (the POG tau.json.gz) drawn in the plots
+    kit_reference_payload: str | None = None  # the KIT embedding file (tauTriggerSF: eff_data, eff_emb) drawn in the plots
 
 
 def parse(model: type[BaseModel], switches: dict) -> BaseModel:

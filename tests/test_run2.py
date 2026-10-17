@@ -10,9 +10,9 @@ from shapesmith.model import AnalysisError, ColumnVariation, LnN, TemplateShift,
 from shapesmith.skim import needed_columns
 from shapesmith.validate import validate
 
-from bbtautau_shapesmith import dilepton, ff_measurement, samples as samples_module, tau_id_measurement
+from bbtautau_shapesmith import dilepton, ff_measurement, samples as samples_module, tau_id_measurement, weights as weights_module
 from bbtautau_shapesmith.analysis import build
-from bbtautau_shapesmith.constants import DILEPTON_CHANNELS, FF_COLUMNS, LUMI_PB, NN_COLUMNS, TAU_CHANNELS
+from bbtautau_shapesmith.constants import DILEPTON_CHANNELS, DY_NJETS_BTAG, FF_COLUMNS, LUMI_PB, NN_COLUMNS, TAU_CHANNELS
 from bbtautau_shapesmith.correlations import FAMILIES, era_token, nuisance
 from bbtautau_shapesmith.processes import NODE_SM, SIGNAL, VH_TAUTAU
 from bbtautau_shapesmith.samples import parse_entry, route, samples
@@ -295,7 +295,8 @@ def test_normalisation_uncertainties_per_era(run2, era):
     lnn = {(e.name, e.channels, e.value): set(e.processes) for e in analysis.lnn}
     names = {name for name, *_ in lnn}
     assert {f"CMS_eff_m_trigger_{era}", f"CMS_eff_m_trigger_emb_{era}", f"CMS_eff_e_trigger_{era}", f"CMS_eff_e_trigger_emb_{era}"} <= names
-    assert {f"eff_t_vsLep_$CHANNEL_{era}", f"eff_t_vsJet_$CHANNEL_{era}", f"jetFakesNorm_$CHANNEL_{year}"} <= names
+    vs_lepton = "2018" if year == "2016" else era  # K6: VSe and VSmu of 2016 are copies of 2018 (E12)
+    assert {f"eff_t_vsLep_$CHANNEL_{vs_lepton}", f"eff_t_vsJet_$CHANNEL_{era}", f"jetFakesNorm_$CHANNEL_{year}"} <= names
     assert lnn[(f"CMS_eff_m_trigger_{era}", ("mt", "em"), 1.02)] >= {"ZL", "TTL", "TT"} and lnn[(f"CMS_eff_m_trigger_emb_{era}", ("mt",), 1.02)] == {"EMB"}
     # E27: the embedded sample shares 0.5 of the MC lepton-ID nuisance and has its own 0.866 part
     assert lnn[("eff_m", ("mt",), 1.01)] == lnn[("eff_m_emb", ("mt",), 1.017)] == lnn[("eff_e", ("et",), 1.01)] == lnn[("eff_e_emb", ("et",), 1.017)] == {"EMB"}
@@ -328,6 +329,7 @@ def test_the_correlation_scheme():
     assert tokens["fake_factors"] == tokens["recoil"] == ("2016", "2016", "2017", "2018")
     assert tokens["tau_vse"] == tokens["tau_e_es"] == ("2018", "2018", "2017", "2018")  # K6: copies of 2018 (E12)
     assert tokens["tau_vsmu"] == ("2018", "2018", "2018", "2018")
+    assert tokens["tau_vslep"] == ("2018", "2018", "2017", "2018")  # the flat VSe + VSmu lnN: a copy where both are
     assert tokens["jes_year"] == ("2016APV", "2016", "2017", "2018")
     assert nuisance("CMS_btag_fixedWP_bc_correlated", "btag_correlated", "2017") == "CMS_btag_fixedWP_bc_correlated"
     assert nuisance("CMS_ff_QCDStatShift_mt", "fake_factors", "2016preVFP") == nuisance("CMS_ff_QCDStatShift_mt", "fake_factors", "2016postVFP") == "CMS_ff_QCDStatShift_mt_2016"
@@ -413,10 +415,14 @@ def test_the_node_sm_sample_stands_in_for_the_signal_without_powheg():
     assert "node_SM" in signal.nick and NODE_SM not in {p.name for p in mt.processes} and VH_TAUTAU not in {p.name for p in mt.processes}
 
 
-def test_the_dy_table_exists_for_2018_only(run2):
-    with pytest.raises(AnalysisError, match="no DY table for 2017"):
-        tau(run2, "2017", dy_correction="njets_btag")
-    assert "dy_correction" in tau(run2, "2018", dy_correction="njets_btag").channel("tt").process("ZL").selection.weights
+@pytest.mark.parametrize("era", ERAS)
+def test_the_dy_table_of_every_era(run2, era, monkeypatch):
+    """E19, spec 6.10: the DY of each era carries the table of its own dilepton run; an era without a table fails."""
+    expected = weights_module.dy_njets_btag_weight(era)
+    assert tau(run2, era, dy_correction="njets_btag").channel("tt").process("ZL").selection.weights["dy_correction"] == expected
+    monkeypatch.setattr(weights_module, "DY_NJETS_BTAG", {other: table for other, table in DY_NJETS_BTAG.items() if other != era})
+    with pytest.raises(AnalysisError, match=f"no DY table for {era}"):
+        tau(run2, era, dy_correction="njets_btag")
 
 
 @pytest.mark.parametrize("era", ERAS)
