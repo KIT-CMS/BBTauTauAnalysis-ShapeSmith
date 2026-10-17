@@ -1,6 +1,6 @@
 # BBTauTauAnalysis-ShapeSmith
 
-Non-resonant HH→bbττ (2018 UL, NanoAODv15) defined for
+Non-resonant HH→bbττ (Run 2 UL: 2016preVFP, 2016postVFP, 2017, 2018; NanoAODv15) defined for
 [ShapeSmith](https://github.com/KIT-CMS/ShapeSmith). Design and physics choices:
 `ShapeSmith/docs/superpowers/specs/2026-09-05-shapesmith-core-and-bbtautau-design.md`; embedding, fake factors and
 sample lists: the specs of 2026-09-29 with their amendments of 2026-09-30.
@@ -97,14 +97,15 @@ Switches of the tau run YAML (typed in `switches.py`; an unknown or mistyped swi
 | `control_regions` | `false` (default), `true` | wider skim plus the named pass/fail control regions; needs `jet_fakes: mc` |
 | `diagnostics` | `false` (default), `true` | QCD in the control regions (et/mt: same-sign data minus MC, tt: ABCD with the fail regions) and the variables `met_uncorrected`, `metphi_uncorrected`, `npv_good`, `rho` (the last two from production v6 on); needs `control_regions: true` |
 | `shape_systematics` | `true` (default), `false` | the CROWN shifts of the embedded samples and of the fake-factor friend as shape variations |
+| `crown_shifts` | `true` (default), `false` | `false` for a production without CROWN shifts (v7 is nominal only, E34): no embedding tau shifts; the fake-factor friend shifts and the weight variations of the nominal tree (b tag, prefiring) stay |
 | `dy_correction` | `none` (default), `njets_btag` | every DY process (ZTT, ZL, ZJ) times the DY data/MC table `DY_NJETS_BTAG` (`constants.py`) of its n_bjets (0, 1, ≥ 2) and n_jets (≤ 2, 3, ≥ 4) |
 
 **em as the ttbar control channel.** A tau run YAML can list `em` in `channels` (e.g. `[et, mt, tt, em]`). It is a
 control channel (`Analysis.control_channels`): `datacards` and `fit` put it into every final state, never into one of
 its own. It is the dilepton em selection (OS, isolated e and μ, ≥ 2 jets) with the unsplit MC of the dilepton
 analysis (ttbar with the top-pT weight), one category `em_tt` with the b tag of the tau baseline counted in one bin,
-no further regions, the b-tag variations of the tau channels and the lnN `eff_e`, `eff_m` and
-`CMS_eff_trigger_em_2018` (2 %); `htt_tjXsec` correlates its ttbar with that of the tau channels. The friends of the
+no further regions, the b-tag and prefiring variations of the tau channels and the lnN `eff_e`, `eff_m` and
+`CMS_eff_m_trigger_<era>` (2 %, the muon trigger of mt); `htt_tjXsec` correlates its ttbar with that of the tau channels. The friends of the
 tau channels name them (`channels: [et, mt, tt]`), so the em skim looks for none; a tau run with em has its own
 `skim_dir` (the em skim of the dilepton run has other columns). The ML labels come from the tau channels only, and
 `ml-export` skips the control channel em.
@@ -165,6 +166,51 @@ corrected count, and re-skim a skim made with the old one once with
 
 `tests/fixtures/datasets.json` holds the database entries (`KingMaker_sample_database` `94bd5a0f`, with the corrected
 mutau 2018D event count) of exactly the nicks in `inventory/`; a new inventory adds its entries in the same change.
+
+## Run 2 (v7)
+
+Every Analysis builds one era, `era:` of the run YAML (`2016preVFP`, `2016postVFP`, `2017`, `2018`; any other fails),
+with the luminosity of `constants.LUMI_PB` (19.52 / 16.81 / 42.07 / 59.56 fb⁻¹, E20; plots `59.6 fb⁻¹ (2018, 13 TeV)`,
+Run 2 `138 fb⁻¹`). The 2016 halves stay separate eras up to the datacards (bins `htt_<channel>_<i>_<era>`); the
+nuisances they share are named so. Spec: `docs/v7_spec.md` of the workspace, sections 6.1-6.7.
+
+- **Triggers** (`triggers.py`, `TRIGGER[era][channel]`, spec 6.2): flags, offline thresholds and the MC and embedding
+  weights per era. Muon 2016 the IsoMu22 OR (pT > 24 GeV, the triggering muon |η| < 2.1 in mm and em), 2017 IsoMu27
+  (> 29 GeV), 2018 IsoMu24, each with the KIT SF `trg_wgt_single_mu22/27/24`; electron 2016 Ele25 (> 27 GeV,
+  |η| < 2.1), 2017 Ele32 for 34-37 GeV and Ele35 above with the weight piecewise and the HLT Zvtx factor 0.991 above
+  37 GeV on MC and embedding, 2018 Ele32; tt 2016 the data with Iso or CombinedIso and the MC with Iso (its POG SF),
+  2017 three and 2018 four paths. The tt embedding has no trigger requirement (the cut uses the skim's kind flags
+  `is_data`, `is_mc`, `is_embedding`) and the weight ε_data(τ1)·ε_data(τ2), each leg in its isolation class
+  (`trg_effdata_emb_{Medium,AntiMedium}_{1,2}`, E33). The tau-ID measurement takes the muon trigger of the era
+  (2018: IsoMu24 or IsoMu27 from 25 GeV, as before).
+- **Selections**: |η| < 2.1 of the light lepton in et and mt (`lepton_eta`) and of the muon in the tau-ID measurement
+  (`muon_eta`), every era (E31, the embedding acceptance); in 2018 `hem_veto < 0.5` in every channel of every
+  Analysis (E29; the HEM nuisance is gone).
+- **Weights**: `prefiring_wgt` on the MC of every era (E11; 2018 is the muon part), not on data or embedding;
+  `CMS_prefiring` from the nominal-tree columns `L1PreFiringWeight_Up/Dn`, written as lnN (the varied over the
+  nominal yield per bin and process, `Analysis.lnn_variations`). The b-tag weight variations follow the [T, M]
+  scheme: `CMS_btag_fixedWP_{bc,light}_correlated` and `..._uncorrelated_<era>` (columns
+  `btag_weight_upart_{up,down}_{bc,light}_{correlated,uncorrelated}`). `DY_NJETS_BTAG` exists for 2018 only.
+- **Samples**: SingleElectron data (2016, 2017) go to et and ee; the powheg `GluGluToHHTo2B2T_kl-1p00` is the signal,
+  the other κλ points have no process, node_SM is the auxiliary process `HH2B2Tau_nodeSM` (the cross-check) or, in a
+  list without powheg (the 2018 productions up to v6), the signal; `ZHToTauTau`, `W±HToTauTau` are the process
+  `VH_htt` (VH theory lnN); `TTWJetsTo*`, `WZTo4Q`, `ZZTo2Nu2Q_5f` go to TTV and VV. Every nick must be a sample of the
+  run's era (its database `era`). A borrowed sample is the inventory line `<source era>/<nick>`: read from the
+  n-tuples of the source era (`Sample.era`), normalised with the run's luminosity, with the lnN
+  `CMS_htt_borrowed_<process>_<era>` 1.05; only the borrowings of `samples.BORROWED` are accepted (2016postVFP takes
+  VH → ττ from 2016preVFP, spec 3.3). `samples.inventory_nicks` reads an inventory with borrowed lines.
+- **Correlations** (`correlations.py`, spec 6.7): `nuisance(name, family, era)` appends the era token of the family:
+  none (correlated), the era (2016 halves separate; the copies of 2018 payloads take 2018, K6) or the year (2016
+  shared). lnN: the LUM POG Cholesky set `lumi_13TeV_1516_l` / `_151617_l` / `_15161718_l` of the year (MC only);
+  `eff_e`, `eff_m` 2 % on MC and, on the embedded sample, 1 % under the same name plus `eff_e_emb`, `eff_m_emb` 1.7 %
+  (E27); the single-lepton triggers `CMS_eff_{m,e}_trigger[_emb]_<era>` 2 % on MC and embedding (the KIT SFs have no
+  variations); `eff_t_vs{Lep,Jet}_<channel>_<era>`; the fake-factor shifts `CMS_ff_<key>_<channel>_<year>` and
+  `jetFakesNorm_<channel>_<year>`; `CMS_htt_emb_ttbar_<era>`; HH theory per E26 (`QCDscale_HH` +7.25/−21.12 %,
+  `PDF_alphas_HH` 2.47 %). The families of CROWN shifts (TES, JES, JER, MET, recoil, the MC vsJet/VSe/VSmu components,
+  the shared EMB/MC parts of TES and the tt trigger) come with the shift production; `correlations.py` names them.
+- **Tests**: `tests/test_run2.py` builds every Analysis in every era on per-era lists (`tests/run2.py`: the 2018
+  fixture lists renamed per era plus powheg and VH → ττ), and checks every column against the v7 CROWN contract per
+  era (`tests/helpers.py`: `branches(channel, era)`).
 
 ## Embedding and fake factors
 
@@ -242,7 +288,7 @@ must follow its keys.
 
 ## Tau-ID and ES measurement of the embedded taus
 
-`tau_id_measurement.py` (`configs/tau_id_es_2018.yaml`) is another measurement Analysis: the successor of smhtt_ul
+`tau_id_measurement.py` (`configs/tau_id_es_2018.yaml`, per era since v7) is another measurement Analysis: the successor of smhtt_ul
 `tauID_SFs_dev`, run by the core measurement `shapesmith.measurements.tau_id_es`. It needs the production of CROWN
 `sm_tau_id_measurement_config` (list `sm2018_tau_id_measurement`, scopes mt and mm, all shifts): production
 `sm2018_tau_id_v1` (2026-10-03/04, 0.73 TB, mostly MC with all shifts).
@@ -258,8 +304,8 @@ must follow its keys.
   W and QCD = same-sign data minus all of them (negative bins clipped); TTT is the auxiliary template of
   `CMS_emb_ttbar_contamination_Run2018`. mm: MUEMB (genmatch 2/2, muon SFs of both legs), W, TTL, VVL and QCD =
   same-sign data minus MUEMB and W. MC and embedding weights are the predecessor's: KIT muon ID/iso SFs, the trigger
-  weight `mu24` for 25 <= pT < 28 GeV and `mu27` above 28 GeV. The MC is normalised to the analysis luminosity of
-  59.83 fb-1 (the predecessor used 59.56 fb-1).
+  weight `mu24` for 25 <= pT < 28 GeV and `mu27` above 28 GeV in 2018 (2016 and 2017: the trigger of the era, see Run 2),
+  the prefiring weight on the MC. The MC is normalised to the luminosity of the era.
 - **Switches** `vsjet_wp` (Medium, Tight) and `vsele_wp` (VVLoose, Tight). The skim takes the loosest of them, and the
   four combinations are regions `wp_<vsjet>_<vsele>`, so one skim serves all four runs.
 - **ES grid**: `es-200` ... `es+200` (0.2 % steps, units of 0.1 %), template column variations of the embedded sample
@@ -268,10 +314,11 @@ must follow its keys.
 - **MC shape uncertainties** (`tau_id_systematics.py`): the predecessor's families with MorphingTauID2017's names, from
   the CROWN shifts `<quantity>__<shift>` of `sm_tau_id_measurement_config` (variations package) and the jet-fake and
   top-pT weights; mt only, nominal region only. `CMS_scale_t_dm*` (three pT bins each) and `CMS_scale_fake_m` (five
-  wheels) are VariationSums of the finer CROWN shifts; the jet energy scale is the regrouped set plus HEM. Produced
-  shifts without a shape in MorphingTauID2017 (vsEle SF, electron -> tau ES, JER, electron ES) are filled under their
-  CROWN name and ignored by the datacards. The vsJet SF families `CMS_eff_t_dm*` equal the nominal, as in the
-  predecessor.
+  wheels) are VariationSums of the finer CROWN shifts; the jet energy scale is the regrouped set (no HEM since v7);
+  `CMS_prefiring` from the CROWN shift `CMS_ecal_prefiring_<year>`; the names carry `Run<era>`. Produced shifts without a
+  shape in MorphingTauID2017 (vsEle SF, electron -> tau ES, JER, electron ES as `CMS_scale_e`/`CMS_res_e`) are filled
+  under their own name and ignored by the datacards. `CMS_htt_ttbarShape` is with (Up, the nominal) against without
+  (Down) the top-pT weight (K9). The vsJet SF families `CMS_eff_t_dm*` equal the nominal, as in the predecessor.
 - **CMSSW**: MorphingTauID2017 exists only with jvoss's local changes plus the regrouped JES declaration, versioned in
   `patches/`; it needs an own area built with the patch (see `patches/README.md`).
 
@@ -281,7 +328,9 @@ must follow its keys.
 |---|---|
 | produced samples (verbatim KingMaker sample lists), groups, routing, per-sample cuts, normalisation | `inventory/*.txt`, `samples.py` |
 | the switches and their checks | `switches.py` |
-| era, luminosity, channel sets, working points, b-tag and jet bins, friend columns, class names, FF shift keys, embedding shift tables, the DY correction table | `constants.py` |
+| eras, luminosity, channel sets, working points, b-tag and jet bins, friend columns, class names, FF shift keys, embedding shift tables, the DY correction table, HEM, lepton eta, prefiring | `constants.py` |
+| triggers per era and channel: cuts, thresholds, MC and embedding weights | `triggers.py` |
+| correlation of the nuisances between the eras | `correlations.py` |
 | tau channels: baseline/skim selection, gen-match splits, estimation and control regions | `cuts.py` |
 | MC, embedding, fake-factor and dilepton weights, trigger chains, the DY correction weight | `weights.py` |
 | process tables (tau: gen-match split, dilepton: unsplit) | `processes.py` |
@@ -295,10 +344,12 @@ must follow its keys.
 
 `tests/fixtures/branches_<channel>.txt` list the branches of one ttbar ntuple per channel of the
 `sm2018_binned_v5` production (`scripts/dump_branches.py <root:// URL>`); the tests check every
-selection, weight and variable against them, and the embedding columns against them plus the Part-A output
-contract until a branch fixture of a real embedding file exists. `tests/fixtures/skim_contracts_v4.json` holds the
-stored contracts and Parquet columns of one data and one MC skim per channel of v4 (from the golden references of
-2026-09-30); `tests/test_contracts_v4.py` checks that the v4 run YAMLs still reuse them.
+selection, weight and variable against them with the v7 changes of each era (`tests/helpers.py`, `branches(channel,
+era)`: the trigger columns of the era, prefiring, the [T, M] b-tag variations, the 2018 HEM flag), and the embedding
+columns against them plus the Part-A output contract until branch fixtures of real v7 files exist.
+`tests/fixtures/skim_contracts_v4.json` holds the stored contracts and Parquet columns of one data and one MC skim per
+channel of v4 (from the golden references of 2026-09-30); `tests/test_contracts_v4.py` checks that the v4 run YAMLs
+differ from them by exactly the changes since (so a v4 skim needs `skim --force`).
 
 ## Prerequisites outside this repository
 

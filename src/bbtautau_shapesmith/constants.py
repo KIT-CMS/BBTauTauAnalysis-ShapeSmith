@@ -1,7 +1,11 @@
-"""Constants of the 2018 UL NanoAODv15 HH->bbtautau analysis."""
+"""Constants of the Run-2 UL NanoAODv15 HH->bbtautau analysis (2016preVFP, 2016postVFP, 2017, 2018)."""
+from shapesmith.model import AnalysisError
 
-ERA = "2018"
-LUMI_PB = 59830.0
+ERAS = ("2016preVFP", "2016postVFP", "2017", "2018")
+# integrated luminosity per era (v7 spec E20): 19.52 / 16.81 / 42.07 / 59.56 fb-1, the HIPM split of 2016 kept, 2017 and
+# 2018 with the new normtag; Run 2 = 137.96 fb-1, labelled 138 fb-1
+LUMI_PB = {"2016preVFP": 19520.0, "2016postVFP": 16810.0, "2017": 42070.0, "2018": 59560.0}
+YEAR = {"2016preVFP": "2016", "2016postVFP": "2016", "2017": "2017", "2018": "2018"}  # the calendar year of an era
 TAU_CHANNELS = ("et", "mt", "tt")
 LT_CHANNELS = ("et", "mt")  # tau channels with a light lepton on leg 1
 TAU_LEGS = {"et": (2,), "mt": (2,), "tt": (1, 2)}  # the hadronic tau legs
@@ -18,11 +22,19 @@ BTAG_BINS = {"btag0": "n_bjets == 0", "btag1": "n_bjets == 1", "btag2": "n_bjets
 # jet multiplicity bins of the dilepton diagnostic regions (switch diagnostics), each with 0 and >= 1 b tags
 NJETS_BINS = {"nj2": "n_jets == 2", "nj3": "n_jets == 3", "nj4p": "n_jets >= 4"}
 
-# DY correction (switch dy_correction: njets_btag): DY data/MC in the mm and ee Z window of sm2018_binned_v6, rows
-# n_bjets 0, 1, >= 2 (measured with 2), columns n_jets <= 2, 3, >= 4 (the tau selections have >= 2 jets), the other
-# MC subtracted with ttbar times the em data/MC of the same b-tag region (0.843, 0.885, 0.980). Derived with
-# scripts/derive_dy_correction.py --ttbar-scale em.
-DY_NJETS_BTAG = {0: (0.868, 1.009, 1.291), 1: (1.090, 1.298, 1.752), 2: (0.958, 1.167, 1.674)}
+# DY correction (switch dy_correction: njets_btag) per era: DY data/MC in the mm and ee Z window, rows n_bjets 0, 1,
+# >= 2 (measured with 2), columns n_jets <= 2, 3, >= 4 (the tau selections have >= 2 jets), the other MC subtracted with
+# ttbar times the em data/MC of the same b-tag region. Derived with scripts/derive_dy_correction.py --ttbar-scale em.
+# 2018: sm2018_binned_v6 (ttbar scale 0.843, 0.885, 0.980); the other eras follow from their dilepton runs (spec 6.10).
+DY_NJETS_BTAG = {"2018": {0: (0.868, 1.009, 1.291), 1: (1.090, 1.298, 1.752), 2: (0.958, 1.167, 1.674)}}
+
+# event selections and weights of the POG cross-check (v7 spec 6.2, 6.4)
+HEM_ERAS = ("2018",)  # E29: veto of the events with a jet in the HEM 15/16 region, column hem_veto (CROWN, 2018 only)
+HEM_VETO = "(hem_veto < 0.5)"
+LEPTON_ETA = "(abs(eta_1) < 2.1)"  # E31: the light lepton inside the embedding acceptance (generator filter |eta| < 2.2)
+PREFIRING_WEIGHT = "prefiring_wgt"  # E11: L1PreFiringWeight_Nom on MC, 2016-2018 (2018: the muon part)
+PREFIRING_VARIATIONS = {"Up": "L1PreFiringWeight_Up", "Down": "L1PreFiringWeight_Dn"}  # columns of the nominal tree (C11)
+PREFIRING_NUISANCE = "CMS_prefiring"  # one lnN for 2016-2018 (E11, E34)
 
 # NN output classes in training order: index = friend column predicted_class, datacard bin id = index + 1
 NN_CLASS_NAMES = ("HH2B2Tau", "DY", "ST", "TT", "VV", "jetFakes", "Other")
@@ -60,14 +72,13 @@ FF_SHIFTS_TT = FF_SHIFTS_LT + (
 # shifts per decay mode; the nuisance sums the two.
 EMBEDDING_TAU_DECAY_MODES = {"0": (0,), "1": (1,), "1011": (10, 11)}
 
-# UParT b-tag shape-correction components; columns btag_weight_upart_{up,down}_<component>
-BTAG_COMPONENTS = (
-    "as", "correlated", "uncorrelated", "statistic", "ttbar", "pileup", "pdf", "mur", "muf", "isrdef", "fsrdef",
-    "jereta0to1p93", "jereta1p93to2p5",
-    "jesAbsoluteMPFBias", "jesAbsoluteScale", "jesAbsoluteStat", "jesFlavorQCD", "jesFragmentation",
-    "jesPileDataMC", "jesPilePtBB", "jesPilePtEC1", "jesPilePtEC2", "jesPilePtHF", "jesPilePtRef",
-    "jesRelativeBal", "jesRelativeFSR", "jesRelativeJEREC1", "jesRelativeJEREC2", "jesRelativeJERHF",
-    "jesRelativePtBB", "jesRelativePtEC1", "jesRelativePtEC2", "jesRelativePtHF", "jesRelativeSample",
-    "jesRelativeStatEC", "jesRelativeStatFSR", "jesRelativeStatHF", "jesSinglePionECAL", "jesSinglePionHCAL",
-    "jesTimePtEta",
-)
+# UParT fixed-WP b-tag weight variations (WPs [T, M], v7 spec C14/E14): b/c and light jets, each correlated between
+# the eras and uncorrelated; columns btag_weight_upart_{up,down}_<component> (one varied, the other at its nominal)
+BTAG_COMPONENTS = ("bc_correlated", "bc_uncorrelated", "light_correlated", "light_uncorrelated")
+
+
+def check_era(era: str) -> str:
+    """The era of the run, one of ERAS; any other is rejected."""
+    if era not in ERAS:
+        raise AnalysisError(f"unknown era {era!r}; the analysis supports {', '.join(ERAS)}")
+    return era

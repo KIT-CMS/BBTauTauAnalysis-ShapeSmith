@@ -39,7 +39,7 @@ def test_the_tau_id_is_the_analysis_tau_id():
     analysis = measurement_analysis()
     mt, tt = analysis.channel("mt"), analysis.channel("tt")
     assert region_cuts(mt, "QCD_sr_like")["tau_iso"] == cuts.isolated(2) and region_cuts(mt, "QCD_ar_like")["tau_iso"] == cuts.anti_isolated(2)
-    assert region_cuts(mt, "ttbar_sr")["tau_iso"] == cuts.baseline_cuts("mt")["tau_iso"]
+    assert region_cuts(mt, "ttbar_sr")["tau_iso"] == cuts.baseline_cuts("mt", "2018")["tau_iso"]
     assert region_cuts(tt, "QCD_ar_like")["tau_iso"] == f"{cuts.anti_isolated(1)} & {cuts.isolated(2)}"
     assert region_cuts(tt, "QCD_subleading_ar_like")["tau_iso"] == f"{cuts.isolated(1)} & {cuts.anti_isolated(2)}"
     # the tt fractions: both taus anti-isolated for both legs (U6)
@@ -65,13 +65,14 @@ def test_the_regions():
     assert qcd["os"] == cuts.SAME_SIGN and qcd["mt_cut"] == "(mt_1 < 50)" and qcd["b_tagging"] == "(n_jets >= 2)"
     # the DR->SR regions: jvoss's lepton isolation below his n-tuples' 0.4 (U5), opposite sign for the correction
     assert region_cuts(mt, "QCD_orthogonal_sr_like")["lepton_iso"] == "(~((iso_1 >= 0.05) & (iso_1 <= 0.15))) & (iso_1 < 0.4)"
-    assert "0.02" in region_cuts(et, "QCD_dr_sr_ar_like")["lepton_iso"] and region_cuts(et, "QCD_dr_sr_ar_like")["os"] == cuts.baseline_cuts("et")["os"]
+    assert "0.02" in region_cuts(et, "QCD_dr_sr_ar_like")["lepton_iso"] and region_cuts(et, "QCD_dr_sr_ar_like")["os"] == cuts.baseline_cuts("et", "2018")["os"]
     assert region_cuts(tt, "QCD_orthogonal_sr_like")["tau_iso"] == f"{cuts.isolated(1)} & {cuts.anti_isolated(2)}"
     # the ttbar scale regions invert the lepton vetoes as one cut
     scale = region_cuts(mt, "ttbar_scale_sr_like_ss")
     assert scale["lepton_vetoes"].startswith("~(") and "dilepton_veto" in scale["lepton_vetoes"] and scale["os"] == cuts.SAME_SIGN
     assert "dilepton_veto" not in region_cuts(tt, "ttbar_scale_ar_like")["lepton_vetoes"]
-    assert not any("veto" in name for name in mt.skim)  # stored, not applied
+    assert not {"extraelec_veto", "extramuon_veto", "dilepton_veto"} & set(mt.skim)  # stored, not applied
+    assert mt.skim["hem_veto"] == mt.cuts["hem_veto"] == "(hem_veto < 0.5)"  # the 2018 HEM veto is no lepton veto
     # the analysis tau eta cut in the measurement and its skim (et, mt)
     assert mt.cuts["tau_eta"] == mt.skim["tau_eta"] == et.cuts["tau_eta"] == "(abs(eta_2) < 2.3)" and "tau_eta" not in tt.cuts
 

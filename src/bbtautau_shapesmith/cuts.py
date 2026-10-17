@@ -1,16 +1,16 @@
-"""Tau channels: baseline and skim selection, gen-match splits, estimation and control regions (v15 branch names)."""
+"""Tau channels: baseline and skim selection per era, gen-match splits, estimation and control regions (v15 branch
+names). The trigger of the era and channel comes from triggers.TRIGGER (v7 spec 6.2); every era cuts the light lepton
+of et and mt to |eta| < 2.1 (E31), 2018 vetoes the HEM 15/16 events (E29)."""
 from __future__ import annotations
 
 from shapesmith.model import Region
 
-from bbtautau_shapesmith.constants import BTAG_BINS, LT_CHANNELS, TAU_LEGS, TAU_VS_ELE_WP, TAU_VS_JET_LOOSE_WP, TAU_VS_JET_WP, TAU_VS_MU_WP
+from bbtautau_shapesmith.constants import (
+    BTAG_BINS, HEM_ERAS, HEM_VETO, LEPTON_ETA, LT_CHANNELS, TAU_LEGS, TAU_VS_ELE_WP, TAU_VS_JET_LOOSE_WP, TAU_VS_JET_WP, TAU_VS_MU_WP,
+)
+from bbtautau_shapesmith.triggers import TRIGGER
 from bbtautau_shapesmith.weights import fail_tau_weights, fake_factor_weight
 
-TRIGGER = {
-    "mt": "(pt_2 > 30) & (pt_1 > 25) & (trg_single_mu24 > 0.5)",
-    "et": "(pt_2 > 30) & (pt_1 > 33) & (trg_single_ele32 > 0.5)",
-    "tt": "(trg_double_tau35_mediumiso > 0.5) | (trg_double_tau35_tightiso > 0.5) | (trg_double_tau40_mediumiso > 0.5) | (trg_double_tau40_tightiso > 0.5)",
-}
 SAME_SIGN = "((q_1 * q_2) > 0)"
 B_TAGGING = "(n_bjets >= 1) & (bpair_pt_2 > 0)"  # a b pair with at least one b tag
 
@@ -27,7 +27,12 @@ def anti_isolated(leg: int) -> str:
     return f"((id_tau_vsJet_{TAU_VS_JET_WP}_{leg} < 0.5) & (id_tau_vsJet_{TAU_VS_JET_LOOSE_WP}_{leg} > 0.5))"
 
 
-def baseline_cuts(channel: str) -> dict[str, str]:
+def era_cuts(era: str) -> dict[str, str]:
+    """The cuts of an era on every channel: the HEM veto in 2018."""
+    return {"hem_veto": HEM_VETO} if era in HEM_ERAS else {}
+
+
+def baseline_cuts(channel: str, era: str) -> dict[str, str]:
     cuts = {
         "extraelec_veto": "(extraelec_veto < 0.5)",
         "extramuon_veto": "(extramuon_veto < 0.5)",
@@ -43,15 +48,16 @@ def baseline_cuts(channel: str) -> dict[str, str]:
         cuts["mt_cut"] = "(mt_1 < 70)"
         # EMB has hardly any tau_h beyond 2.3, where the Run-2 vsMu SFs end; tt: the trigger matching cuts at 2.1
         cuts["tau_eta"] = "(abs(eta_2) < 2.3)"
+        cuts["lepton_eta"] = LEPTON_ETA
     else:
         cuts["pt_selection"] = "(pt_1 > 40) & (pt_2 > 40)"
-    cuts["trg_selection"] = TRIGGER[channel]
-    return cuts
+    cuts["trg_selection"] = TRIGGER[era][channel].cut
+    return {**cuts, **era_cuts(era)}
 
 
-def skim_cuts(channel: str, control_regions: bool = False) -> dict[str, str]:
+def skim_cuts(channel: str, era: str, control_regions: bool = False) -> dict[str, str]:
     """Baseline without the charge requirement and with the loosest tau isolation, so that all estimation regions survive."""
-    baseline = baseline_cuts(channel)
+    baseline = baseline_cuts(channel, era)
     cuts = {name: expr for name, expr in baseline.items() if name != "os"}
     cuts["tau_iso"] = " & ".join(loose(leg) for leg in TAU_LEGS[channel])
     if control_regions:

@@ -6,7 +6,7 @@ from shapesmith.validate import validate
 from bbtautau_shapesmith import dilepton, ff_measurement
 from bbtautau_shapesmith.analysis import build, process_union
 from bbtautau_shapesmith.constants import FF_COLUMNS, FF_RAW_COLUMNS, LT_CHANNELS, NN_COLUMNS, TAU_CHANNELS
-from bbtautau_shapesmith.systematics import btag_variations, embedding_variation_sums
+from bbtautau_shapesmith.systematics import btag_variations, embedding_variation_sums, prefiring_variations
 from bbtautau_shapesmith.variables import DIAGNOSTIC_VARIABLES
 from bbtautau_shapesmith.weights import dy_njets_btag_weight, fake_factor_weight
 from tests.helpers import EMBEDDING_LIST, V6_COLUMNS, branches, config, embedded, embedding_branches
@@ -15,7 +15,8 @@ COMBINATIONS = [(jet_fakes, embedding) for jet_fakes in ("mc", "ff") for embeddi
 T_PARTS = {"ZTT", "TTT", "STT", "VVT", "TTVT", "EWKT"}
 L_PARTS = {"ZL", "TTL", "STL", "VVL", "TTVL", "EWKL"}
 J_PARTS = {"ZJ", "TTJ", "STJ", "VVJ", "TTVJ", "EWKJ"}
-SINGLE_HIGGS = {"ggH125", "qqH125", "ttH125", "VH125"}
+SINGLE_HIGGS = {"ggH125", "qqH125", "ttH125", "VH125"}  # the 2018 fixture lists have no VH -> tautau
+LUMI_2018 = "lumi_13TeV_15161718_l"
 
 
 def analysis_for(jet_fakes="mc", embedding=False, **switches):
@@ -70,7 +71,7 @@ def test_estimators(jet_fakes, embedding):
     else:
         assert first == ABCD("QCD", "abcd_anti_iso", "abcd_same_sign", "abcd_same_sign_anti_iso",
                              genuine + lepton_fakes + ("ZJ", "TTJ", "STJ", "VVJ", "TTVJ", "EWKJ", "W"))
-    sums = list(embedding_variation_sums("tt")) if embedded(embedding, "tt") else []
+    sums = list(embedding_variation_sums("tt", "2018")) if embedded(embedding, "tt") else []
     assert rest == sums + ([TemplateShift("CMS_htt_emb_ttbar_2018", "EMB", "TTT", 0.1)] if embedded(embedding, "tt") else [])
     assert all(e not in analysis_for(jet_fakes, embedding, shape_systematics=False).channel("tt").estimators for e in sums)
 
@@ -115,7 +116,7 @@ def test_embedding_per_channel():
     assert not any(s.kind == "embedding" for s in tt.samples)
     assert not any(isinstance(e, TemplateShift) for e in tt.estimators) and not any("emb" in v.name for v in tt.variations)
     lnn = {(entry.name, entry.channels): set(entry.processes) for entry in analysis.lnn}
-    assert {"ZTT", "TTT", "STT", "VVT"} <= lnn[("lumi_13TeV_$ERA", None)] and "EMB" not in lnn[("lumi_13TeV_$ERA", None)]
+    assert {"ZTT", "TTT", "STT", "VVT"} <= lnn[(LUMI_2018, None)] and "EMB" not in lnn[(LUMI_2018, None)]
     assert lnn[("htt_tjXsec", None)] == {"TTT", "TTL", "TTJ"} and lnn[("htt_zjXsec", None)] == {"ZTT", "ZL", "ZJ"}
     ml = analysis.ml
     assert {"EMB", "ZTT", "TTT"} <= set(ml.processes)
@@ -129,7 +130,7 @@ def test_dy_correction_weights_the_dy_processes_only():
 
     tau = analysis_for("mc", dy_correction="njets_btag")
     assert corrected(tau) == {(name, p) for name in TAU_CHANNELS for p in ("ZTT", "ZL", "ZJ")}
-    assert tau.channel("mt").process("ZL").selection.weights["dy_correction"] == dy_njets_btag_weight()
+    assert tau.channel("mt").process("ZL").selection.weights["dy_correction"] == dy_njets_btag_weight("2018")
     assert not corrected(analysis_for("mc"))
     fake_factors = ff_measurement.build(config(analysis="bbtautau_shapesmith.ff_measurement:build", sample_lists=["sm2018_binned_v3"], dy_correction="njets_btag"))
     assert corrected(fake_factors) == {(name, p) for name in TAU_CHANNELS for p in ("ZTT", "ZL", "ZJ")}
@@ -163,14 +164,14 @@ def test_em_is_the_ttbar_control_channel():
     (category,) = em.categories
     assert (category.name, category.cut, category.variable.name) == ("em_tt", "(n_bjets >= 1) & (bpair_pt_2 > 0)", "yield")
     assert em.cuts["jets"] == "n_jets >= 2" and em.regions == () and em.estimators == ()
-    assert em.variations == btag_variations()  # the components of the tau channels, so that the b-tag nuisances correlate
+    assert em.variations == btag_variations("2018") + prefiring_variations()  # those of the tau channels, so that the nuisances correlate
     assert set(em.backgrounds()) == {"DY", "TT", "ST", "VV", "TTV", "EWK", "W"} | SINGLE_HIGGS and "top_pt" in em.process("TT").selection.weights
     assert {s.kind for s in em.samples} == {"data", "mc"} and all(s.nick.startswith("SingleMuon_") for s in em.samples_of("data"))
     for sample in em.samples:
         assert needed_columns(em, sample) <= branches("em") | {"npartons"}, sample.nick
     lnn = {(entry.name, entry.channels): set(entry.processes) for entry in analysis.lnn}
-    assert lnn[("htt_tjXsec", None)] == {"TT", "TTL", "TTT"} and {"TT", "EMB"} & lnn[("lumi_13TeV_$ERA", None)] == {"TT"}  # TTT of tt
-    assert "TT" in lnn[("eff_e", ("et", "em"))] & lnn[("eff_m", ("mt", "em"))] & lnn[("CMS_eff_trigger_em_$ERA", ("em",))]
+    assert lnn[("htt_tjXsec", None)] == {"TT", "TTL", "TTT"} and {"TT", "EMB"} & lnn[(LUMI_2018, None)] == {"TT"}  # TTT of tt
+    assert "TT" in lnn[("eff_e", ("et", "em"))] & lnn[("eff_m", ("mt", "em"))] & lnn[("CMS_eff_m_trigger_2018", ("mt", "em"))]  # em triggers on the muon
     assert not {"DY", "TT", "ST"} & set(analysis.ml.processes)  # no NN labels from the control channel
 
 

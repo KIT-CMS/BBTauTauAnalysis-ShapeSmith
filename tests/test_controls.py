@@ -30,7 +30,7 @@ def dilepton_channel(channel):
 def event(**updates):
     return dict(pt_1=40., pt_2=30., iso_1=.05, iso_2=.05, q_1=1, q_2=-1,
                 extraelec_veto=0, extramuon_veto=0, m_vis=90., n_jets=2,
-                n_bjets=1, trg_single_mu24=1, trg_single_ele32=1) | updates
+                n_bjets=1, trg_single_mu24=1, trg_single_ele32=1, hem_veto=0) | updates
 
 
 @pytest.mark.parametrize("channel,changes,expected", [
@@ -105,7 +105,7 @@ def test_both_lepton_legs_weighted(channel, expected):
         "mm": {"id_wgt_mu_1": 2, "iso_wgt_mu_1": 3, "id_wgt_mu_2": 5, "iso_wgt_mu_2": 7},
         "ee": {"id_wgt_ele_1": 2, "reco_wgt_ele_1": 3, "id_wgt_ele_2": 5, "reco_wgt_ele_2": 7},
     }[channel]
-    frame = pd.DataFrame([columns | {"puweight": 1, "btag_weight_upart": 1, "trg_wgt_single_mu24": 1, "trg_wgt_single_ele32": 1}])
+    frame = pd.DataFrame([columns | {"puweight": 1, "btag_weight_upart": 1, "trg_wgt_single_mu24": 1, "trg_wgt_single_ele32": 1, "prefiring_wgt": 1}])
     assert product(frame, dilepton_channel(channel).process("DY").selection.weights.values()).tolist() == [expected]
 
 
@@ -190,7 +190,7 @@ def test_tau_data_and_mc_control_histograms_from_parquet(tmp_path):
 
     def rows(sample, row):
         row.update(q_1=1, q_2=-1, n_bjets=0, n_jets=2, bpair_pt_2=-999, pt_1=50, pt_2=45, mt_1=90, iso_1=.1,
-                   extraelec_veto=0, extramuon_veto=0, dilepton_veto=0, norm_weight=1.)
+                   extraelec_veto=0, extramuon_veto=0, dilepton_veto=0, hem_veto=0, norm_weight=1.)
         if sample.kind == "mc":
             row.update(gen_match_1=4, gen_match_2=5, id_wgt_tau_vsJet_Medium_2=.8)
         return [row, row | {"id_tau_vsJet_Medium_2": 0}]

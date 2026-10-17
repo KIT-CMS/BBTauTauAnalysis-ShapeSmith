@@ -32,3 +32,4 @@ def test_btag_components_exist_in_every_channel():
     for channel in TAU_CHANNELS + DILEPTON_CHANNELS:
         for component in BTAG_COMPONENTS:
             assert {f"btag_weight_upart_up_{component}", f"btag_weight_upart_down_{component}"} <= branches(channel), (channel, component)
+    assert len(BTAG_COMPONENTS) == 4  # b/c and light, correlated and uncorrelated (WPs [T, M], C14)

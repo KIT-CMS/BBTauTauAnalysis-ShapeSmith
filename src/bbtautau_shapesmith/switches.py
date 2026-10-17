@@ -51,6 +51,9 @@ class TauSwitches(_EmbeddedChannels, BaseModel):
     control_regions: bool = False  # wider skim plus the named pass/fail control regions (needs jet_fakes: mc)
     diagnostics: bool = False  # QCD in the control regions and the diagnostic variables (needs control_regions; npv_good, rho from v6)
     shape_systematics: bool = True  # the embedding and fake-factor shifts (column variations)
+    # the production has CROWN shifts (the embedding tau ES and vsJet ID); false for a nominal-only production (v7, E34),
+    # which keeps the fake-factor friend shifts and the weight variations of the nominal tree
+    crown_shifts: bool = True
     dy_correction: DyCorrection = "none"  # on every DY process (ZTT, ZL, ZJ)
 
     @model_validator(mode="after")

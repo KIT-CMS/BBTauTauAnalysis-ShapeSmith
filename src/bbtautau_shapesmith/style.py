@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from shapesmith.model import Style
 
-from bbtautau_shapesmith.constants import DILEPTON_CHANNELS, TAU_CHANNELS
+from bbtautau_shapesmith.constants import DILEPTON_CHANNELS, ERAS, LUMI_PB, TAU_CHANNELS
+
+RUN2 = "Run2"  # the label of the combined Run 2 (spec 6.1): 138 fb-1
 
 COLORS = {
     "Z": "#3f90da", "TT": "#832db6", "ST": "#717581", "VV": "#94a4a2", "rare": "#009333",
@@ -54,13 +56,22 @@ def axis_labels() -> dict[str, dict[str, str]]:
     return labels
 
 
-def style() -> Style:
+def lumi_label(era: str) -> str:
+    """The luminosity of an era with one decimal, e.g. 59.6 fb-1 (2018, 13 TeV); Run 2 as 138 fb-1 (13 TeV)."""
+    if era == RUN2:
+        return r"138 fb$^{-1}$ (13 TeV)"
+    if era not in ERAS:
+        raise ValueError(f"unknown era {era!r}")
+    return rf"{LUMI_PB[era] / 1000:.1f} fb$^{{-1}}$ ({era}, 13 TeV)"
+
+
+def style(era: str) -> Style:
     return Style(
         colors=COLORS,
         labels=LABELS,
         group_order=GROUP_ORDER,
         signal_label=r"HH$\rightarrow$bb$\tau\tau$",
-        lumi_label=r"59.8 fb$^{-1}$ (2018, 13 TeV)",
+        lumi_label=lumi_label(era),
         channel_labels=CHANNEL_LABELS,
         axis_labels=axis_labels(),
     )

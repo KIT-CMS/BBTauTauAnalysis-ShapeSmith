@@ -13,7 +13,7 @@ CHANNELS = list(TAU_CHANNELS + DILEPTON_CHANNELS)
 
 
 def test_every_produced_nick_has_a_group_and_its_kind_from_the_database():
-    by_channel = samples(DATABASE, ["sm2018_binned_v2"], CHANNELS)
+    by_channel = samples(DATABASE, ["sm2018_binned_v2"], CHANNELS, "2018")
     assert {s.nick for chosen in by_channel.values() for s in chosen} == set(nicks())
     table = {s.nick: s for chosen in by_channel.values() for s in chosen}
     assert all((s.kind == "data") == (s.group == "data") and s.kind in ("data", "mc") for s in table.values())
@@ -37,7 +37,7 @@ def test_embedding_nicks_are_routed_by_their_final_state():
 
 
 def test_embedding_samples_go_to_their_channel_only():
-    by_channel = samples(DATABASE, ["sm2018_binned_v2", EMBEDDING_LIST], CHANNELS)
+    by_channel = samples(DATABASE, ["sm2018_binned_v2", EMBEDDING_LIST], CHANNELS, "2018")
     for channel in CHANNELS:
         embedded = [s for s in by_channel[channel] if s.kind == "embedding"]
         assert len(embedded) == (4 if channel in TAU_CHANNELS else 0)
@@ -46,7 +46,7 @@ def test_embedding_samples_go_to_their_channel_only():
 
 def test_a_nick_in_two_sample_lists_raises():
     with pytest.raises(AnalysisError, match="more than one"):
-        samples(DATABASE, ["sm2018_binned_v2", "sm2018_binned_v3"], ["mt"])
+        samples(DATABASE, ["sm2018_binned_v2", "sm2018_binned_v3"], ["mt"], "2018")
 
 
 def test_missing_sample_list_is_reported():
@@ -56,7 +56,7 @@ def test_missing_sample_list_is_reported():
 
 def test_v3_adds_the_zero_parton_part_of_the_inclusive_dy_sample():
     assert sorted(nicks("sm2018_binned_v3")) == sorted([*nicks("sm2018_binned_v2"), INCLUSIVE_DY])
-    table = {s.nick: s for s in samples(DATABASE, ["sm2018_binned_v3"], ["mt"])["mt"]}
+    table = {s.nick: s for s in samples(DATABASE, ["sm2018_binned_v3"], ["mt"], "2018")["mt"]}
     inclusive = table[INCLUSIVE_DY]
     assert (inclusive.group, inclusive.cut) == ("DY", "npartons == 0")
     assert inclusive.norm_weight == pytest.approx(6077.22 / (196626007 * 0.6729628751500812))  # the whole dataset, not its 0-parton part
@@ -75,7 +75,7 @@ def test_v6_drops_the_ttz_and_zz_double_counting():
 
 
 def test_the_inclusive_dy_sample_is_uncut_without_the_ptz_bins():
-    table = {s.nick: s for s in samples(DATABASE, ["sm2018_tau_id_measurement"], ["mt"])["mt"]}
+    table = {s.nick: s for s in samples(DATABASE, ["sm2018_tau_id_measurement"], ["mt"], "2018")["mt"]}
     assert table[INCLUSIVE_DY].cut is None and not any(nick.startswith("DYJetsToLL_LHEFilterPtZ-") for nick in table)
 
 
