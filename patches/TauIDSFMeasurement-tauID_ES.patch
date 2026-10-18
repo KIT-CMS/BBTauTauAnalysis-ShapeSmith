@@ -346,7 +346,7 @@ diff --git a/src/HttSystematics_TauIDRun2.cc b/src/HttSystematics_TauIDRun2.cc
 index 959b339..0542472 100644
 --- a/src/HttSystematics_TauIDRun2.cc
 +++ b/src/HttSystematics_TauIDRun2.cc
-@@ -1,869 +1,872 @@
+@@ -1,869 +1,877 @@
  #include "CombineHarvester/TauIDSFMeasurement/interface/HttSystematics_TauIDRun2.h"
  #include "CombineHarvester/CombineTools/interface/Process.h"
  #include "CombineHarvester/CombineTools/interface/Systematics.h"
@@ -761,6 +761,10 @@ index 959b339..0542472 100644
        .channel({"mt"})
        .process({"ZTT", "TT", "TTT", "TTL", "TTJ", "W", "ZJ", "ZL", "VV", "VVT", "VVL", "VVJ", "STT", "STL", "STJ"})  //Z and W processes are only included due to the EWK fraction. Make sure that there is no contribution to the shift from the DY or Wjets samples.
        .AddSyst(cb, "CMS_scale_met_unclustered_energy_$ERA", "shape", SystMap<>::init(1.00));
++  // the recoil calibration of DY and W in 2018 only: since the MET fix of 2026-10-18 the v15 production
++  // (smrun2_binned_v7b, smrun2_tau_id_v2) recoil-corrects DY and W in 2018 alone and has no recoil shifts in
++  // 2016 and 2017 (BBTauTauAnalysis-ShapeSmith constants.RECOIL_ERAS)
++  if (era_tag == "Run2018") {
    cb.cp()
        .channel({"mt"})
        .process({"ZTT", "ZL", "ZJ", "W"})
@@ -769,6 +773,7 @@ index 959b339..0542472 100644
        .channel({"mt"})
       .process({"ZTT", "ZL", "ZJ", "W"})
        .AddSyst(cb, "CMS_res_met_$ERA", "shape", SystMap<>::init(1.00));
++  }
  
    // ##########################################################################
    // Uncertainty: Background normalizations

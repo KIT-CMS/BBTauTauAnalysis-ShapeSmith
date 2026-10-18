@@ -2,7 +2,7 @@
 context) against the tau-ID measurement of every era: MorphingTauID2017 throws on a declared shape that the synced
 shapes lack (CombineTools TFileIO.cc: "TH1 ... not found"), so every shape it declares for a process of the measurement
 must be one the analysis produces. v7: no HEM shape (E29), CMS_prefiring in every era (E11), the lumi lnN the total of
-the Cholesky scheme of the year (6.6).
+the Cholesky scheme of the year (6.6); v7b: the recoil shapes of DY and W in 2018 only (the MET fix of 2026-10-18).
 
 The file is read by a small interpreter of its few constructs: if / else if / else on the arguments of
 AddTauIDRun2Systematics, range-for over string arrays, string list assignments and the cb.cp()...AddSyst(...)
@@ -195,6 +195,9 @@ def test_every_declared_shape_is_produced(code, era):
     assert not shapes(code, era, "mm") - made["mm"]  # the control region: normalisations only
     assert "CMS_prefiring" in declared and not [name for name in declared if "HEM" in name]  # E11, E29
     assert f"CMS_emb_ttbar_contamination_{ERA_TAG[era]}" in declared and f"CMS_scale_t_dm1_{ERA_TAG[era]}" in declared
+    # the MET fix (2026-10-18): the recoil calibration of DY and W in 2018 only
+    recoil = {f"CMS_scale_met_{ERA_TAG[era]}", f"CMS_res_met_{ERA_TAG[era]}"}
+    assert (recoil <= declared) if era == "2018" else not recoil & declared
     # the other way round: only the shifts without a shape in MorphingTauID2017 (filled for the skim) and the
     # predecessor's undeclared CMS_PileUp stay out of the fit
     assert made["mt"] - declared == {name for name, _ in unused_shifts(era)} | {"CMS_PileUp"}

@@ -1,0 +1,37 @@
+# v7b: the MC and the embedding re-produced as smrun2_binned_v7b (the MET fix of 2026-10-18: DY and W recoil-corrected
+# in 2018 only, without recoil correction in 2016 and 2017; the POG muon_Z trigger SF on MC, E5), the data stay in
+# smrun2_binned_v7: ntuples.base is the data production, ntuples.bases the MC and embedding one, and every friend is
+# split by applies_to likewise. Skims, outputs and galleries under smrun2_binned_v7b; the smrun2_binned_v7 run YAMLs
+# keep reproducing the v7 results.
+# Light-dilepton controls (Z+jets in ee/mm, top in em) on smrun2_binned_v7b, one YAML for every era:
+#   shapesmith <command> -c configs/smrun2_binned_v7b_dilepton.yaml -s era=<era>
+# The source of the DY table of the era (spec 6.10, E19): without the correction (dy_correction: none),
+#   python scripts/derive_dy_correction.py -c configs/smrun2_binned_v7b_dilepton.yaml -s era=<era> --ttbar-scale em
+# prints the DY_NJETS_BTAG entry of the era (constants.py holds these since 2026-10-19); its closure with
+# -s switches.dy_correction=njets_btag
+# -s output_dir=/ceph/sdaigler/shapesmith/smrun2_binned_v7b/output/dilepton_dycorr/<era>.
+# Switches (types and defaults in switches.py):
+#   sample_lists:  the inventories of the era (the embedding exists in et, mt and tt only)
+#   diagnostics:   true (n_jets regions, DY and ttbar flavour templates, met_uncorrected, metphi_uncorrected, npv_good, rho)
+analysis: bbtautau_shapesmith.dilepton:build
+era: "2018"
+channels: [em, mm, ee]
+switches: {sample_lists: ["sm_{era}_binned", "sm_{era}_borrowed"], diagnostics: true}
+sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
+ntuples:
+  server: root://cmsdcache-kit-disk.gridka.de
+  base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7/CROWNRun      # the data
+  bases:                                                  # the MC and the embedding: the re-production
+    mc: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNRun
+    embedding: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNRun
+  friends: []
+skim_dir: /ceph/sdaigler/shapesmith/smrun2_binned_v7b/skims/dilepton/{era}
+output_dir: /ceph/sdaigler/shapesmith/smrun2_binned_v7b/output/dilepton/{era}
+workers: 8                                                # the DY and data samples need much memory per worker
+log_level: DEBUG
+# web gallery of the era: the dilepton channels of the column "classic"
+web:
+  dir: "/web/sdaigler/public_html/smrun2_binned_v7b/{era}"
+  variant: classic
+  label: classic
+  description: "MC for genuine ττ and jet→τh fakes, QCD from the ABCD method; the dilepton controls em, mm and ee (MC, DY uncorrected)."

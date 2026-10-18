@@ -19,18 +19,25 @@ changes to `HttSystematics_TauIDRun2.cc`:
   instead of all but 2018 (E11: 2018 has the muon part), and `lumi_13TeV_$ERA` the total of the LUM POG Cholesky
   scheme of the year (spec 6.6): 1.0123 (2016 halves), 1.0082 (2017), 1.0084 (2018). MorphingTauID2017 throws on a
   declared shape that the synced shapes lack (`CombineTools/src/TFileIO.cc:24`, "TH1 ... not found"), so the v7
-  shapes (without HEM, with `CMS_prefiring` in 2018) need exactly this declaration.
+  shapes (without HEM, with `CMS_prefiring` in 2018) need exactly this declaration;
+- v7b (2026-10-18, the MET fix): `CMS_scale_met_$ERA` and `CMS_res_met_$ERA` (recoil calibration of DY and W) only for
+  `Run2018`, as the productions from `smrun2_tau_id_v2` on recoil-correct DY and W in 2018 alone
+  (`constants.RECOIL_ERAS`); 2016 and 2017 have no recoil shapes. A refit of `smrun2_tau_id_v1` 2016/2017 shapes
+  ignores their recoil shapes (MorphingTauID2017 skips undeclared shapes).
 
 The patch is `git diff bin/MorphingTauID2017.cpp` followed by `git diff -U100000 src/HttSystematics_TauIDRun2.cc`: the
 second file with full context, so that `tests/test_tau_id_patch.py` reads the whole patched file and checks, per era,
 that every shape it declares for a process of the measurement is one the analysis produces (and the lumi value). It
-applies with `git apply` to a clean 84095dd. sha256 `1d15cde86f47981899689b9d33d2a5d2f87238af14b71dce1cbc2713944df61e`.
+applies with `git apply` to a clean 84095dd. sha256 `dc29badd0a66192f2158037b866739c074bc33f92788452d1976eeb52937faa3`.
 
 jvoss's built area declares the 28 individual sources, which the shapes do not have, so the measurement needs an own
 area built with this patch; `combine.cmssw_dir` points to it (`/work/sdaigler/tau_id_es/CMSSW_14_1_0_pre4`, built
 2026-10-03, rebuilt with the v7 changes on 2026-10-17: `scram b` in `CombineHarvester/TauIDSFMeasurement`; checked with
 MorphingTauID2017 on the v5 2018 synced shapes of Tight/VVLoose, DM0, which now stops at the missing
-`W_CMS_prefiringUp`, and on a copy without the HEM shapes and with `CMS_prefiring`, which gives the cards). `MorphingTauID2017` writes its `cb.PrintAll()` log to the hard-coded path
+`W_CMS_prefiringUp`, and on a copy without the HEM shapes and with `CMS_prefiring`, which gives the cards); rebuilt with
+the v7b recoil guard on 2026-10-18 and checked on the `smrun2_tau_id_v1` Tight/VVLoose DM0 shapes: 2017 gives the cards
+without a recoil nuisance, also from a copy without the 108 recoil histograms (as `smrun2_tau_id_v2` will have), 2018
+declares `CMS_scale_met_Run2018` and `CMS_res_met_Run2018` and stops on such a copy at `W_CMS_scale_met_Run2018Up`. `MorphingTauID2017` writes its `cb.PrintAll()` log to the hard-coded path
 `/work/jvoss/ntuples/smhtt_ul_SFs_v15/log/cb_PrintAll.log`; that directory does not exist, so the binary prints
 "Could not open log file" and carries on.
 

@@ -2,7 +2,8 @@
 #   shapesmith <command> -c configs/smrun2_binned_v7_dilepton.yaml -s era=<era>
 # The source of the DY table of the era (spec 6.10, E19): without the correction (dy_correction: none),
 #   python scripts/derive_dy_correction.py -c configs/smrun2_binned_v7_dilepton.yaml -s era=<era> --ttbar-scale em
-# prints the DY_NJETS_BTAG entry of the era (constants.py); its closure with -s switches.dy_correction=njets_btag
+# prints the DY_NJETS_BTAG entry of the era (constants.py held these until 2026-10-19, now those of v7b); its closure
+# with -s switches.dy_correction=njets_btag
 # -s output_dir=/ceph/sdaigler/shapesmith/smrun2_binned_v7/output/dilepton_dycorr/<era>.
 # Switches (types and defaults in switches.py):
 #   sample_lists:  the inventories of the era (the embedding exists in et, mt and tt only)

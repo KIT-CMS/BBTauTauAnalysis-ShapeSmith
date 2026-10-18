@@ -16,6 +16,11 @@ SF, electron -> tau ES, JER, electron ES) are filled under their own name, so th
 branch; the datacards ignore them. The electron ES and resolution are correlated between the eras (EGM, K4), so their
 names have no era.
 
+The recoil calibration of the MET (CMS_scale_met, CMS_res_met on DY and W) exists only where the production
+recoil-corrects DY and W: since the MET fix of 2026-10-18 in 2018 alone (constants.RECOIL_ERAS, the switch recoil_eras;
+smrun2_tau_id_v2 on), so 2016preVFP, 2016postVFP and 2017 book no recoil shape, as the patched HttSystematics_TauIDRun2.cc
+declares none there. smrun2_tau_id_v1 has the recoil shifts in every era (recoil_eras of its run YAML).
+
 The top-pT shape (K9, TOP recommendation): the difference between with (the nominal) and without the reweighting,
 symmetrised: Down is without the weight, Up the mirror 2 w - 1 of it around the nominal. The predecessor took the
 weight squared as Up (1 - 2d + d^2 for w = 1 - d, against 1 - 2d now).
@@ -25,10 +30,12 @@ nominal SF), and the payload was fitted so; they stay no-ops here, and the produ
 """
 from __future__ import annotations
 
+from collections.abc import Collection
+
 from shapesmith.histogram import part_of
 from shapesmith.model import ColumnVariation, VariationSum, WeightVariation
 
-from bbtautau_shapesmith.constants import ERAS, PREFIRING_NUISANCE, YEAR
+from bbtautau_shapesmith.constants import ERAS, PREFIRING_NUISANCE, RECOIL_ERAS, YEAR
 
 TOP_PT_WEIGHT = "topPtReweightWeight"
 
@@ -52,14 +59,26 @@ def jes_shifts(era: str) -> dict[str, str]:
     }
 
 
-def crown_shifts(era: str) -> tuple[tuple[str, str, tuple[str, ...] | None], ...]:
-    """(datacard name, CROWN shift without its direction, sample groups or None for every MC group)."""
+def recoil_shifts(era: str, recoil_eras: Collection[str] = RECOIL_ERAS) -> tuple[tuple[str, str, tuple[str, ...]], ...]:
+    """(datacard name, CROWN shift, groups) of the recoil calibration of DY and W; none in an era without the recoil
+    correction (2016 and 2017 since the MET fix)."""
+    if era not in recoil_eras:
+        return ()
+    tag = ERA_TAG[era]
+    return (
+        (f"CMS_res_met_{tag}", f"CMS_res_met_RecoilCalibration_{era}", ("DY", "W")),
+        (f"CMS_scale_met_{tag}", f"CMS_scale_met_RecoilCalibration_{era}", ("DY", "W")),
+    )
+
+
+def crown_shifts(era: str, recoil_eras: Collection[str] = RECOIL_ERAS) -> tuple[tuple[str, str, tuple[str, ...] | None], ...]:
+    """(datacard name, CROWN shift without its direction, sample groups or None for every MC group); the recoil shifts
+    only in `recoil_eras`."""
     tag = ERA_TAG[era]
     return (
         *((name, shift, None) for name, shift in jes_shifts(era).items()),
         (f"CMS_scale_met_unclustered_energy_{tag}", f"CMS_scale_met_unclustered_energy_{era}", None),
-        (f"CMS_res_met_{tag}", f"CMS_res_met_RecoilCalibration_{era}", ("DY", "W")),
-        (f"CMS_scale_met_{tag}", f"CMS_scale_met_RecoilCalibration_{era}", ("DY", "W")),
+        *recoil_shifts(era, recoil_eras),
         ("CMS_PileUp", f"CMS_pileup_{era}", None),
         (f"CMS_eff_m_trigger_{tag}", f"CMS_eff_m_trigger_{era}", None),
         (PREFIRING_NUISANCE, f"CMS_ecal_prefiring_{YEAR[era]}", None),
@@ -97,10 +116,10 @@ def weight_shifts(era: str) -> tuple[tuple[str, str, str, str], ...]:
     )
 
 
-def mc_variations(tau_id_weight: str, era: str) -> tuple[ColumnVariation | WeightVariation, ...]:
+def mc_variations(tau_id_weight: str, era: str, recoil_eras: Collection[str] = RECOIL_ERAS) -> tuple[ColumnVariation | WeightVariation, ...]:
     """Every MC variation, the parts of the summed families included; `tau_id_weight` is the nominal vsJet SF weight,
-    which the no-op CMS_eff_t_dm* keep."""
-    shifts = (*crown_shifts(era), *((name, shift, None) for name, shift in unused_shifts(era)))
+    which the no-op CMS_eff_t_dm* keep; the recoil shifts only in `recoil_eras`."""
+    shifts = (*crown_shifts(era, recoil_eras), *((name, shift, None) for name, shift in unused_shifts(era)))
     columns = tuple(ColumnVariation(f"{name}{d}", f"__{shift}{d}", groups=groups, regions=("nominal",)) for name, shift, groups in shifts for d in DIRECTIONS)
     parts = tuple(
         ColumnVariation(part_of(f"{name}{d}", part), f"__{shift}{d}", regions=("nominal",)) for name, family in summed_shifts(era).items() for part, shift in family.items() for d in DIRECTIONS

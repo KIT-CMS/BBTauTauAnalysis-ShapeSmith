@@ -29,15 +29,24 @@ NJETS_BINS = {"nj2": "n_jets == 2", "nj3": "n_jets == 3", "nj4p": "n_jets >= 4"}
 # window, rows n_bjets 0, 1, >= 2 (measured with 2), columns n_jets <= 2, 3, >= 4 (the tau selections have >= 2 jets),
 # the other MC subtracted with ttbar times the em data/MC of the same b-tag region. Derived per era with
 # scripts/derive_dy_correction.py --ttbar-scale em (dy_correction.py), which prints the entry of the era.
-# Every era from its smrun2_binned_v7 dilepton run (configs/smrun2_binned_v7_dilepton.yaml); ttbar scale of em per row:
-# 2016preVFP 0.897, 0.939, 1.001; 2016postVFP 0.939, 0.961, 1.057; 2017 0.904, 0.917, 0.988; 2018 0.863, 0.906, 1.003
-# (v6: 0.843, 0.885, 0.980).
+# Every era from its smrun2_binned_v7b dilepton run (configs/smrun2_binned_v7b_dilepton.yaml, 2026-10-19: the MET fix and
+# the POG muon trigger SF on MC); ttbar scale of em per row: 2016preVFP 0.832, 0.892, 0.954; 2016postVFP 0.896, 0.930,
+# 1.026; 2017 0.892, 0.909, 0.981; 2018 0.855, 0.900, 0.997. They serve the v7 run YAMLs as well, so the v7 runs with
+# dy_correction: njets_btag no longer reproduce exactly. The v7 tables (smrun2_binned_v7, KIT muon trigger SF on MC) are
+# those of analysis abd7657: up to 3.0 % (2016preVFP), 1.6 % (2016postVFP), 0.6 % (2017) and 0.4 % (2018) higher, the
+# normalisation of the mm MC, with the same n_jets shape.
 DY_NJETS_BTAG = {
-    "2016preVFP": {0: (0.899, 1.063, 1.397), 1: (1.078, 1.327, 1.868), 2: (0.978, 1.186, 1.630)},
-    "2016postVFP": {0: (0.934, 1.111, 1.486), 1: (1.115, 1.339, 1.900), 2: (1.012, 1.230, 1.803)},
-    "2017": {0: (0.889, 1.043, 1.349), 1: (1.072, 1.309, 1.731), 2: (0.940, 1.136, 1.626)},
-    "2018": {0: (0.885, 1.033, 1.331), 1: (1.120, 1.338, 1.809), 2: (0.983, 1.201, 1.716)},
+    "2016preVFP": {0: (0.875, 1.033, 1.355), 1: (1.052, 1.297, 1.824), 2: (0.968, 1.180, 1.631)},
+    "2016postVFP": {0: (0.919, 1.094, 1.463), 1: (1.099, 1.323, 1.878), 2: (1.008, 1.230, 1.812)},
+    "2017": {0: (0.884, 1.039, 1.344), 1: (1.067, 1.304, 1.726), 2: (0.938, 1.135, 1.628)},
+    "2018": {0: (0.882, 1.030, 1.328), 1: (1.115, 1.334, 1.805), 2: (0.981, 1.200, 1.717)},
 }
+
+# MET fix of 2026-10-18 (met_recoil_study): DY and W carry the recoil correction of the MET and its shifts
+# CMS_{scale,res}_met_RecoilCalibration_<era> only in these eras (CROWN bbtautau RUN2_V15_RECOIL_CORRECTION_ERAS), from the
+# productions smrun2_binned_v7b and smrun2_tau_id_v2 on; in 2016 and 2017 they take the MET of every other simulated sample
+# (JES and JER propagated, no recoil shifts). smrun2_binned_v7 and smrun2_tau_id_v1 have them in every era.
+RECOIL_ERAS = ("2018",)
 
 # event selections and weights of the POG cross-check (v7 spec 6.2, 6.4)
 HEM_ERAS = ("2018",)  # E29: veto of the events with a jet in the HEM 15/16 region, column hem_veto (CROWN, 2018 only)

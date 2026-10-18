@@ -1,6 +1,9 @@
 """The v7 run YAMLs (spec 6.11): one per run type, every era with `-s era=<era>` ({era} filled by the core); the
 productions P1 smrun2_tau_id_v1 and P3 smrun2_binned_v7 with the friends ff_v7 and ff_v7_w; skims and outputs under
-/ceph/sdaigler/shapesmith/<tag>/; the galleries per era with the columns classic, emb, emb ff and emb ff with W."""
+/ceph/sdaigler/shapesmith/<tag>/; the galleries per era with the columns classic, emb, emb ff and emb ff with W.
+The re-production of 2026-10-18 (MET fix, POG muon trigger SF on MC): a copy of every run YAML that reads the MC and the
+embedding of P3 from smrun2_binned_v7b and the MC of P1 from smrun2_tau_id_v2 (ntuples.bases), with its own skims,
+outputs and galleries under the new tag."""
 import json
 from pathlib import Path
 
@@ -16,6 +19,8 @@ from tests.helpers import DATABASE, ERAS, REPO
 from tests.run2 import list_name
 
 P1, P3 = "smrun2_tau_id_v1", "smrun2_binned_v7"
+REPRODUCTION = {P3: ("smrun2_binned_v7b", ("mc", "embedding")), P1: ("smrun2_tau_id_v2", ("mc",))}  # tag, re-produced kinds
+STORE = "/store/user/sdaigler/CROWN/ntuples"
 RUNS = {  # run YAML -> (production, gallery column or measurement name)
     "smrun2_binned_v7": (P3, "emb"),
     "smrun2_binned_v7_noemb": (P3, "classic"),
@@ -29,6 +34,8 @@ RUNS = {  # run YAML -> (production, gallery column or measurement name)
 }
 MEASUREMENTS = ("ff_smrun2_binned_v7", "ff_smrun2_binned_v7_w", "smrun2_tau_id_v1_id_es", "smrun2_tau_id_v1_trigger")
 COLUMNS = {"classic": "classic", "emb": "emb", "emb_ff": "emb ff", "emb_ff_w": "emb ff with W"}
+REPRODUCED = {name: name.replace(production, REPRODUCTION[production][0]) for name, (production, _) in RUNS.items()}  # v7 -> v7b
+RENAMED = {P3: (("ff_v7", "ff_v7b"),), P1: ()}  # the FF friends of v7b get their own names (ff_v7b, ff_v7b_w): P5 of v7 and v7b never overwrite each other
 
 
 def load(name: str, era: str, *overrides: str):
@@ -47,7 +54,57 @@ def strings(value):
 
 
 def test_one_run_yaml_per_run_type():
-    assert {p.stem for p in (REPO / "configs").glob("*.yaml") if "smrun2" in p.stem} == set(RUNS)
+    assert {p.stem for p in (REPO / "configs").glob("*.yaml") if "smrun2" in p.stem} == set(RUNS) | set(REPRODUCED.values())
+
+
+def moved(value, old: str, new: str, renamed=()):
+    """Every string of a dumped configuration with the tag `old` replaced by `new`, then the `renamed` (old, new) pairs."""
+    if isinstance(value, str):
+        value = value.replace(old, new)
+        for before, after in renamed:
+            value = value.replace(before, after)
+        return value
+    if isinstance(value, dict):
+        return {key: moved(item, old, new, renamed) for key, item in value.items()}
+    if isinstance(value, list):
+        return [moved(item, old, new, renamed) for item in value]
+    return value
+
+
+@pytest.mark.parametrize("era", ERAS)
+@pytest.mark.parametrize("name", RUNS)
+def test_the_reproduction_reads_its_kinds_from_the_new_tag(name, era):
+    """The copy of a run YAML: the data (P1: and the embedding) from the first production, the re-produced kinds and their
+    friends from the new tag; skims, outputs, ML folds, galleries and payload paths under the new tag; the rest is the run
+    of the first production (the about text aside, and the recoil eras of the tau-ID measurement)."""
+    production, _ = RUNS[name]
+    tag, kinds = REPRODUCTION[production]
+    first, again = load(name, era), load(REPRODUCED[name], era)
+    assert again.ntuples.server == first.ntuples.server and again.ntuples.base == first.ntuples.base == f"{STORE}/{production}/CROWNRun"
+    assert again.ntuples.bases == {kind: f"{STORE}/{tag}/CROWNRun" for kind in kinds} and not first.ntuples.bases
+    split = []
+    for friend in first.ntuples.friends:
+        assert set(friend.applies_to) == {"mc", "data", "embedding"}
+        base = moved(friend.base, "", "", RENAMED[production])
+        split += [friend.model_copy(update={"base": base, "applies_to": tuple(k for k in ("data", "mc", "embedding") if k not in kinds)}),
+                  friend.model_copy(update={"base": base.replace(f"/{production}/", f"/{tag}/"), "applies_to": kinds})]
+    assert again.ntuples.friends == split
+    for path in (again.skim_dir, again.output_dir, *([again.ml_dir] if again.ml_dir else [])):
+        assert str(path).startswith(f"/ceph/sdaigler/shapesmith/{tag}/"), path
+    rest = [{key: value for key, value in json.loads(c.model_dump_json()).items() if key != "ntuples"} for c in (first, again)]
+    for dump in rest:
+        if dump.get("web"):
+            dump["web"].pop("about")
+        recoil = dump["switches"].pop("recoil_eras", None)
+        assert recoil is None or name.endswith("_id_es")
+    assert rest[1] == moved(rest[0], production, tag, RENAMED[production])
+    if name.endswith("_id_es"):  # the MET fix: the recoil shifts of DY and W in 2018 only; v1 has them in every era
+        assert first.switches["recoil_eras"] == list(ERAS) and again.switches["recoil_eras"] == ["2018"]
+    overrides = ["switches.emb_es_payload=null"] if name.endswith("_trigger") else []
+    if again.switches.get("dy_correction") == "njets_btag" and era not in DY_NJETS_BTAG:
+        overrides.append("switches.dy_correction=none")
+    analysis = load_analysis(load(REPRODUCED[name], era, *overrides))
+    assert analysis.era == era and analysis.lumi_pb == LUMI_PB[era]
 
 
 @pytest.mark.parametrize("era", ERAS)

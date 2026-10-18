@@ -25,7 +25,7 @@ LUMI = {
 LEPTON_ID = 1.02  # e/mu ID and isolation on MC (the correlated part, K4)
 # E27: the embedded sample shares half of the MC lepton-ID nuisance (0.5 x 2 %) and has its own part (0.866 x 2 %)
 EMBEDDING_SHARED, EMBEDDING_OWN = 0.5, 0.866
-TRIGGER_LNN = 1.02  # the KIT single-lepton trigger SFs have no variations: +-2 % (TauAnalysis convention, spec C6)
+TRIGGER_LNN = 1.02  # the single-lepton trigger SFs of the nominal production have no variations: +-2 % (TauAnalysis convention, spec C6)
 BORROWED_LNN = 1.05  # a process of samples borrowed from another era (3.3): the detector differences
 
 
@@ -127,7 +127,8 @@ def lnn(processes: tuple[Process, ...], jet_fakes_output: str, era: str, borrowe
         LnN("eff_m", emb, round(1 + EMBEDDING_SHARED * (LEPTON_ID - 1), 3), channels=("mt",)),
         LnN("eff_e_emb", emb, round(1 + EMBEDDING_OWN * (LEPTON_ID - 1), 3), channels=("et",)),
         LnN("eff_m_emb", emb, round(1 + EMBEDDING_OWN * (LEPTON_ID - 1), 3), channels=("mt",)),
-        # single-lepton triggers (KIT SFs), per era, MC and embedding separately; em triggers on the muon
+        # single-lepton triggers, per era, MC and embedding separately (KIT SFs, except the POG muon_Z SF of the MC muon
+        # trigger from smrun2_binned_v7b on, E5); em triggers on the muon
         LnN(trigger("CMS_eff_m_trigger"), mc, TRIGGER_LNN, channels=("mt", "em")),
         LnN(trigger("CMS_eff_m_trigger_emb"), emb, TRIGGER_LNN, channels=("mt",)),
         LnN(trigger("CMS_eff_e_trigger"), mc, TRIGGER_LNN, channels=("et",)),

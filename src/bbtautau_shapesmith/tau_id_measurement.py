@@ -10,8 +10,9 @@ The embedded signal carries no tau ID or ES correction. Its energy scale is a gr
 the nominal columns: the tau four-momentum scaled by s (pt_2, mass_2, m_vis), the MET corrected by (1 - s) times the
 tau pT, and mt_1 from that MET.
 
-Per era (v7 spec 6.1, 6.2): the single-muon trigger of the era with its threshold and KIT scale factor (triggers.TRIGGER
-[era]["tau_id"]: 2016 the IsoMu22 family from 24 GeV, 2017 IsoMu27 from 29 GeV, 2018 IsoMu24 or IsoMu27 from 25 GeV),
+Per era (v7 spec 6.1, 6.2): the single-muon trigger of the era with its threshold and scale factor (triggers.TRIGGER
+[era]["tau_id"]: 2016 the IsoMu22 family from 24 GeV, 2017 IsoMu27 from 29 GeV, 2018 IsoMu24 or IsoMu27 from 25 GeV; E5:
+on MC the POG muon_Z SF from smrun2_tau_id_v2 on, the KIT SF before, on the embedding the KIT SF),
 the muon within |eta| < 2.1 in mt and mm (E2, E31: the embedding acceptance), the HEM veto in 2018 (E29), the
 prefiring weight on the MC of every era (E11). The MC is normalised to the luminosity of the era (constants.LUMI_PB).
 The embedded samples are data-driven and unaffected.
@@ -201,7 +202,7 @@ def mt_channel(switches: TauIdSwitches, era: str, channel_samples: tuple[Sample,
     return _channel(
         "mt", mt_cuts(switches.vsjet_wp, switches.vsele_wp, era), processes, channel_samples, working_point_regions(era),
         categories=categories(),
-        variations=tuple(es_variation(shift) for shift in ES_GRID) + (mc_variations(tau_id_weight, era) if switches.shape_systematics else ()),
+        variations=tuple(es_variation(shift) for shift in ES_GRID) + (mc_variations(tau_id_weight, era, switches.recoil_eras) if switches.shape_systematics else ()),
         estimators=(
             DataMinus("QCD", "same_sign", subtract, clip_negative=True),
             *(mc_variation_sums(era) if switches.shape_systematics else ()),

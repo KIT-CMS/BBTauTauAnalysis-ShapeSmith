@@ -99,3 +99,25 @@ def test_every_era_and_2016_half_has_its_table():
         for column, factor in enumerate(factors):
             halves = [constants.DY_NJETS_BTAG[era][row][column] for era in ("2016preVFP", "2016postVFP")]
             assert min(halves) <= factor <= max(halves)
+
+
+# the entries scripts/derive_dy_correction.py --ttbar-scale em printed on the smrun2_binned_v7b dilepton runs (2026-10-19)
+V7B_TABLES = {
+    "2016preVFP": {0: (0.875, 1.033, 1.355), 1: (1.052, 1.297, 1.824), 2: (0.968, 1.18, 1.631)},
+    "2016postVFP": {0: (0.919, 1.094, 1.463), 1: (1.099, 1.323, 1.878), 2: (1.008, 1.23, 1.812)},
+    "2017": {0: (0.884, 1.039, 1.344), 1: (1.067, 1.304, 1.726), 2: (0.938, 1.135, 1.628)},
+    "2018": {0: (0.882, 1.03, 1.328), 1: (1.115, 1.334, 1.805), 2: (0.981, 1.2, 1.717)},
+}
+
+
+def test_the_tables_are_those_of_the_v7b_dilepton_runs():
+    """Since 2026-10-19 the tables come from the v7b dilepton runs (MET fix, POG muon trigger SF on MC) and serve the
+    v7 run YAMLs too; every cell is the derived entry, and the 2016 FF measurement takes their luminosity-weighted mean."""
+    from bbtautau_shapesmith import constants, weights
+
+    assert constants.DY_NJETS_BTAG == V7B_TABLES
+    share = constants.LUMI_PB["2016preVFP"] / (constants.LUMI_PB["2016preVFP"] + constants.LUMI_PB["2016postVFP"])
+    combined = weights.dy_table("2016")
+    assert combined[0][0] == pytest.approx(share * 0.875 + (1 - share) * 0.919, abs=1e-4)
+    assert combined[2][2] == pytest.approx(share * 1.631 + (1 - share) * 1.812, abs=1e-4)
+    assert "(n_bjets == 1) & (n_jets == 3)) * 1.334" in weights.dy_njets_btag_weight("2018")

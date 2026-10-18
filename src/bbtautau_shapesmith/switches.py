@@ -7,6 +7,8 @@ from typing import Annotated, Literal
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, ValidationError, model_validator
 from shapesmith.model import AnalysisError
 
+from bbtautau_shapesmith.constants import RECOIL_ERAS
+
 STRICT = ConfigDict(extra="forbid", strict=True, frozen=True)
 SampleLists = list[str]  # inventory/<name>.txt: the KingMaker sample lists of the production
 
@@ -127,6 +129,9 @@ class TauIdSwitches(BaseModel):
     vsjet_wp: Literal["Medium", "Tight"] = "Tight"  # the measured DeepTau vsJet working point
     vsele_wp: Literal["VVLoose", "Tight"] = "VVLoose"  # the DeepTau vsEle working point it is measured with
     shape_systematics: bool = True  # the MC shape uncertainties (CROWN shifts and weight variations)
+    # the eras whose DY and W carry the recoil shifts in the production: constants.RECOIL_ERAS (2018, the MET fix,
+    # smrun2_tau_id_v2 on); smrun2_tau_id_v1 has them in every era
+    recoil_eras: list[Literal["2016preVFP", "2016postVFP", "2017", "2018"]] = Field(default_factory=lambda: list(RECOIL_ERAS))
 
 
 class TauTriggerSwitches(BaseModel):

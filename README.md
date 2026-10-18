@@ -106,7 +106,7 @@ shapesmith skim    -c configs/smrun2_tau_id_v1_trigger.yaml $S
 for cls in Medium VVVLoose_not_Medium; do for variant in nominal signal_mc tag_pt mt30 monitor; do   # no monitor in 2018
   shapesmith measure -c configs/smrun2_tau_id_v1_trigger.yaml $S -s switches.wp_class=$cls -s switches.variant=$variant; done; done
 shapesmith measure -c configs/smrun2_tau_id_v1_trigger.yaml $S --merge
-# P3: dilepton controls and the DY table of the era (constants.DY_NJETS_BTAG)
+# P3: dilepton controls and the DY table of the era (constants.DY_NJETS_BTAG; v7b: smrun2_binned_v7b_dilepton.yaml)
 D=configs/smrun2_binned_v7_dilepton.yaml
 shapesmith skim -c $D $S && shapesmith hist -c $D $S --control --regions all --skip-systematics && shapesmith plot -c $D $S --control
 python scripts/derive_dy_correction.py -c $D $S --ttbar-scale em
@@ -136,9 +136,25 @@ nominal cards). They are CROWN shifts of the friend (`friend_common.py`), so P5 
 with `--shifts all` as `ff_v2` in v6, not with the `--shifts None` that spec E34 names for P2-P5: the skim refuses a
 declared FF shift without its shifted branch (`-s switches.shape_systematics=false` runs without them).
 
-Every era and 2016 half has its DY table (`constants.DY_NJETS_BTAG`, from its `smrun2_binned_v7_dilepton.yaml` run);
-the 2016 FF measurement takes the luminosity-weighted mean of the tables of both halves. `--workers` stays at most 24
-on portal2; the dilepton `hist` needs up to ~45 GB per worker for the DY and data samples of 2017 and 2018.
+Every era and 2016 half has its DY table (`constants.DY_NJETS_BTAG`, from its `smrun2_binned_v7b_dilepton.yaml` run
+since 2026-10-19; the v7 tables came from `smrun2_binned_v7_dilepton.yaml`); the 2016 FF measurement takes the
+luminosity-weighted mean of the tables of both halves. `--workers` stays at most 24 on portal2; the dilepton `hist`
+needs up to ~45 GB per worker for the DY and data samples of 2017 and 2018 (57 GB with one worker in 2017 v7b).
+
+**v7b (re-production, 2026-10-18).** The MET fix (DY and W recoil-corrected in 2018 only, on the PuppiMET with the
+leptons before the jet energy scale; 2016 and 2017 without recoil correction) and the POG muon_Z trigger SF on MC (E5)
+need new MC and embedding: P3 MC and embedding as `smrun2_binned_v7b` (its friends `fastmtt` and `ff_v7b`, `ff_v7b_w` of the
+MC and embedding there too; the FF friends have their own names, so that P5 of v7 and v7b never overwrite each other,
+and their data friends lie under `smrun2_binned_v7`), P1 MC as `smrun2_tau_id_v2`; the data (P1: and the embedding) stay. Every v7 run YAML has
+its copy that reads the re-produced kinds from the new tag (`ntuples.bases`, friends split by `applies_to`) and writes
+skims, outputs and galleries under the new tag, so the v7 run YAMLs keep reproducing the v7 results
+(`tests/test_v7_runs.py` checks that each copy is its v7 run otherwise): `smrun2_binned_v7b.yaml`, `_noemb`,
+`_dilepton`, `_ff`, `_ff_w`, `ff_smrun2_binned_v7b.yaml`, `ff_smrun2_binned_v7b_w.yaml`, `smrun2_tau_id_v2_id_es.yaml`
+(`recoil_eras: ["2018"]`; the v1 YAML sets every era) and `smrun2_tau_id_v2_trigger.yaml` (the ES payload of
+`smrun2_tau_id_v2`). The commands are those above with these YAMLs. `constants.DY_NJETS_BTAG` holds the tables of the
+`smrun2_binned_v7b_dilepton.yaml` runs (2026-10-19); they serve the v7 run YAMLs as well, so a v7 run with
+`dy_correction: njets_btag` no longer reproduces its v7 result exactly (the v7 MC is superseded; the v7 tables are in
+the git history, analysis abd7657).
 
 The v5 run YAMLs (`*v5*.yaml`, galleries `sm2018_binned_v5` and `ff_sm2018_binned_v5`, run as above) share one skim
 directory between the tau and the dilepton run. With the v6 code, `hist`, `estimate` and `plot` of tt, em, mm and ee
@@ -261,7 +277,8 @@ nuisances they share are named so. Spec: `docs/v7_spec.md` of the workspace, sec
 
 - **Triggers** (`triggers.py`, `TRIGGER[era][channel]`, spec 6.2): flags, offline thresholds and the MC and embedding
   weights per era. Muon 2016 the IsoMu22 OR (pT > 24 GeV, the triggering muon |η| < 2.1 in mm and em), 2017 IsoMu27
-  (> 29 GeV), 2018 IsoMu24, each with the KIT SF `trg_wgt_single_mu22/27/24`; electron 2016 Ele25 (> 27 GeV,
+  (> 29 GeV), 2018 IsoMu24, each with the SF `trg_wgt_single_mu22/27/24` (E5: on MC the POG muon_Z SF from
+  smrun2_binned_v7b and smrun2_tau_id_v2 on, the KIT SF in v7 and tau_id_v1; on the embedding the KIT SF); electron 2016 Ele25 (> 27 GeV,
   |η| < 2.1), 2017 Ele32 for 34-37 GeV and Ele35 above with the weight piecewise and the HLT Zvtx factor 0.991 above
   37 GeV on MC and embedding, 2018 Ele32; tt 2016 the data with Iso or CombinedIso and the MC with Iso (its POG SF),
   2017 three and 2018 four paths. The tt embedding has no trigger requirement (the cut uses the skim's kind flags
@@ -278,7 +295,7 @@ nuisances they share are named so. Spec: `docs/v7_spec.md` of the workspace, sec
   nominal yield per bin and process, `Analysis.lnn_variations`). The b-tag weight variations follow the [T, M]
   scheme: `CMS_btag_fixedWP_{bc,light}_correlated` and `..._uncorrelated_<era>` (columns
   `btag_weight_upart_{up,down}_{bc,light}_{correlated,uncorrelated}`). `DY_NJETS_BTAG` is per era and 2016 half
-  (E19, spec 6.10), each from the v7 dilepton run of the era: `scripts/derive_dy_correction.py -c <dilepton run>
+  (E19, spec 6.10), each from the v7b dilepton run of the era: `scripts/derive_dy_correction.py -c <dilepton run>
   -s era=<era> --ttbar-scale em` (`dy_correction.py`) prints the entry of the era.
 - **Samples**: SingleElectron data (2016, 2017) go to et and ee; the powheg `GluGluToHHTo2B2T_kl-1p00` is the signal,
   the other κλ points have no process, node_SM is the auxiliary process `HH2B2Tau_nodeSM` (the cross-check) or, in a
@@ -292,8 +309,8 @@ nuisances they share are named so. Spec: `docs/v7_spec.md` of the workspace, sec
   none (correlated), the era (2016 halves separate; the copies of 2018 payloads take 2018, K6) or the year (2016
   shared). lnN: the LUM POG Cholesky set `lumi_13TeV_1516_l` / `_151617_l` / `_15161718_l` of the year (MC only);
   `eff_e`, `eff_m` 2 % on MC and, on the embedded sample, 1 % under the same name plus `eff_e_emb`, `eff_m_emb` 1.7 %
-  (E27); the single-lepton triggers `CMS_eff_{m,e}_trigger[_emb]_<era>` 2 % on MC and embedding (the KIT SFs have no
-  variations); `eff_t_vsJet_<channel>_<era>` and `eff_t_vsLep_<channel>_<era>` (VSe and VSmu together; 2018 token in
+  (E27); the single-lepton triggers `CMS_eff_{m,e}_trigger[_emb]_<era>` 2 % on MC and embedding (the SFs of the nominal
+  production have no variations); `eff_t_vsJet_<channel>_<era>` and `eff_t_vsLep_<channel>_<era>` (VSe and VSmu together; 2018 token in
   both 2016 halves, whose VSe and VSmu payloads are 2018 copies, K6); the fake-factor shifts `CMS_ff_<key>_<channel>_<year>` and
   `jetFakesNorm_<channel>_<year>`; `CMS_htt_emb_ttbar_<era>`; HH theory per E26 (`QCDscale_HH` +7.25/−21.12 %,
   `PDF_alphas_HH` 2.47 %). The families of CROWN shifts (TES, JES, JER, MET, recoil, the MC vsJet/VSe/VSmu components,
@@ -456,10 +473,13 @@ must follow its keys.
   wheels) are VariationSums of the finer CROWN shifts; the jet energy scale is the regrouped set (no HEM since v7);
   `CMS_prefiring` from the CROWN shift `CMS_ecal_prefiring_<year>`; the names carry `Run<era>`. Produced shifts without a
   shape in MorphingTauID2017 (vsEle SF, electron -> tau ES, JER, electron ES as `CMS_scale_e`/`CMS_res_e`) are filled
-  under their own name and ignored by the datacards. `CMS_htt_ttbarShape` is the difference with (the nominal)
+  under their own name and ignored by the datacards. The recoil calibration `CMS_scale_met`/`CMS_res_met` (DY and W)
+  exists in 2018 only since the MET fix (`constants.RECOIL_ERAS`, from `smrun2_tau_id_v2` on); the switch `recoil_eras`
+  books it where the production has it (`smrun2_tau_id_v1`: every era). `CMS_htt_ttbarShape` is the difference with (the nominal)
   against without the top-pT weight (K9): Down without it, Up the mirror 2 w - 1 around the nominal. The vsJet SF families `CMS_eff_t_dm*` equal the nominal, as in the predecessor.
 - **CMSSW**: MorphingTauID2017 exists only with jvoss's local changes plus the regrouped JES declaration and the v7
-  changes (no HEM, `CMS_prefiring` in every era, the Cholesky lumi total), versioned in `patches/`; it needs an own
+  changes (no HEM, `CMS_prefiring` in every era, the Cholesky lumi total) and the v7b change (the recoil shapes in 2018
+  only), versioned in `patches/`; it needs an own
   area built with the patch (see `patches/README.md`). `tests/test_tau_id_patch.py` checks per era that every shape the
   patched file declares is produced.
 

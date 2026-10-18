@@ -35,7 +35,7 @@ FAMILIES = {
     "jes_year": E,  # the year-specific regrouped JES sources
     "jer": E,
     "met_unclustered": E,
-    "recoil": J,  # one recoil file for 2016
+    "recoil": J,  # one recoil file per year; since the MET fix (constants.RECOIL_ERAS) only 2018 has a recoil correction
     "prefiring": K,  # one CMS_prefiring for 2016-2018 (E11)
     "pileup": K,  # E21
     "btag_correlated": K,

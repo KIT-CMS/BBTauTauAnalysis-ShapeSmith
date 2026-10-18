@@ -13,12 +13,14 @@
 #   vsjet_wp:          Medium | Tight, the measured DeepTau vsJet working point
 #   vsele_wp:          VVLoose | Tight, the DeepTau vsEle working point it is measured with
 #   shape_systematics: true (default): the MC shape uncertainties of the shifts of P1 (E34 exception)
+#   recoil_eras:       every era: smrun2_tau_id_v1 has the recoil shifts of DY and W in every era (before the MET fix;
+#                      the default is constants.RECOIL_ERAS, 2018 only)
 # combine.cmssw_dir: a CMSSW_14_1_0_pre4 with CombineHarvester and TauIDSFMeasurement tauID_ES plus
 # patches/TauIDSFMeasurement-tauID_ES.patch and SMRun2Legacy (patches/README.md).
 analysis: bbtautau_shapesmith.tau_id_measurement:build
 era: "2018"
 channels: [mt, mm]
-switches: {sample_lists: ["sm_{era}_tau_id_measurement"], vsjet_wp: Tight, vsele_wp: VVLoose}
+switches: {sample_lists: ["sm_{era}_tau_id_measurement"], vsjet_wp: Tight, vsele_wp: VVLoose, recoil_eras: ["2016preVFP", "2016postVFP", "2017", "2018"]}
 sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
 ntuples:
   server: root://cmsdcache-kit-disk.gridka.de

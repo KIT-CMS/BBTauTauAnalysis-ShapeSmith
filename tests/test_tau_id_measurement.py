@@ -19,7 +19,8 @@ from shapesmith.validate import validate
 from bbtautau_shapesmith.tau_id_binning import M_VIS_BINNING
 from bbtautau_shapesmith.tau_id_measurement import ES_GRID, build, es_variation
 from bbtautau_shapesmith.tau_id_systematics import mc_variation_sums, summed_shifts, unused_shifts, weight_shifts
-from tests.helpers import DATABASE, REPO, config
+from tests.helpers import DATABASE, ERAS, REPO, config
+from tests.run2 import list_name
 from tests.test_controls import only, write_rows
 
 WPS = (("Medium", "VVLoose"), ("Medium", "Tight"), ("Tight", "VVLoose"), ("Tight", "Tight"))
@@ -27,7 +28,8 @@ WPS = (("Medium", "VVLoose"), ("Medium", "Tight"), ("Tight", "VVLoose"), ("Tight
 TRIGGER_WEIGHT = "((pt_1 >= 25) & (pt_1 < 28)) * trg_wgt_single_mu24 + (pt_1 > 28) * trg_wgt_single_mu27"
 # the CROWN shifts of sm_tau_id_measurement_config (feat-new-sm-bbtautau-config 6f58e65, generated code of 2018) that
 # move a column of the mt channel, for every MC sample type, with the CROWN era in the name; v7 drops the HEM shift (E29,
-# C20) and adds the prefiring shift of the year (E11, C11); the recoil shifts exist for DY and W only
+# C20) and adds the prefiring shift of the year (E11, C11); the recoil shifts exist for DY and W only, and since the MET
+# fix of 2026-10-18 (smrun2_tau_id_v2) in 2018 only
 def produced_shifts(era):
     year = era[:4]
     return (
@@ -206,14 +208,42 @@ def test_mc_systematics_are_the_predecessor_families():
     assert not [e for e in without.estimators if isinstance(e, VariationSum)]
 
 
-def test_every_produced_shift_is_declared():
-    # the skim fails on a shifted branch of a read column that no variation declares, and on a declared one without branch
-    channel = analysis_for().channel("mt")
+def era_analysis(era, **switches):
+    analysis = build(config(("mt", "mm"), "bbtautau_shapesmith.tau_id_measurement:build", era=era, sample_lists=[list_name("tau_id", era)], **switches))
+    validate(analysis)
+    return analysis
+
+
+@pytest.mark.parametrize("era", ERAS)
+def test_every_produced_shift_is_declared(era):
+    # the skim fails on a shifted branch of a read column that no variation declares, and on a declared one without
+    # branch; DY and W carry the recoil shifts in 2018 only (MET fix, smrun2_tau_id_v2)
+    channel = era_analysis(era).channel("mt")
     for group in ("DY", "W", "TT", "ST", "VV"):
         suffixes = {v.suffix for v in channel.variations if isinstance(v, ColumnVariation) and v.suffix and applies(v, "mc", group)}
-        shifts = produced_shifts("2018") | (recoil_shifts("2018") if group in ("DY", "W") else set())
+        shifts = produced_shifts(era) | (recoil_shifts(era) if group in ("DY", "W") and era == "2018" else set())
         assert suffixes == {f"__{shift}{d}" for shift in shifts for d in ("Up", "Down")}, group
     assert not [v for v in channel.variations if isinstance(v, ColumnVariation) and v.suffix and applies(v, "embedding", "EMB")]
+
+
+@pytest.mark.parametrize("era", ERAS)
+def test_the_recoil_shapes_follow_the_recoil_eras_of_the_production(era):
+    """The MET fix: CMS_scale_met and CMS_res_met (DY and W) in 2018 only; the switch recoil_eras books them where the
+    production has them, e.g. smrun2_tau_id_v1 in every era."""
+    tag = f"Run{era}"
+    recoil = {f"CMS_{kind}_met_{tag}{d}" for kind in ("scale", "res") for d in ("Up", "Down")}
+
+    def names(**switches):
+        return {v.name for v in era_analysis(era, **switches).channel("mt").variations}
+
+    booked = names()
+    assert (recoil <= booked) if era == "2018" else not recoil & booked
+    assert recoil <= names(recoil_eras=list(ERAS)) and not recoil & names(recoil_eras=[])
+    every_era = [v for v in era_analysis(era, recoil_eras=list(ERAS)).channel("mt").variations if v.name in recoil]
+    assert {v.groups for v in every_era} == {("DY", "W")}
+    assert {v.suffix for v in every_era} == {f"__CMS_{kind}_met_RecoilCalibration_{era}{d}" for kind in ("scale", "res") for d in ("Up", "Down")}
+    with pytest.raises(AnalysisError, match="recoil_eras"):
+        era_analysis(era, recoil_eras=["2022"])
 
 
 def test_summed_families_reach_the_shapes_file(tmp_path):

@@ -3,8 +3,10 @@ weights of the simulated and the embedded samples.
 
 Flags and weights are the CROWN columns of the v7 configuration (spec C6-C8, E2-E7, E33):
 - muon (mt, em, mm, the tau-ID measurement): 2016 the OR of IsoMu22, IsoTkMu22, IsoMu22_eta2p1 and IsoTkMu22_eta2p1,
-  pT > 24 GeV and |eta| < 2.1 for the triggering muon (E2); 2017 IsoMu27, pT > 29 GeV (E3); 2018 IsoMu24 (E4). The KIT
-  scale factor of the era (E5): trg_wgt_single_mu22 / _mu27 / _mu24, for MC and embedding.
+  pT > 24 GeV and |eta| < 2.1 for the triggering muon (E2); 2017 IsoMu27, pT > 29 GeV (E3); 2018 IsoMu24 (E4). The scale
+  factor of the era (E5): trg_wgt_single_mu22 / _mu27 / _mu24, on MC the POG muon_Z SF (2016 IsoMu24_or_IsoTkMu24, 2017
+  IsoMu27, 2018 IsoMu24; productions smrun2_binned_v7b and smrun2_tau_id_v2 on), on the embedding the KIT SF; the column
+  names stay. smrun2_binned_v7 and smrun2_tau_id_v1 carry the KIT SF on MC as well.
 - electron (et, ee): 2016 Ele25_eta2p1, pT > 27 GeV (|eta| < 2.1); 2017 Ele32 for 34 <= pT < 37 GeV and Ele35 from 37
   GeV, the weight piecewise and, above 37 GeV, the EGM HLT Zvtx factor 0.991 on MC and embedding (E6, D4); 2018 Ele32.
 - di-tau (tt, E7): 2016 the data take DoubleMediumIsoPFTau35 or DoubleMediumCombinedIsoPFTau35, the MC the Iso path only
