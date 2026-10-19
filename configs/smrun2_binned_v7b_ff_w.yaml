@@ -3,6 +3,8 @@
 # smrun2_binned_v7: ntuples.base is the data production, ntuples.bases the MC and embedding one, and every friend is
 # split by applies_to likewise. Skims, outputs and galleries under smrun2_binned_v7b; the smrun2_binned_v7 run YAMLs
 # keep reproducing the v7 results.
+# Decision of 2026-10-19 (E33): the tt-embedding closure (12.7.5) failed in every era, so tt takes its genuine taus
+# from MC as in v6 and only et and mt keep the embedding: switches.embedding [et, mt] (was [et, mt, tt]).
 # HH->bbtautau tau channels on smrun2_binned_v7b with fake factors, variant QCD + W+jets + ttbar (friend ff_v7b_w), and em as
 # the ttbar control channel of the fits; the datacards of an era and the Run-2 combination (spec 6.9). One YAML for every era:
 #   shapesmith <command> -c configs/smrun2_binned_v7b_ff_w.yaml -s era=<era>
@@ -13,7 +15,7 @@
 # Switches (types and defaults in switches.py):
 #   sample_lists:      the inventories of the era (sm_<era>_borrowed: VH -> tautau of 2016postVFP from 2016preVFP)
 #   jet_fakes:         ff (jetFakes from the FF friend ff_v7b_w: data minus genuine and lepton fakes in anti_iso)
-#   embedding:         [et, mt, tt], as the FF measurement of the payload (E33; [et, mt] if tt keeps MC)
+#   embedding:         [et, mt], as the FF measurement of the payload (tt: MC genuine tautau, E33 decision of 2026-10-19)
 #   crown_shifts:      false (nominal only, E34); the FF friend shifts and the b-tag and prefiring weight variations stay
 # P5 for v7b: ff_v7b_w of the data under smrun2_binned_v7, of the MC and embedding under smrun2_binned_v7b, both from the
 #   payload of ff_smrun2_binned_v7b_w.yaml. The friend ff_v7b_w must carry its FF shift keys (CROWN shifts of the friend,
@@ -27,7 +29,7 @@
 analysis: bbtautau_shapesmith.analysis:build
 era: "2018"
 channels: [et, mt, tt, em]                                # em: the ttbar control channel (in every final state)
-switches: {sample_lists: ["sm_{era}_binned", "sm_{era}_borrowed", "sm_{era}_embedding"], jet_fakes: ff, embedding: [et, mt, tt], crown_shifts: false, nn_friend: false, fit_categories: control, control_regions: false, dy_correction: njets_btag, ff_processes: [QCD, Wjets, ttbar]}
+switches: {sample_lists: ["sm_{era}_binned", "sm_{era}_borrowed", "sm_{era}_embedding"], jet_fakes: ff, embedding: [et, mt], crown_shifts: false, nn_friend: false, fit_categories: control, control_regions: false, dy_correction: njets_btag, ff_processes: [QCD, Wjets, ttbar]}
 sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
 ntuples:
   server: root://cmsdcache-kit-disk.gridka.de

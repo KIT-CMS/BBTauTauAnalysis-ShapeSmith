@@ -3,7 +3,8 @@ productions P1 smrun2_tau_id_v1 and P3 smrun2_binned_v7 with the friends ff_v7 a
 /ceph/sdaigler/shapesmith/<tag>/; the galleries per era with the columns classic, emb, emb ff and emb ff with W.
 The re-production of 2026-10-18 (MET fix, POG muon trigger SF on MC): a copy of every run YAML that reads the MC and the
 embedding of P3 from smrun2_binned_v7b and the MC of P1 from smrun2_tau_id_v2 (ntuples.bases), with its own skims,
-outputs and galleries under the new tag."""
+outputs and galleries under the new tag. The decision of 2026-10-19 (E33: the tt-embedding closure failed in every era):
+the v7b runs with the embedding take the genuine taus of tt from MC, switches.embedding [et, mt] for [et, mt, tt]."""
 import json
 from pathlib import Path
 
@@ -35,6 +36,8 @@ RUNS = {  # run YAML -> (production, gallery column or measurement name)
 MEASUREMENTS = ("ff_smrun2_binned_v7", "ff_smrun2_binned_v7_w", "smrun2_tau_id_v1_id_es", "smrun2_tau_id_v1_trigger")
 COLUMNS = {"classic": "classic", "emb": "emb", "emb_ff": "emb ff", "emb_ff_w": "emb ff with W"}
 REPRODUCED = {name: name.replace(production, REPRODUCTION[production][0]) for name, (production, _) in RUNS.items()}  # v7 -> v7b
+TT_FROM_MC = ("smrun2_binned_v7", "smrun2_binned_v7_ff", "smrun2_binned_v7_ff_w", "ff_smrun2_binned_v7", "ff_smrun2_binned_v7_w")  # E33
+TT_FROM_MC_TEXT = ("in et, mt and tt", "in et and mt (tt: MC)")  # the web description of those runs says so
 RENAMED = {P3: (("ff_v7", "ff_v7b"),), P1: ()}  # the FF friends of v7b get their own names (ff_v7b, ff_v7b_w): P5 of v7 and v7b never overwrite each other
 
 
@@ -76,7 +79,8 @@ def moved(value, old: str, new: str, renamed=()):
 def test_the_reproduction_reads_its_kinds_from_the_new_tag(name, era):
     """The copy of a run YAML: the data (P1: and the embedding) from the first production, the re-produced kinds and their
     friends from the new tag; skims, outputs, ML folds, galleries and payload paths under the new tag; the rest is the run
-    of the first production (the about text aside, and the recoil eras of the tau-ID measurement)."""
+    of the first production (the about text aside, the recoil eras of the tau-ID measurement and, in the runs with the
+    embedding, tt from MC: switches.embedding [et, mt] and the matching web description)."""
     production, _ = RUNS[name]
     tag, kinds = REPRODUCTION[production]
     first, again = load(name, era), load(REPRODUCED[name], era)
@@ -97,7 +101,15 @@ def test_the_reproduction_reads_its_kinds_from_the_new_tag(name, era):
             dump["web"].pop("about")
         recoil = dump["switches"].pop("recoil_eras", None)
         assert recoil is None or name.endswith("_id_es")
-    assert rest[1] == moved(rest[0], production, tag, RENAMED[production])
+    expected = moved(rest[0], production, tag, RENAMED[production])
+    if name in TT_FROM_MC:
+        assert first.switches["embedding"] == ["et", "mt", "tt"] and again.switches["embedding"] == ["et", "mt"]
+        expected["switches"]["embedding"] = ["et", "mt"]
+        if expected.get("web"):  # the runs whose description names the embedded channels
+            expected["web"]["description"] = expected["web"]["description"].replace(*TT_FROM_MC_TEXT)
+    else:
+        assert again.switches.get("embedding") == first.switches.get("embedding")
+    assert rest[1] == expected
     if name.endswith("_id_es"):  # the MET fix: the recoil shifts of DY and W in 2018 only; v1 has them in every era
         assert first.switches["recoil_eras"] == list(ERAS) and again.switches["recoil_eras"] == ["2018"]
     overrides = ["switches.emb_es_payload=null"] if name.endswith("_trigger") else []

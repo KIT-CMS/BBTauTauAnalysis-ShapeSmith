@@ -178,8 +178,9 @@ W_TABLES = {
 # The tables of an era. TABLE_ERA: the tables an era uses (the 2016 halves and their union share the 2016 ones, so that a
 # measurement per half compares bin by bin with the combined one).
 TABLE_ERA = {"2016preVFP": "2016", "2016postVFP": "2016", "2016": "2016", "2017": "2017", "2018": "2018"}
-# The equipopulated bin counts per era: those of 2018 times the luminosity ratio, so that a bin holds as many events
-# as in 2018 (statistical error per bin <= ~25-30 %, spec 6.8), at least 2 where 2018 has 2 or more.
+# The starting equipopulated bin counts per era: those of 2018 times the luminosity ratio, so that a bin holds as many
+# events as in 2018 (statistical error per bin <= ~25-30 %, spec 6.8), at least 2 where 2018 has 2 or more; the review
+# below (BIN_COUNTS) replaces them where the measured statistics differ.
 BIN_SCALE = {"2016": 36330.0 / 59560.0, "2017": 42070.0 / 59560.0}
 
 
@@ -204,22 +205,52 @@ def _all_tables() -> dict:
     return {channel: {**TABLES[channel], **W_TABLES.get(channel, {})} for channel in TABLES}
 
 
-# era -> channel -> quantity name -> equipopulated bin counts per category (edit by hand where the rule misses)
+# era -> channel -> quantity name -> equipopulated bin counts per category: the luminosity rule (BIN_SCALE), then the
+# counts of the statistics review of the measured v7b ratios (ff_edges.BIN_COUNTS, scripts/ff_binning.py counts: a
+# median relative stat error above 0.30 lowers a count, in 2016 and 2017 one below 0.25 raises it up to the 2018 count;
+# 2018 entries replace jvoss's counts). era -> channel -> quantity name -> edges per category: the JSON line of
+# `measure --suggest-binning` of the era ("<channel> suggested edges (JSON): {...}"), entered into ff_edges.py by
+# scripts/ff_binning.py edges (2018: the W+jets quantities and those with their own 2018 count or lower end; its other
+# QCD and ttbar edges are the measured 2018 tables above).
+from bbtautau_shapesmith.ff_edges import BIN_COUNTS, PER_ERA_EDGES  # noqa: E402
+
 PER_ERA_OVERRIDES = {
     era: {
-        channel: {name: _scaled(b.equipopulated.n_bins, scale) for key, table in tables.items() for name, b in quantity_names(key, table).items() if b.equipopulated}
+        channel: {
+            **{name: _scaled(b.equipopulated.n_bins, BIN_SCALE[era]) for key, table in tables.items() for name, b in quantity_names(key, table).items() if b.equipopulated and era in BIN_SCALE},
+            **{name: tuple(counts) for name, counts in BIN_COUNTS.get(era, {}).get(channel, {}).items()},
+        }
         for channel, tables in _all_tables().items()
     }
-    for era, scale in BIN_SCALE.items()
+    for era in ("2016", "2017", "2018")
 }
-# era -> channel -> quantity name -> edges per category: the JSON line of `measure --suggest-binning` of the era
-# ("<channel> suggested edges (JSON): {...}"), entered here. Empty until the v7 productions exist.
-PER_ERA_EDGES: dict[str, dict[str, dict[str, list[list[float]]]]] = {"2016": {}, "2017": {}, "2018": {}}
+
+# era -> channel -> quantity name -> lower end of its equipopulated range, where the 2018 table starts above the
+# offline threshold of the era: the mt lepton pT non-closures start at 32 GeV, the muon triggers at 24 (2016), 29
+# (2017) and 25 GeV (2018). Without it the non-closure is measured from 32 GeV only and its first bin is clamped onto
+# the 11 % (2017) to ~30 % (2016) of the events below (v6 2018 too); with it the suggested edges start at the
+# threshold. A quantity with its own lower end needs edges of its era, in 2018 too.
+_MT_LEPTON_PT = ("QCD_non_closure_pt_1", "ttbar_non_closure_pt_1")
+PER_ERA_LOW = {era: {"mt": dict.fromkeys(_MT_LEPTON_PT, low)} for era, low in (("2016", 24.0), ("2017", 29.0), ("2018", 25.0))}
 
 
-def _resolved(binned: Binned, n_bins: tuple[int, ...] | None, edges: list[list[float]] | None, name: str) -> Binned:
+# channel -> quantity name -> fits per category that replace those of the tables in every era (v7b review,
+# 2026-10-19): the ttbar fake factors of et and mt are smoothed with 6 GeV instead of jvoss's 26 (et) and 12 GeV (mt).
+# The MC fake factor rises steeply over its first bins (2-4 GeV wide); the wide kernels missed the measured ratio by
+# up to -14 % / +8 % (chi2 13-250 for 8-12 points with 2 % MC errors, 6 GeV: 1-10), a non-closure in the tau pT that
+# no later correction removes (DR closure after all corrections 0.83-1.06 in et 2018).
+FIT_OVERRIDES = {channel: {"ttbar_fake_factors": (Fit("smoothed", 6.0), Fit("smoothed", 6.0))} for channel in ("et", "mt")}
+
+
+def _resolved(binned: Binned, n_bins: tuple[int, ...] | None, edges: list[list[float]] | None, name: str, low: float | None = None, fits: tuple[Fit, ...] | None = None) -> Binned:
+    if fits is not None:
+        if len(fits) != len(binned.fits):
+            raise ValueError(f"{name}: {len(fits)} categories of fits, the table has {len(binned.fits)}")
+        binned = replace(binned, fits=tuple(fits))
     if n_bins is not None and binned.equipopulated is not None:
         binned = replace(binned, equipopulated=replace(binned.equipopulated, n_bins=tuple(n_bins)))
+    if low is not None:
+        binned = replace(binned, equipopulated=replace(binned.equipopulated, low=float(low)))
     if edges is not None:
         if len(edges) != len(binned.edges):
             raise ValueError(f"{name}: {len(edges)} categories of edges, the table has {len(binned.edges)}")
@@ -227,9 +258,9 @@ def _resolved(binned: Binned, n_bins: tuple[int, ...] | None, edges: list[list[f
     return binned
 
 
-def _resolve_table(key: str, table: dict, n_bins: dict, edges: dict) -> dict:
+def _resolve_table(key: str, table: dict, n_bins: dict, edges: dict, lows: dict | None = None, fits: dict | None = None) -> dict:
     def resolve(name: str, binned: Binned) -> Binned:
-        return _resolved(binned, n_bins.get(name), edges.get(name), name)
+        return _resolved(binned, n_bins.get(name), edges.get(name), name, (lows or {}).get(name), (fits or {}).get(name))
 
     if key.startswith("process_fractions"):
         return {**table, "binned": resolve(key, table["binned"])}
@@ -241,18 +272,42 @@ def _resolve_table(key: str, table: dict, n_bins: dict, edges: dict) -> dict:
     return result
 
 
+# channel -> table keys whose non-closures end with one in the fake-factor variable itself, on the bins and with the
+# fits of the fake factors (v7b review, 2026-10-19). The later non-closures of the ttbar chain (pt_1, met, mt_tot,
+# mass) are correlated with the tau pT and bend its dependence again: the DR closure of the fully corrected ttbar fake
+# factor in the tau pT was 0.83-0.92 in the lowest and 1.06-1.13 in the highest bin (et, mt 2018; v6 the same), tt
+# 0.93-1.12. The last correction removes that by construction.
+FF_VARIABLE_NON_CLOSURE = {"et": ("ttbar",), "mt": ("ttbar",), "tt": ("ttbar", "ttbar_subleading")}
+
+
+def _with_ff_variable_non_closure(table: dict) -> dict:
+    """The table with a last non-closure in its fake-factor variable (fixed edges: those of the fake factors)."""
+    fake_factors = table["fake_factors"]
+    closure = Binned(fake_factors.variable, fake_factors.edges, fake_factors.fits)
+    return {**table, "non_closures": (*table["non_closures"], closure)}
+
+
 def tables(era: str, wjets: bool = False) -> tuple[dict, list[str]]:
     """The tables of an era (with the W+jets tables of et and mt if `wjets`) and the quantities whose edges are
-    placeholders: in 2018 the measured 2018 tables, in the other eras the 2018 tables with the bin counts of
-    PER_ERA_OVERRIDES; then the edges of PER_ERA_EDGES. Placeholders are the equipopulated quantities without edges of
-    their era: every one outside 2018, and the W+jets ones in 2018 too."""
+    placeholders: in 2018 the measured 2018 tables, in the other eras the 2018 tables; then the fits of FIT_OVERRIDES,
+    the bin counts of PER_ERA_OVERRIDES, the lower ends of PER_ERA_LOW and the edges of PER_ERA_EDGES. Placeholders are the equipopulated
+    quantities without edges of their era: every one outside 2018, and in 2018 the W+jets ones and those with their own
+    count or lower end."""
     table_era = TABLE_ERA[era]
     result, placeholders = {}, []
     for channel, channel_tables in (_all_tables() if wjets else TABLES).items():
         n_bins = PER_ERA_OVERRIDES.get(table_era, {}).get(channel, {})
         edges = PER_ERA_EDGES.get(table_era, {}).get(channel, {})
-        result[channel] = {key: _resolve_table(key, table, n_bins, edges) for key, table in channel_tables.items()}
+        lows = PER_ERA_LOW.get(table_era, {}).get(channel, {})
+        fits = FIT_OVERRIDES.get(channel, {})
+        result[channel] = {key: _resolve_table(key, table, n_bins, edges, lows, fits) for key, table in channel_tables.items()}
+        for key in FF_VARIABLE_NON_CLOSURE.get(channel, ()):
+            result[channel][key] = _with_ff_variable_non_closure(result[channel][key])
         for key, table in channel_tables.items():
             measured = table_era == "2018" and key in TABLES[channel]
-            placeholders += [f"{channel} {name}" for name, b in quantity_names(key, table).items() if b.equipopulated and not measured and name not in edges]
+            own = set(lows) | set(BIN_COUNTS.get(table_era, {}).get(channel, {}))  # a 2018 quantity with its own count or lower end
+            placeholders += [
+                f"{channel} {name}" for name, b in quantity_names(key, table).items()
+                if b.equipopulated and (not measured or name in own) and name not in edges
+            ]
     return result, placeholders

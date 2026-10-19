@@ -116,7 +116,7 @@ shapesmith skim -c $T $S
 for C in $T $N; do shapesmith hist -c $C $S --control --regions all --skip-systematics && shapesmith estimate -c $C $S --control && shapesmith plot -c $C $S --control; done
 # fake factors, both variants (2016: -s era=2016, both halves; the halves alone are the cross-check)
 shapesmith skim    -c configs/ff_smrun2_binned_v7_w.yaml $S
-shapesmith measure -c configs/ff_smrun2_binned_v7_w.yaml $S --suggest-binning   # edges -> ff_tables.PER_ERA_EDGES
+shapesmith measure -c configs/ff_smrun2_binned_v7_w.yaml $S --suggest-binning   # edges -> ff_edges.py (scripts/ff_binning.py)
 shapesmith measure -c configs/ff_smrun2_binned_v7.yaml $S && shapesmith measure -c configs/ff_smrun2_binned_v7_w.yaml $S
 # FF runs (after the friends ff_v7, ff_v7_w), datacards, background-only fit, then the Run-2 combination
 for F in configs/smrun2_binned_v7_ff.yaml configs/smrun2_binned_v7_ff_w.yaml; do
@@ -325,9 +325,17 @@ nuisances they share are named so. Spec: `docs/v7_spec.md` of the workspace, sec
   halves, where a list named with 2016, e.g. `sm_2016_binned` from `sm_{era}_binned`, stands for those of both halves,
   `samples.inventory_names`; the DY table is the luminosity-weighted mean of theirs; every sample reads the n-tuples of its half and is normalised to its luminosity, `Sample.lumi_scale`), one
   payload `…/2016/`; a run per half with the same tables is the cross-check. Tables per era: the 2018 tables with the
-  equipopulated bin counts of `PER_ERA_OVERRIDES` (2018 counts times the luminosity ratio) and the edges of
-  `PER_ERA_EDGES`, entered from the JSON line of `measure --suggest-binning` of the era; until an era (and the W+jets
-  tables in every era) has its edges, `measure` refuses and only `--suggest-binning` runs.
+  equipopulated bin counts of `PER_ERA_OVERRIDES` and the edges of `PER_ERA_EDGES` (both in `ff_edges.py`, written by
+  `scripts/ff_binning.py`); until an era (and the W+jets tables in every era) has its edges, `measure` refuses and
+  only `--suggest-binning` runs. The v7b binning (2026-10-19): `ff_binning.py counts <output_dir>` reviews the
+  measured ratios of the W variant (median relative stat error per category above 0.30 lowers a count, in 2016 and
+  2017 one below 0.25 raises it up to the 2018 count; stable after two rounds), `ff_binning.py edges <measure log>
+  --era <era>` enters the `--suggest-binning` edges. 2018 keeps jvoss's measured QCD and ttbar tables except the
+  reviewed quantities (QCD DR->SR of et and mt with 2 bins, et QCD iso_1 non-closure), the mt lepton pT non-closures,
+  which start at the trigger threshold of the era (`PER_ERA_LOW`: 24, 29, 25 GeV instead of 32), and the ttbar fake
+  factors of et and mt, smoothed with 6 GeV instead of 26/12 GeV (`FIT_OVERRIDES`). `scripts/ff_validation.py` checks
+  a payload on its skim: the DR closure of the fully corrected fake factor in every table variable and the jet-fake
+  prediction per b-tag and jet category (both variants compared on it).
 - **Tau-leg trigger efficiency** (E33; `tau_trigger_measurement.py`, core `shapesmith.measurements.tau_trigger`):
   ε_data of the tau leg of the tt trigger for the tt embedding, μτh tag and probe on the tau-ID production P1, per era,
   isolation class (`wp_class`: `Medium`, `VVVLoose_not_Medium`), decay mode (0, 1, 10, 11, all; `dm1011` merges 10 and

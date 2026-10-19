@@ -66,32 +66,96 @@ def test_the_w_variant_adds_w_fake_factors_in_et_and_mt(run2):
     assert all(leg.wjets is None and leg.fractions.wjets is None for leg in tt_legs) and not [r for r in analysis.channel("tt").regions if r.name.startswith("Wjets")]
 
 
-def test_the_variants_and_their_placeholder_edges(run2):
+def test_the_variants_and_their_placeholder_edges(run2, monkeypatch):
     classic = measurement(run2)
     assert classic.measurement.name == "fake_factors" and classic.measurement.placeholder_edges is None
     assert all(leg.wjets is None for legs in classic.measurement.legs.values() for leg in legs)
+    assert measurement(run2, ff_processes=W).measurement.placeholder_edges is None  # the W+jets edges of 2018 are entered
+    monkeypatch.setitem(ff_tables.PER_ERA_EDGES, "2018", {})
     note = measurement(run2, ff_processes=W).measurement.placeholder_edges
-    assert note.startswith("8 quantities have no edges of 2018") and "Wjets_fake_factors" in note  # the W+jets edges come from --suggest-binning
+    # without the 2018 edges: the W+jets quantities and those with their own 2018 count or lower end
+    assert note.startswith("13 quantities have no edges of 2018") and "Wjets_fake_factors" in note
     assert measurement(run2, channels=("tt",), ff_processes=W, embedding=False).measurement.placeholder_edges is None  # tt has no W+jets
     with pytest.raises(AnalysisError, match="ff_processes must be one of"):
         measurement(run2, ff_processes=["QCD", "Wjets"])
 
 
 def test_the_tables_of_the_other_eras(monkeypatch):
+    monkeypatch.setattr(ff_tables, "PER_ERA_EDGES", {})
     tables, placeholders = ff_tables.tables("2017")
     qcd = tables["mt"]["QCD"]["fake_factors"]
-    assert qcd.equipopulated.n_bins == (round(ff_tables.TABLES["mt"]["QCD"]["fake_factors"].equipopulated.n_bins[0] * 42070 / 59560),)
     assert qcd.edges == ff_tables.TABLES["mt"]["QCD"]["fake_factors"].edges and "mt QCD_fake_factors" in placeholders  # 2018 edges as placeholders
     assert "mt QCD_non_closure_tau_decaymode_2" not in placeholders  # binwise without equipopulated options: fixed edges
     assert ff_tables.tables("2016preVFP") == ff_tables.tables("2016postVFP") == ff_tables.tables("2016")  # one table for both halves
-    assert ff_tables.PER_ERA_OVERRIDES["2016"]["tt"]["ttbar_fake_factors"] == (2, 2)  # 3 and 4 bins in 2018: at least 2
     edges = {"QCD_fake_factors": [[30.0, 35.0, 45.0, 150.0]]}
-    monkeypatch.setitem(ff_tables.PER_ERA_EDGES, "2017", {"mt": edges})
+    monkeypatch.setattr(ff_tables, "PER_ERA_EDGES", {"2017": {"mt": edges}})
     tables, placeholders = ff_tables.tables("2017")
     assert tables["mt"]["QCD"]["fake_factors"].edges == ((30.0, 35.0, 45.0, 150.0),) and "mt QCD_fake_factors" not in placeholders
-    monkeypatch.setitem(ff_tables.PER_ERA_EDGES, "2017", {"mt": {"QCD_fake_factors": [[30.0, 150.0], [30.0, 150.0]]}})
+    monkeypatch.setattr(ff_tables, "PER_ERA_EDGES", {"2017": {"mt": {"QCD_fake_factors": [[30.0, 150.0], [30.0, 150.0]]}}})
     with pytest.raises(ValueError, match="QCD_fake_factors: 2 categories of edges, the table has 1"):
         ff_tables.tables("2017")
+
+
+def test_the_bin_counts_of_the_other_eras(monkeypatch):
+    """Without a reviewed count an era takes the 2018 count times the luminosity ratio, at least 2; a reviewed count
+    (ff_edges.BIN_COUNTS) replaces it, in 2018 jvoss's count."""
+    monkeypatch.setattr(ff_tables, "BIN_COUNTS", {})
+    monkeypatch.setattr(ff_tables, "PER_ERA_OVERRIDES", {
+        era: {ch: {name: ff_tables._scaled(b.equipopulated.n_bins, scale) for key, table in tables.items() for name, b in ff_tables.quantity_names(key, table).items() if b.equipopulated}
+              for ch, tables in ff_tables._all_tables().items()}
+        for era, scale in ff_tables.BIN_SCALE.items()
+    })
+    assert ff_tables.PER_ERA_OVERRIDES["2017"]["mt"]["QCD_fake_factors"] == (round(ff_tables.TABLES["mt"]["QCD"]["fake_factors"].equipopulated.n_bins[0] * 42070 / 59560),)
+    assert ff_tables.PER_ERA_OVERRIDES["2016"]["tt"]["ttbar_fake_factors"] == (2, 2)  # 3 and 4 bins in 2018: at least 2
+
+
+@pytest.mark.parametrize("era", ["2016", "2017", "2018"])
+def test_the_recorded_binning_of_every_era(era):
+    """v7b (2026-10-19): every quantity of both variants has the edges of its era, as many as its reviewed bin count
+    asks for, from the lower to the upper end of its range; the mt lepton pT non-closures start at the muon trigger
+    threshold of the era; the QCD DR->SR corrections of et and mt and the W+jets ones have the 2 bins of the review."""
+    tables, placeholders = ff_tables.tables(era, wjets=True)
+    assert not placeholders
+    assert ff_tables.tables(era, wjets=False)[1] == []
+    for channel, channel_tables in tables.items():
+        for key, table in channel_tables.items():
+            for name, binned in ff_tables.quantity_names(key, table).items():
+                options = binned.equipopulated
+                if options is None or name not in ff_tables.PER_ERA_EDGES[era].get(channel, {}):
+                    assert era == "2018" or options is None, (era, channel, name)  # 2018: jvoss's measured edges
+                    continue
+                for edges, n in zip(binned.edges, options.n_bins):
+                    assert len(edges) == n + 1 + len(options.add_left), (era, channel, name)
+                    assert list(edges) == sorted(set(edges)), (era, channel, name)
+                    assert edges[len(options.add_left)] == options.low and edges[-1] == options.high, (era, channel, name)
+    low = {"2016": 24.0, "2017": 29.0, "2018": 25.0}[era]
+    for key in ("QCD", "ttbar"):
+        pt_1 = [b for b in tables["mt"][key]["non_closures"] if b.variable == "pt_1"][0]
+        assert all(edges[0] == low for edges in pt_1.edges)
+    for channel in ("et", "mt"):
+        assert [len(e) - 1 for e in tables[channel]["QCD"]["dr_sr"].edges] == [2]
+        assert [len(e) - 1 for e in tables[channel]["Wjets"]["dr_sr"].edges] == [2 if (era, channel) != ("2016", "mt") else 3]
+
+
+def test_2018_keeps_the_measured_tables_but_the_reviewed_quantities():
+    """In 2018 only the W+jets tables, the quantities with a reviewed count and the mt lepton pT non-closures have new
+    edges, and the ttbar fake factors of et and mt the 6 GeV smoothing of FIT_OVERRIDES; every other QCD and ttbar
+    quantity keeps jvoss's measured edges, counts and fits."""
+    tables, _ = ff_tables.tables("2018", wjets=True)
+    own = {(ch, name) for ch, names in ff_tables.PER_ERA_EDGES["2018"].items() for name in names}
+    assert {(ch, name) for ch, name in own if not name.startswith("Wjets")} == {
+        ("et", "QCD_non_closure_iso_1"), ("et", "QCD_DR_SR"), ("mt", "QCD_DR_SR"), ("mt", "QCD_non_closure_pt_1"), ("mt", "ttbar_non_closure_pt_1")}
+    for channel, channel_tables in ff_tables.TABLES.items():
+        for key, table in channel_tables.items():
+            for name, binned in ff_tables.quantity_names(key, table).items():
+                (resolved,) = [b for n, b in ff_tables.quantity_names(key, tables[channel][key]).items() if n == name]
+                fits = ff_tables.FIT_OVERRIDES.get(channel, {}).get(name)
+                assert resolved.fits == (fits or binned.fits), (channel, name)
+                if (channel, name) not in own:
+                    assert resolved.edges == binned.edges and resolved.equipopulated == binned.equipopulated, (channel, name)
+    for era in ("2016", "2017", "2018"):
+        for channel in ("et", "mt"):
+            assert ff_tables.tables(era)[0][channel]["ttbar"]["fake_factors"].fits == (ff_tables.Fit("smoothed", 6.0),) * 2
 
 
 def test_every_table_quantity_has_its_suggest_binning_name():
@@ -119,7 +183,7 @@ def test_2016_is_measured_on_both_halves_with_their_luminosity(run2):
         assert sorted(s.nick for s in by_era[half]) == sorted(s.nick for s in measurement(run2, era=half, channels=("mt",), embedding=["mt"]).channel("mt").samples)
     assert {s.group for s in by_era["2016preVFP"] if s.kind == "data"} == {"data"}
     assert "hem_veto" not in mt.cuts and mt.cuts["trg_selection"] == cuts.baseline_cuts("mt", "2016preVFP")["trg_selection"]
-    assert analysis.measurement.placeholder_edges.startswith("60 quantities have no edges of 2016")
+    assert analysis.measurement.placeholder_edges is None  # the 2016 edges are entered
     # the DY of both halves with the luminosity-weighted mean of their tables (weights.dy_table)
     corrected = measurement(run2, era="2016", eras=("2016preVFP", "2016postVFP"), dy_correction="njets_btag").channel("mt")
     dy = [p for p in corrected.processes if p.group == "DY"]
@@ -143,3 +207,22 @@ def test_the_tau_analysis_shifts_the_w_keys_of_the_friend(run2):
     assert not [v for v in analysis.channel("tt").variations if "Wjets" in v.name]
     classic = build_tau(config(("mt",), era="2018", database=run2, sample_lists=lists, jet_fakes="ff", embedding=["mt"], crown_shifts=False))
     assert not [v for v in classic.channel("mt").variations if "Wjets" in v.name]
+
+
+@pytest.mark.parametrize("era", ["2016", "2017", "2018"])
+def test_the_ttbar_chains_end_with_a_non_closure_in_the_fake_factor_variable(era):
+    """v7b: every ttbar non-closure chain ends with a correction in the variable of its fake factors, on their bins and
+    with their fits (the later corrections bend the tau-pT dependence again); QCD and W+jets keep jvoss's chains."""
+    tables, _ = ff_tables.tables(era, wjets=True)
+    for channel, keys in ff_tables.FF_VARIABLE_NON_CLOSURE.items():
+        for key in keys:
+            table = tables[channel][key]
+            last = table["non_closures"][-1]
+            assert last.variable == table["fake_factors"].variable and last.edges == table["fake_factors"].edges
+            assert last.fits == table["fake_factors"].fits and last.equipopulated is None
+            assert [b.variable for b in table["non_closures"][:-1]] == [b.variable for b in ff_tables.TABLES[channel][key]["non_closures"]]
+            assert len({b.variable for b in table["non_closures"]}) == len(table["non_closures"])  # one correction per variable
+    for channel in ("et", "mt", "tt"):
+        for key in [k for k in tables[channel] if k.startswith(("QCD", "Wjets"))]:
+            raw = {**ff_tables.TABLES[channel], **ff_tables.W_TABLES.get(channel, {})}[key]
+            assert [b.variable for b in tables[channel][key]["non_closures"]] == [b.variable for b in raw["non_closures"]]
