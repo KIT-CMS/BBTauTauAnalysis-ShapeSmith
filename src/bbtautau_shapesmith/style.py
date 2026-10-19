@@ -36,6 +36,8 @@ _COMMON_AXIS_LABELS = {
     "mass_1": "Mass (leg 1) / GeV", "q_1": "Charge (leg 1)", "NN_score": "NN output", "yield": "Events",
     "met_uncorrected": r"Uncorrected $p_T^{miss}$ / GeV", "metphi_uncorrected": r"Uncorrected $\varphi(p_T^{miss})$",
     "npv_good": "Number of good primary vertices", "rho": r"$\rho$ / GeV",
+    "m_fastmtt": r"$m_{\tau\tau}$ (FastMTT) / GeV", "pt_fastmtt": r"$p_T^{\tau\tau}$ (FastMTT) / GeV",
+    "eta_fastmtt": r"$\eta^{\tau\tau}$ (FastMTT)", "phi_fastmtt": r"$\varphi^{\tau\tau}$ (FastMTT)",
 }
 
 

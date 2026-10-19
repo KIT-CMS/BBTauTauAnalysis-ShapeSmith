@@ -54,7 +54,7 @@ def test_the_v7_inventories():
 
 @pytest.mark.skipif(not SIBLING_DATABASE.exists(), reason=f"no sibling sample database {SIBLING_DATABASE}")
 def test_the_fixture_entries_are_those_of_the_sibling_database():
-    """The sibling checkout is the database of the v7 runs (KingMaker_sample_database v7-run2-registration 0de63ebe or
+    """The sibling checkout is the database of the v7 runs (KingMaker_sample_database feat-run2-nanoaodv15-samples 0de63ebe or
     later): every inventory nick is there with the fixture's entry."""
     sibling = json.loads(SIBLING_DATABASE.read_text())
     assert {n: entry for n, entry in database().items()} == {n: sibling.get(n) for n in database()}

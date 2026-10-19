@@ -22,20 +22,22 @@
 #   control_regions:   true (wider skim plus the named control regions), diagnostics: true (QCD there, npv_good, rho, ...)
 #   dy_correction:     njets_btag (DY_NJETS_BTAG of the era, constants.py: the tables of the smrun2_binned_v7b_dilepton.yaml
 #                      runs)
+# 2026-10-20: the FastMTT friend (P4 fastmtt: data under v7, MC and embedding under v7b) for the control variables
+# m, pt, eta and phi_fastmtt of et, mt and tt (switch fastmtt_friend).
 analysis: bbtautau_shapesmith.analysis:build
 era: "2018"
 channels: [et, mt, tt]
-switches: {sample_lists: ["sm_{era}_binned", "sm_{era}_borrowed", "sm_{era}_embedding"], jet_fakes: mc, embedding: [et, mt], crown_shifts: false, nn_friend: false, control_regions: true, diagnostics: true, dy_correction: njets_btag}
-sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout (v7-run2-registration 0de63ebe or later); relative to this file
+switches: {sample_lists: ["sm_{era}_binned", "sm_{era}_borrowed", "sm_{era}_embedding"], jet_fakes: mc, embedding: [et, mt], crown_shifts: false, nn_friend: false, fastmtt_friend: true, control_regions: true, diagnostics: true, dy_correction: njets_btag}
+sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout (feat-run2-nanoaodv15-samples 0de63ebe or later); relative to this file
 ntuples:
   server: root://cmsdcache-kit-disk.gridka.de
   base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7/CROWNRun      # the data; <base>/<era>/<nick>/<channel>/
   bases:                                                  # the MC and the embedding: the re-production
     mc: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNRun
     embedding: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNRun
-  friends: []
-  # - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7/CROWNFriend/fastmtt, applies_to: [data], channels: [et, mt, tt]}
-  # - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNFriend/fastmtt, applies_to: [mc, embedding], channels: [et, mt, tt]}
+  friends:                                                # the tau channels only
+    - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7/CROWNFriend/fastmtt, applies_to: [data], channels: [et, mt, tt]}
+    - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNFriend/fastmtt, applies_to: [mc, embedding], channels: [et, mt, tt]}
 skim_dir: /ceph/sdaigler/shapesmith/smrun2_binned_v7b/skims/tau_control/{era}      # shared with smrun2_binned_v7b_noemb.yaml
 output_dir: /ceph/sdaigler/shapesmith/smrun2_binned_v7b/output/tau_control_emb/{era}
 ml_dir: /ceph/sdaigler/shapesmith/smrun2_binned_v7b/ml/tau_control/{era}

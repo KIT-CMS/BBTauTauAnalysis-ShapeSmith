@@ -128,7 +128,7 @@ def channel(name: str, era: str, switches: TauSwitches, channel_samples: tuple[S
         processes=table,
         regions=cuts.regions(name, switches.jet_fakes, switches.ff_type) + (cuts.diagnostic_regions(name) if switches.control_regions else ()),
         categories=fit_categories(switches),
-        variables=control_variables(switches.nn_friend, switches.diagnostics),
+        variables=control_variables(switches.nn_friend, switches.diagnostics, switches.fastmtt_friend),
         variations=btag_variations(era) + prefiring_variations() + column_variations(name, era, switches),
         estimators=estimators(name, era, table, switches),
         keep_columns=("event", "run", "lumi"),

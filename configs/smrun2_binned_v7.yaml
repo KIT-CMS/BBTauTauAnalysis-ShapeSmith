@@ -19,7 +19,7 @@ analysis: bbtautau_shapesmith.analysis:build
 era: "2018"
 channels: [et, mt, tt]
 switches: {sample_lists: ["sm_{era}_binned", "sm_{era}_borrowed", "sm_{era}_embedding"], jet_fakes: mc, embedding: [et, mt, tt], crown_shifts: false, nn_friend: false, control_regions: true, diagnostics: true, dy_correction: njets_btag}
-sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout (v7-run2-registration 0de63ebe or later); relative to this file
+sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout (feat-run2-nanoaodv15-samples 0de63ebe or later); relative to this file
 ntuples:
   server: root://cmsdcache-kit-disk.gridka.de
   base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7/CROWNRun   # <base>/<era>/<nick>/<channel>/

@@ -69,6 +69,9 @@ class TauSwitches(_EmbeddedChannels, _FakeFactorProcesses, BaseModel):
     ff_type: Literal["corrected", "raw"] = "corrected"  # FF friend weight; raw: no DR->SR and non-closure corrections (needs jet_fakes: ff, shape_systematics: false)
     embedding: Embedding = False  # genuine tautau from the embedded samples instead of MC, in every tau channel or the listed ones
     nn_friend: bool = False  # NN categories from the NN friend
+    # the control variables m, pt, eta and phi_fastmtt of the di-tau system from the FastMTT friend (CROWN sm_fastmtt,
+    # tag fastmtt; et, mt and tt, em has none)
+    fastmtt_friend: bool = False
     fit_categories: Literal["nn", "control"] = "nn"  # nn: the NN categories (with nn_friend); control: one category 'nominal' per channel
     control_regions: bool = False  # wider skim plus the named pass/fail control regions (needs jet_fakes: mc)
     diagnostics: bool = False  # QCD in the control regions and the diagnostic variables (needs control_regions; npv_good, rho from v6)

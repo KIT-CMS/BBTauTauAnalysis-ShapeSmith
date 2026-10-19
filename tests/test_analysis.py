@@ -7,7 +7,7 @@ from bbtautau_shapesmith import dilepton, ff_measurement
 from bbtautau_shapesmith.analysis import build, process_union
 from bbtautau_shapesmith.constants import FF_COLUMNS, FF_RAW_COLUMNS, LT_CHANNELS, NN_COLUMNS, TAU_CHANNELS
 from bbtautau_shapesmith.systematics import btag_variations, embedding_variation_sums, prefiring_variations
-from bbtautau_shapesmith.variables import DIAGNOSTIC_VARIABLES
+from bbtautau_shapesmith.variables import DIAGNOSTIC_VARIABLES, FASTMTT_VARIABLES
 from bbtautau_shapesmith.weights import dy_njets_btag_weight, fake_factor_weight
 from tests.helpers import EMBEDDING_LIST, V6_COLUMNS, branches, config, embedded, embedding_branches
 
@@ -154,6 +154,21 @@ def test_diagnostics_estimate_qcd_in_the_control_regions():
             available = (embedding_branches(name) if sample.kind == "embedding" else branches(name) | {"npartons"}) | V6_COLUMNS
             assert not needed_columns(channel, sample) - available, sample.nick
     assert not set(DIAGNOSTIC_VARIABLES) & set(analysis_for("mc", control_regions=True).channel("mt").variables)
+
+
+
+def test_the_fastmtt_friend_adds_the_di_tau_variables_of_the_tau_channels():
+    """fastmtt_friend: m, pt, eta and phi_fastmtt in et, mt and tt, read from every kind (the friend of data, MC and
+    the embedding); em (no FastMTT friend) and a run without the switch do not need them."""
+    analysis = build(config(("et", "mt", "tt", "em"), jet_fakes="ff", embedding=["et", "mt"], fit_categories="control", fastmtt_friend=True, sample_lists=["sm2018_binned_v3", EMBEDDING_LIST]))
+    for name, channel in analysis.channels.items():
+        tau = name in TAU_CHANNELS
+        assert set(FASTMTT_VARIABLES) & set(channel.variables) == (set(FASTMTT_VARIABLES) if tau else set())
+        assert set(FASTMTT_VARIABLES) <= set(analysis.style.axis_labels[name])
+        for sample in channel.samples:
+            assert (set(FASTMTT_VARIABLES) <= needed_columns(channel, sample)) == tau, sample.nick
+    assert {v: analysis.channel("mt").variables[v].edges[::10] for v in ("m_fastmtt", "pt_fastmtt")} == {"m_fastmtt": (0.0, 100.0, 200.0, 300.0, 400.0), "pt_fastmtt": (0.0, 100.0, 200.0, 300.0)}
+    assert not set(FASTMTT_VARIABLES) & set(analysis_for("ff", ["et", "mt"]).channel("mt").variables)
 
 
 def test_em_is_the_ttbar_control_channel():

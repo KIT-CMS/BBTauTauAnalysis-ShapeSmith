@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 from shapesmith.combination import run_card
-from shapesmith.config import load_analysis, load_config
+from shapesmith.config import FriendConfig, load_analysis, load_config
 from shapesmith.model import AnalysisError
 
 from bbtautau_shapesmith import weights
@@ -51,6 +51,9 @@ def tt_from_mc(name: str, description: str) -> str:
     return description.replace(" in et, mt and tt,", ",").removesuffix(".") + f"; et and mt only (tt has no embedding, see {see})."
 # the v7b fake-factor runs carry the uncertainties sized in the v7b studies (switch study_uncertainties, 2026-10-19)
 STUDY_UNCERTAINTIES = ("smrun2_binned_v7_ff", "smrun2_binned_v7_ff_w")
+# the v7b tau runs read the FastMTT friend of P4 (data under v7, MC and embedding under v7b) for the control variables
+# m, pt, eta and phi_fastmtt (switch fastmtt_friend, 2026-10-20); the v7 runs never read it
+FASTMTT = ("smrun2_binned_v7", "smrun2_binned_v7_noemb", "smrun2_binned_v7_ff", "smrun2_binned_v7_ff_w")
 RENAMED = {P3: (("ff_v7", "ff_v7b"),), P1: ()}  # the FF friends of v7b get their own names (ff_v7b, ff_v7b_w): P5 of v7 and v7b never overwrite each other
 
 
@@ -106,6 +109,10 @@ def test_the_reproduction_reads_its_kinds_from_the_new_tag(name, era):
         base = moved(friend.base, "", "", RENAMED[production])
         split += [friend.model_copy(update={"base": base, "applies_to": tuple(k for k in ("data", "mc", "embedding") if k not in kinds)}),
                   friend.model_copy(update={"base": base.replace(f"/{production}/", f"/{tag}/"), "applies_to": kinds})]
+    if name in FASTMTT:
+        assert not any("fastmtt" in friend.base for friend in first.ntuples.friends)
+        split += [FriendConfig(base=f"{STORE}/{production}/CROWNFriend/fastmtt", applies_to=("data",), channels=("et", "mt", "tt")),
+                  FriendConfig(base=f"{STORE}/{tag}/CROWNFriend/fastmtt", applies_to=kinds, channels=("et", "mt", "tt"))]
     assert again.ntuples.friends == split
     for path in (again.skim_dir, again.output_dir, *([again.ml_dir] if again.ml_dir else [])):
         assert str(path).startswith(f"/ceph/sdaigler/shapesmith/{tag}/"), path
@@ -136,6 +143,11 @@ def test_the_reproduction_reads_its_kinds_from_the_new_tag(name, era):
         expected["switches"]["symmetrise_ff_shifts"] = True
     else:
         assert "study_uncertainties" not in again.switches and "symmetrise_ff_shifts" not in again.switches
+    if name in FASTMTT:
+        assert "fastmtt_friend" not in first.switches and again.switches["fastmtt_friend"] is True
+        expected["switches"]["fastmtt_friend"] = True
+    else:
+        assert "fastmtt_friend" not in again.switches
     assert rest[1] == expected
     if name.endswith("_id_es"):  # the MET fix: the recoil shifts of DY and W in 2018 only; v1 has them in every era
         assert first.switches["recoil_eras"] == list(ERAS) and again.switches["recoil_eras"] == ["2018"]

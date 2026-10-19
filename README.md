@@ -159,6 +159,10 @@ below add or replace an era. `constants.DY_NJETS_BTAG` holds the tables of the
 `dy_correction: njets_btag` no longer reproduces its v7 result exactly (the v7 MC is superseded; the v7 tables are in
 the git history, analysis abd7657).
 
+The v7b tau runs (`smrun2_binned_v7b.yaml`, `_noemb`, `_ff`, `_ff_w`) read the FastMTT friend of P4 (data under
+`smrun2_binned_v7`, MC and embedding under `smrun2_binned_v7b`; switch `fastmtt_friend`, since 2026-10-20), so their
+control plots include m, pt, eta and phi of the di-tau system from FastMTT.
+
 tt has no embedding in v7b (E33: genuine ττ from MC), so as in v6 the control site shows tt only in the columns classic
 and ff (the tt of the FF run; the same in `ff_v7b_w`, which has W+jets fake factors in et and mt only), and emb, emb ff
 and emb ff with W hold et and mt (the emb ff columns also em). Publish a column again with fewer channels and its other
@@ -190,6 +194,7 @@ Switches of the tau run YAML (typed in `switches.py`; an unknown or mistyped swi
 | `ff_type` | `corrected` (default), `raw` | the FF friend weight of `jetFakes`: corrected, or raw (no DR->SR and non-closure corrections; needs `jet_fakes: ff` and `shape_systematics: false`) |
 | `embedding` | `false` (default), `true`, a list of channels (`[et, mt]`) | genuine ττ from the embedded samples (`EMB`) instead of the T parts of the MC, in every tau channel or in the listed ones (each a channel of the run); needs the embedding inventory in `sample_lists` |
 | `nn_friend` | `false` (default), `true` | NN categories from the NN friend |
+| `fastmtt_friend` | `false` (default), `true` | the control variables `m_fastmtt`, `pt_fastmtt`, `eta_fastmtt` and `phi_fastmtt` of et, mt and tt from the FastMTT friend (CROWN `sm_fastmtt`, tag `fastmtt`; em has none), which `ntuples.friends` must list for the tau channels |
 | `fit_categories` | `nn` (default), `control` | the categories of `hist`, `datacards` and `fit`: the NN classes (with `nn_friend`), or one category `nominal` per tau channel with the nominal region in one bin (`yield`), e.g. for `fit --background-only` without NN friends |
 | `control_regions` | `false` (default), `true` | wider skim plus the named pass/fail control regions; needs `jet_fakes: mc` |
 | `diagnostics` | `false` (default), `true` | QCD in the control regions (et/mt: same-sign data minus MC, tt: ABCD with the fail regions) and the variables `met_uncorrected`, `metphi_uncorrected`, `npv_good`, `rho` (the last two from production v6 on); needs `control_regions: true` |
@@ -283,10 +288,10 @@ corrected count, and re-skim a skim made with the old one once with
 `shapesmith skim --force --samples EmbeddingRun2018D_cwinter-embedding_2018UL_mutau`.
 
 `tests/fixtures/datasets.json` holds the database entries of exactly the nicks in `inventory/`, taken from the sibling
-checkout `KingMaker_sample_database` at `v7-run2-registration` `0de63ebe` (the v7 registration and the HH-WG 2026 / YR4
-mH = 125.00 cross sections; `tests/test_inventory.py` compares them with the sibling checkout when it exists); a new
-inventory adds its entries in the same change. The v2-v6 run YAMLs read the same sibling checkout, so their single-Higgs
-and HH cross sections are now those of v7 (HH 0.002221 pb instead of 0.002246 pb).
+checkout `KingMaker_sample_database` at `feat-run2-nanoaodv15-samples` `0de63ebe` (the v7 registration and the HH-WG
+2026 / YR4 mH = 125.00 cross sections; `tests/test_inventory.py` compares them with the sibling checkout when it
+exists); a new inventory adds its entries in the same change. The v2-v6 run YAMLs read the same sibling checkout, so
+their single-Higgs and HH cross sections are now those of v7 (HH 0.002221 pb instead of 0.002246 pb).
 
 ## Run 2 (v7)
 
