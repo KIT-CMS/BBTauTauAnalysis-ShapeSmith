@@ -24,11 +24,20 @@
 #   (no FF shapes in the cards).
 #   fit_categories:    control (one category 'nominal' per tau channel and em_tt in em, without NN friends)
 #   dy_correction:     njets_btag (needs the DY table of the era)
+#                      and the lnN CMS_htt_dy_table_<era> on its DY processes (constants.DY_TABLE_LNN, spec 6.7)
+#   study_uncertainties: true (the uncertainties sized in the v7b studies, study_uncertainties.py and
+#                      /ceph/sdaigler/v7_results/systematics_v7b_summary.md: embedding tau ID and ES, POG MC tau ES, vsJet
+#                      components and di-tau trigger, MET residual, HIPM, FF decay-mode non-closure and 2016 halves, K4)
+#   symmetrise_ff_shifts: true (2026-10-19): the datacards replace the fake-factor friend shifts whose Up and Down move a
+#                      process to the same side of the nominal or one side by more than twice the other by a symmetric
+#                      pair around the nominal (shapesmith.datacards: half the distance of Down to Up, one-sided the
+#                      larger shift; per bin); the mt QCD non-closure shifts of 2017/2018 (-8/+28 %) made robustHesse drop
+#                      them. The cards leave out every nuisance that is a no-op (Up = Down = nominal everywhere).
 #   ff_processes:      [QCD, ttbar], the payload of ff_v7b (smrun2_binned_v7b_ff_w.yaml: QCD, W+jets, ttbar)
 analysis: bbtautau_shapesmith.analysis:build
 era: "2018"
 channels: [et, mt, tt, em]                                # em: the ttbar control channel (in every final state)
-switches: {sample_lists: ["sm_{era}_binned", "sm_{era}_borrowed", "sm_{era}_embedding"], jet_fakes: ff, embedding: [et, mt], crown_shifts: false, nn_friend: false, fit_categories: control, control_regions: false, dy_correction: njets_btag, ff_processes: [QCD, ttbar]}
+switches: {sample_lists: ["sm_{era}_binned", "sm_{era}_borrowed", "sm_{era}_embedding"], jet_fakes: ff, embedding: [et, mt], crown_shifts: false, nn_friend: false, fit_categories: control, control_regions: false, dy_correction: njets_btag, study_uncertainties: true, symmetrise_ff_shifts: true, ff_processes: [QCD, ttbar]}
 sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
 ntuples:
   server: root://cmsdcache-kit-disk.gridka.de

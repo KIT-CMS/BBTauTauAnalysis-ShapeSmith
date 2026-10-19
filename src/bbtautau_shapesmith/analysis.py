@@ -14,7 +14,8 @@ from bbtautau_shapesmith.samples import sample_database, samples
 from bbtautau_shapesmith.style import style
 from bbtautau_shapesmith.switches import TauSwitches, parse
 from bbtautau_shapesmith.systematics import (
-    btag_variations, embedding_ttbar_nuisance, embedding_variation_sums, embedding_variations, ff_variations, lnn, prefiring_variations,
+    Study, btag_variations, embedding_id_variations, embedding_ttbar_nuisance, embedding_variation_sums, embedding_variations, ff_dm_nonclosure_variations,
+    ff_variant, ff_variations, lnn, prefiring_variations,
 )
 from bbtautau_shapesmith.variables import categories, control_variables, nominal_category
 
@@ -88,11 +89,26 @@ def estimators(name: str, era: str, processes: tuple[Process, ...], switches: Ta
 
 
 def column_variations(name: str, era: str, switches: TauSwitches) -> tuple:
-    """The embedding tau shifts (CROWN shifts, not in a nominal-only production) and the fake-factor friend shifts."""
+    """The embedding tau shifts (CROWN shifts, not in a nominal-only production) and the fake-factor friend shifts; with
+    study_uncertainties the embedding tau ID as weight factors in a nominal-only production and the decay-mode
+    non-closure of the fake factors."""
     if not switches.shape_systematics:
         return ()
     embedding = embedding_variations(name, era) if switches.embedded(name) and switches.crown_shifts else ()
-    return embedding + (ff_variations(name, era, switches.wjets) if switches.jet_fakes == "ff" else ())
+    if switches.study_uncertainties and switches.embedded(name) and not switches.crown_shifts and name in LT_CHANNELS:
+        embedding += embedding_id_variations(name, era)
+    fakes = ff_variations(name, era, switches.wjets) if switches.jet_fakes == "ff" else ()
+    if switches.study_uncertainties and switches.jet_fakes == "ff":
+        fakes += ff_dm_nonclosure_variations(name, era, ff_variant(switches.wjets))
+    return embedding + fakes
+
+
+def study(switches: TauSwitches, channels: Iterable[str]) -> Study | None:
+    """The switch study_uncertainties for lnn(); None without it."""
+    if not switches.study_uncertainties:
+        return None
+    embedded = tuple(name for name in channels if name in TAU_CHANNELS and switches.embedded(name))
+    return Study(embedded, ff_variant(switches.wjets) if switches.jet_fakes == "ff" else None, switches.crown_shifts)
 
 
 def fit_categories(switches: TauSwitches) -> tuple[Category, ...]:
@@ -117,6 +133,15 @@ def channel(name: str, era: str, switches: TauSwitches, channel_samples: tuple[S
         estimators=estimators(name, era, table, switches),
         keep_columns=("event", "run", "lumi"),
     )
+
+
+def symmetrised_ff_shifts(channels: Iterable[Channel], era: str, switches: TauSwitches) -> tuple[str, ...]:
+    """With symmetrise_ff_shifts the names (without the direction) of the fake-factor friend shifts of the channels,
+    which the datacards symmetrise where one-sided or strongly asymmetric; the other variations stay as they are."""
+    if not (switches.symmetrise_ff_shifts and switches.shape_systematics):
+        return ()
+    names = {v.name[: -len("Up")] for c in channels for v in ff_variations(c.name, era, switches.wjets) if v.name.endswith("Up")}
+    return tuple(sorted(names))
 
 
 def borrowed_processes(channels: Iterable[Channel]) -> tuple[str, ...]:
@@ -150,8 +175,9 @@ def build(config: RunConfig) -> Analysis:
         channels=channels,
         control_channels=tuple(name for name in config.channels if name in CONTROL_CHANNELS),
         # the channels can differ in their processes
-        lnn=lnn(process_union(channels.values()), jet_fakes_output(switches.jet_fakes), era, borrowed_processes(channels.values())),
+        lnn=lnn(process_union(channels.values()), jet_fakes_output(switches.jet_fakes), era, borrowed_processes(channels.values()), study(switches, config.channels), switches.dy_correction),
         lnn_variations=(PREFIRING_NUISANCE,),
+        symmetrised_variations=symmetrised_ff_shifts(tau_channels, era, switches),
         style=style(era),
         ml=ml_config(process_union(tau_channels), switches.jet_fakes),  # no NN training on a control channel
     )

@@ -41,6 +41,13 @@ DY_NJETS_BTAG = {
     "2017": {0: (0.884, 1.039, 1.344), 1: (1.067, 1.304, 1.726), 2: (0.938, 1.135, 1.628)},
     "2018": {0: (0.882, 1.030, 1.328), 1: (1.115, 1.334, 1.805), 2: (0.981, 1.200, 1.717)},
 }
+# The DY-table nuisance CMS_htt_dy_table_<era> (spec 6.7, family E): lnN on every DY process the table corrects (ZL, ZJ,
+# ZTT from MC, em DY), per era and 2016 half, sized with scripts/size_dy_table_uncertainty.py on the v7b dilepton runs
+# (dy_correction.table_uncertainty) for the categories of the fake-factor runs (a b pair with >= 1 b tag: rows 1 and
+# >= 2, all with >= 2 jets): the table statistics propagated with the DY of btag1, btag2 and btag3p (0.45 / 0.47 / 0.29 /
+# 0.26 %) in quadrature with the larger closure residual of one lepton flavour in btag1 + btag2 (mm +0.45 / +0.11 /
+# +1.15 / +0.21 %, ee -0.67 / -0.13 / -1.65 / -0.26 %; 2016preVFP / 2016postVFP / 2017 / 2018).
+DY_TABLE_LNN = {"2016preVFP": 1.008, "2016postVFP": 1.005, "2017": 1.017, "2018": 1.004}
 
 # MET fix of 2026-10-18 (met_recoil_study): DY and W carry the recoil correction of the MET and its shifts
 # CMS_{scale,res}_met_RecoilCalibration_<era> only in these eras (CROWN bbtautau RUN2_V15_RECOIL_CORRECTION_ERAS), from the

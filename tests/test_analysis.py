@@ -209,6 +209,8 @@ def test_processes_of_every_channel():
     ({"ff_type": "uncorrected", "jet_fakes": "ff"}, "ff_type"),
     ({"ff_type": "raw", "shape_systematics": False}, "ff_type raw requires jet_fakes: ff"),
     ({"ff_type": "raw", "jet_fakes": "ff"}, "ff_type raw supports nominal control plots only; set shape_systematics: false"),
+    ({"study_uncertainties": True, "crown_shifts": False}, "study_uncertainties requires jet_fakes: ff and crown_shifts: false"),
+    ({"study_uncertainties": True, "jet_fakes": "ff"}, "study_uncertainties requires jet_fakes: ff and crown_shifts: false"),
 ])
 def test_invalid_switches_are_reported(switches, match):
     with pytest.raises(AnalysisError, match=match):

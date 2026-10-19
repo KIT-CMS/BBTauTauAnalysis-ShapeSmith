@@ -43,6 +43,9 @@ FAMILIES = {
     "fake_factors": J,  # FF shifts and jetFakesNorm per channel; 2016 is measured on both halves together
     "qcd": E,  # QCD from ABCD, estimated per era
     "dy_table": E,
+    "met_residual": E,  # the mT acceptance of DY and W without recoil correction (2016, 2017; met_recoil_study section 7)
+    "hipm": E,  # the pileup-dependent lepton efficiency of the 2016preVFP data (norm_study)
+    "ff_halves": E,  # the jet fakes of a 2016 half with the combined 2016 fake-factor payload
     "theory": K,  # cross sections and theory
 }
 # eras whose payload is a byte-identical copy of the 2018 one (E12): their nuisance is the 2018 one (K6)

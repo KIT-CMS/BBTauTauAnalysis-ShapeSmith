@@ -79,6 +79,16 @@ class TauSwitches(_EmbeddedChannels, _FakeFactorProcesses, BaseModel):
     dy_correction: DyCorrection = "none"  # on every DY process (ZTT, ZL, ZJ)
     # the fake-factor payload variant of the friend: the CROWN shifts of its W+jets keys in et and mt (jet_fakes: ff)
     ff_processes: FfProcesses = Field(default_factory=lambda: ["QCD", "ttbar"])
+    # the uncertainties sized in the v7b studies (study_uncertainties.py, systematics_v7b_summary.md): embedding tau ID
+    # (weight factors) and ES, POG MC tau ES, vsJet components (in place of the flat eff_t_vsJet) and di-tau trigger SF,
+    # MET residual, HIPM, the fake-factor decay-mode non-closure (shape) and 2016 halves, K4; only for the fake-factor run
+    # of a nominal-only production (the MC tau ES and the vsJet replacement of the MC jet fakes have no other source)
+    study_uncertainties: bool = False
+    # the datacards symmetrise the fake-factor friend shifts whose Up and Down move a process to the same side of the
+    # nominal or by more than twice as much on one side (Analysis.symmetrised_variations, shapesmith.datacards; on in the
+    # v7b fake-factor runs since 2026-10-19: the mt QCD non-closure shifts of 2017/2018 at -8/+28 % made robustHesse drop
+    # them from the covariance); needs jet_fakes: ff
+    symmetrise_ff_shifts: bool = False
 
     @model_validator(mode="after")
     def _controls_need_mc_fakes(self) -> TauSwitches:
@@ -90,6 +100,18 @@ class TauSwitches(_EmbeddedChannels, _FakeFactorProcesses, BaseModel):
     def _diagnostics_need_control_regions(self) -> TauSwitches:
         if self.diagnostics and not self.control_regions:
             raise ValueError("diagnostics requires control_regions: true")
+        return self
+
+    @model_validator(mode="after")
+    def _study_uncertainties_need_a_nominal_fake_factor_run(self) -> TauSwitches:
+        if self.study_uncertainties and (self.jet_fakes != "ff" or self.crown_shifts):
+            raise ValueError("study_uncertainties requires jet_fakes: ff and crown_shifts: false")
+        return self
+
+    @model_validator(mode="after")
+    def _symmetrised_shifts_need_fake_factors(self) -> TauSwitches:
+        if self.symmetrise_ff_shifts and self.jet_fakes != "ff":
+            raise ValueError("symmetrise_ff_shifts requires jet_fakes: ff")
         return self
 
     @model_validator(mode="after")

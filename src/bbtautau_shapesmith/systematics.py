@@ -1,15 +1,21 @@
 """Systematic uncertainties per era: b-tag and prefiring weight variations, the CROWN shifts of the embedded sample and
 of the fake-factor friend (column variations), normalisation uncertainties (lnN). The era tokens follow the
 correlation scheme of correlations.py (v7 spec 6.7); in v7 (nominal only, E34) the datacards carry the lnN and the
-variations of the nominal trees (b tag, fake factors, prefiring)."""
+variations of the nominal trees (b tag, fake factors, prefiring). The switch study_uncertainties adds the uncertainties
+sized in the v7b studies (study_uncertainties.py): the embedding tau ID as exact weight factors and its ES as lnN, the
+POG MC tau ES, vsJet components and di-tau trigger SF as lnN, the residual decay-mode non-closure of the fake factors as
+a shape, the MET residual, the HIPM lepton efficiency, the 2016 halves of the fake factors and K4 as lnN."""
 from __future__ import annotations
 
-from shapesmith.histogram import part_of
-from shapesmith.model import ColumnVariation, LnN, Process, VariationSum, WeightVariation
+from dataclasses import dataclass
 
+from shapesmith.histogram import part_of
+from shapesmith.model import AnalysisError, ColumnVariation, LnN, Process, VariationSum, WeightVariation
+
+from bbtautau_shapesmith import study_uncertainties as study_sizes
 from bbtautau_shapesmith.constants import (
-    BTAG_COMPONENTS, EMBEDDING_TAU_DECAY_MODES, FF_SHIFTS_LT, FF_SHIFTS_TT, FF_SHIFTS_W, LT_CHANNELS, PREFIRING_NUISANCE, PREFIRING_VARIATIONS, TAU_VS_ELE_WP,
-    YEAR,
+    BTAG_COMPONENTS, DY_TABLE_LNN, EMBEDDING_TAU_DECAY_MODES, FF_COLUMNS, FF_SHIFTS_LT, FF_SHIFTS_TT, FF_SHIFTS_W, LT_CHANNELS, PREFIRING_NUISANCE, PREFIRING_VARIATIONS,
+    RECOIL_ERAS, TAU_LEGS, TAU_VS_ELE_WP, TAU_VS_JET_WP, YEAR,
 )
 from bbtautau_shapesmith.correlations import nuisance
 from bbtautau_shapesmith.processes import EMBEDDED, SIGNAL, VH_TAUTAU
@@ -103,8 +109,135 @@ def lumi_lnn(processes: tuple[str, ...], era: str) -> tuple[LnN, ...]:
     return tuple(LnN(name, processes, values[year]) for name, values in LUMI.items() if year in values)
 
 
-def lnn(processes: tuple[Process, ...], jet_fakes_output: str, era: str, borrowed: tuple[str, ...] = ()) -> tuple[LnN, ...]:
-    """Normalisation uncertainties; `borrowed` are the processes made of samples borrowed from another era."""
+@dataclass(frozen=True)
+class Study:
+    """The run's view of the switch study_uncertainties: its embedded tau channels, its fake-factor variant (None
+    without fake factors) and whether the production has CROWN shifts (then the shifts replace the stand-ins of the
+    embedding tau ID/ES and the MC tau ES)."""
+
+    embedded: tuple[str, ...]
+    ff_variant: str | None
+    crown_shifts: bool
+
+
+def ff_variant(wjets: bool) -> str:
+    return "QCD_Wjets_ttbar" if wjets else "QCD_ttbar"
+
+
+def _decay_modes(column: str, decay_modes: tuple[int, ...]) -> str:
+    return " | ".join(f"({column} == {dm})" for dm in decay_modes)
+
+
+def embedding_id_variations(channel: str, era: str) -> tuple[ColumnVariation, ...]:
+    """The embedding vsJet SF interval of each decay-mode category (study_uncertainties.EMBEDDING_TAU_ID) as exact
+    weight factors on the SF column of the embedded sample, under the names of the CROWN shifts (embedding_variations);
+    the stand-in of a nominal-only production. One tau per event (et, mt): a category of two decay modes is one factor.
+    The fake-factor estimate subtracts the embedded sample in the AR under it too."""
+    column = f"id_wgt_tau_vsJet_{TAU_VS_JET_WP}_2"
+    result = ()
+    for token, decay_modes in EMBEDDING_TAU_DECAY_MODES.items():
+        name = nuisance(f"CMS_eff_t_emb_dm{token}_vsEle{TAU_VS_ELE_WP[channel]}", "embedding", era)
+        down, up = study_sizes.EMBEDDING_TAU_ID[era][TAU_VS_ELE_WP[channel]][token]
+        for direction, ratio in (("Up", up), ("Down", down)):
+            factor = f"(1 + ({_decay_modes('tau_decaymode_2', decay_modes)}) * {round(ratio - 1, 4)!r})"
+            result += (ColumnVariation(f"{name}{direction}", derived={column: f"{column} * {factor}"}, applies_to=("embedding",)),)
+    return result
+
+
+def ff_dm_nonclosure_variations(channel: str, era: str, variant: str) -> tuple[ColumnVariation, ...]:
+    """The residual decay-mode non-closure of the fake factors after all corrections (study_uncertainties
+    FF_DM_NONCLOSURE): Up multiplies the fake factor of each leg by 1 + shift(DM of the leg), Down by 1 - shift; per
+    channel and year (one 2016 measurement). Channels whose decay-mode closure holds (et) have none."""
+    table = study_sizes.FF_DM_NONCLOSURE[variant][YEAR[era]].get(channel)
+    if table is None:
+        return ()
+    name = nuisance(f"CMS_ff_dm_nonclosure_{channel}", "fake_factors", era)
+    result = ()
+    for direction, sign in (("Up", 1), ("Down", -1)):
+        derived = {}
+        for leg in TAU_LEGS[channel]:
+            column = FF_COLUMNS["lt"] if channel in LT_CHANNELS else FF_COLUMNS[f"tt_{leg}"]
+            dm = f"tau_decaymode_{leg}"
+            bins = {0: f"({dm} == 0)", 1: f"(({dm} == 1) | ({dm} == 2))", 10: f"({dm} == 10)", 11: f"({dm} == 11)"}
+            shift = " + ".join(f"{bins[d]} * {sign * value!r}" for d, value in table[str(leg)].items())
+            derived[column] = f"{column} * (1 + {shift})"
+        result += (ColumnVariation(f"{name}{direction}", derived=derived, applies_to=("data", "mc", "embedding")),)
+    return result
+
+
+def study_lnn(processes: tuple[Process, ...], jet_fakes_output: str, era: str, study: Study) -> list[LnN]:
+    """The lnN of the switch study_uncertainties (study_uncertainties.py, systematics_v7b_summary.md):
+    - embedding tau ES per decay-mode category (et, mt; the stand-in of the CROWN shifts);
+    - MC: POG tau ES per decay mode (stand-in of the shifts), the POG vsJet SF as syst_alleras (K), era part (E) and
+      syst_TES per decay mode (E; replaces the flat eff_t_vsJet), in tt the POG di-tau trigger SF per decay mode (E),
+      each per process class;
+    - K4: muon_Z ID + isolation stat per era (mt, em), EGM electron reconstruction (K; et, em) on MC;
+    - DY and W in et and mt of the eras without recoil correction: +-3 % mT acceptance (MET residual);
+    - 2016preVFP: the HIPM lepton efficiency per light lepton on the MC except DY (whose table absorbs it);
+    - jet fakes of the 2016 halves: the difference of the combined 2016 payload to the payload of the half."""
+    mc = tuple(p.name for p in processes if p.role in ("signal", "background") and p.group != EMBEDDED)
+    names = {p.name for p in processes}
+    year = YEAR[era]
+
+    def group(*groups: str) -> tuple[str, ...]:
+        return tuple(p.name for p in processes if p.group in groups and p.role != "auxiliary")
+
+    entries = []
+    if not study.crown_shifts:
+        for channel in (c for c in study.embedded if c in LT_CHANNELS):
+            for token, value in study_sizes.EMBEDDING_TAU_ES[era][channel].items():
+                name = nuisance(f"CMS_scale_t_emb_dm{token}_vsEle{TAU_VS_ELE_WP[channel]}", "embedding", era)
+                entries.append(LnN(name, (EMBEDDED,), value, channels=(channel,)))
+    for channel, classes in study_sizes.MC_TAU_CLASSES.items():
+        for klass, members in classes.items():
+            table = study_sizes.MC_TAU[era][channel].get(klass)
+            members = tuple(m for m in members if m in names and m in mc)
+            if table is None or not members:
+                continue
+            channels = (channel,)
+            for dm in (0, 1, 10, 11):
+                if not study.crown_shifts:
+                    entries.append(LnN(nuisance(f"CMS_scale_t_dm{dm}", "tau_mc", era), members, table[f"tes_dm{dm}"], channels=channels))
+                entries.append(LnN(nuisance(f"CMS_eff_t_vsJet_syst_TES_dm{dm}", "tau_mc", era), members, table[f"syst_TES_dm{dm}"], channels=channels))
+                if f"trigger_dm{dm}" in table:
+                    entries.append(LnN(nuisance(f"CMS_eff_t_trigger_ditau_dm{dm}", "trigger", era), members, table[f"trigger_dm{dm}"], channels=channels))
+            entries.append(LnN(nuisance("CMS_eff_t_vsJet_syst_alleras", "tau_vsjet_alleras", era), members, table["syst_alleras"], channels=channels))
+            entries.append(LnN(nuisance("CMS_eff_t_vsJet", "tau_mc", era), members, table["era"], channels=channels))
+    for channel, sizes in study_sizes.LEPTONS[era].items():
+        if "muon_stat" in sizes:
+            entries.append(LnN(nuisance("CMS_eff_m_stat", "muon_id_stat", era), mc, sizes["muon_stat"], channels=(channel,)))
+        if "electron_reco" in sizes:
+            entries.append(LnN(nuisance("CMS_eff_e_reco", "electron_reco", era), mc, sizes["electron_reco"], channels=(channel,)))
+    if era not in RECOIL_ERAS:
+        entries.append(LnN(nuisance("CMS_htt_met_mt_acceptance", "met_residual", era), group("DY", "W"), study_sizes.MET_RESIDUAL, channels=LT_CHANNELS))
+    if era in study_sizes.HIPM:
+        without_dy = tuple(name for name in mc if name not in group("DY"))
+        hipm = study_sizes.HIPM[era]
+        entries.append(LnN(nuisance("CMS_htt_hipm_eff_m", "hipm", era), without_dy, hipm["m"], channels=("mt", "em")))
+        entries.append(LnN(nuisance("CMS_htt_hipm_eff_e", "hipm", era), without_dy, hipm["e"], channels=("et", "em")))
+    halves = study_sizes.FF_HALVES.get(study.ff_variant, {}).get(era, {}) if jet_fakes_output == "jetFakes" else {}
+    for channel, value in halves.items():
+        entries.append(LnN(nuisance(f"CMS_ff_2016half_{channel}", "ff_halves", era), (jet_fakes_output,), value, channels=(channel,)))
+    return [e for e in entries if _relevant(e.value)]
+
+
+def _relevant(value: float | tuple[float, float]) -> bool:
+    """An lnN that moves the yield by more than 0.01 % in one direction (the others are left out of the card)."""
+    return any(abs(v - 1) > 0.0001 + 1e-9 for v in (value if isinstance(value, tuple) else (value,)))
+
+
+def dy_table_lnn(processes: tuple[Process, ...], era: str) -> LnN:
+    """The DY-table nuisance of the era (constants.DY_TABLE_LNN) on every DY process the table corrects."""
+    if era not in DY_TABLE_LNN:
+        raise AnalysisError(f"dy_correction njets_btag: no DY-table uncertainty for {era} (constants.DY_TABLE_LNN has {', '.join(DY_TABLE_LNN)})")
+    dy = tuple(p.name for p in processes if p.group == "DY" and p.role != "auxiliary")
+    return LnN(nuisance("CMS_htt_dy_table", "dy_table", era), dy, DY_TABLE_LNN[era])
+
+
+def lnn(processes: tuple[Process, ...], jet_fakes_output: str, era: str, borrowed: tuple[str, ...] = (), study: Study | None = None, dy_correction: str = "none") -> tuple[LnN, ...]:
+    """Normalisation uncertainties; `borrowed` are the processes made of samples borrowed from another era; `study`
+    adds the lnN of the switch study_uncertainties (study_lnn), whose POG vsJet components replace the flat
+    eff_t_vsJet; with the DY table (dy_correction njets_btag) its uncertainty (dy_table_lnn)."""
     mc = tuple(p.name for p in processes if p.role in ("signal", "background") and p.group != EMBEDDED)
     emb = tuple(p.name for p in processes if p.role == "background" and p.group == EMBEDDED)
 
@@ -136,8 +269,7 @@ def lnn(processes: tuple[Process, ...], jet_fakes_output: str, era: str, borrowe
         # VSe and VSmu together (K6: the 2016 eras, whose VSe and VSmu payloads are 2018 copies, share the 2018 nuisance)
         LnN(nuisance("eff_t_vsLep_$CHANNEL", "tau_vslep", era), mc, 1.01, channels=LT_CHANNELS),
         LnN(nuisance("eff_t_vsLep_$CHANNEL", "tau_vslep", era), mc, 1.0201, channels=("tt",)),
-        LnN(tau("eff_t_vsJet_$CHANNEL"), mc, 1.02, channels=LT_CHANNELS),
-        LnN(tau("eff_t_vsJet_$CHANNEL"), mc, 1.0404, channels=("tt",)),
+        *(() if study else (LnN(tau("eff_t_vsJet_$CHANNEL"), mc, 1.02, channels=LT_CHANNELS), LnN(tau("eff_t_vsJet_$CHANNEL"), mc, 1.0404, channels=("tt",)))),
         LnN("htt_zjXsec", group("DY"), 1.02),
         LnN("htt_tjXsec", group("TT"), 1.06),
         LnN("htt_stXsec", group("ST"), 1.05),
@@ -155,5 +287,7 @@ def lnn(processes: tuple[Process, ...], jet_fakes_output: str, era: str, borrowe
         LnN(nuisance(f"{jet_fakes_output}Norm_$CHANNEL", fakes_family, era), (jet_fakes_output,), 1.108, channels=LT_CHANNELS),
         LnN(nuisance(f"{jet_fakes_output}Norm_$CHANNEL", fakes_family, era), (jet_fakes_output,), 1.216, channels=("tt",)),
         *(LnN(f"CMS_htt_borrowed_{name}_{era}", (name,), BORROWED_LNN) for name in borrowed),
+        *(study_lnn(processes, jet_fakes_output, era, study) if study else ()),
+        *((dy_table_lnn(processes, era),) if dy_correction == "njets_btag" else ()),
     ]
     return tuple(e for e in entries if e.processes)

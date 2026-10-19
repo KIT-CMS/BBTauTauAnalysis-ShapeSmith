@@ -38,6 +38,8 @@ COLUMNS = {"classic": "classic", "emb": "emb", "emb_ff": "emb ff", "emb_ff_w": "
 REPRODUCED = {name: name.replace(production, REPRODUCTION[production][0]) for name, (production, _) in RUNS.items()}  # v7 -> v7b
 TT_FROM_MC = ("smrun2_binned_v7", "smrun2_binned_v7_ff", "smrun2_binned_v7_ff_w", "ff_smrun2_binned_v7", "ff_smrun2_binned_v7_w")  # E33
 TT_FROM_MC_TEXT = ("in et, mt and tt", "in et and mt (tt: MC)")  # the web description of those runs says so
+# the v7b fake-factor runs carry the uncertainties sized in the v7b studies (switch study_uncertainties, 2026-10-19)
+STUDY_UNCERTAINTIES = ("smrun2_binned_v7_ff", "smrun2_binned_v7_ff_w")
 RENAMED = {P3: (("ff_v7", "ff_v7b"),), P1: ()}  # the FF friends of v7b get their own names (ff_v7b, ff_v7b_w): P5 of v7 and v7b never overwrite each other
 
 
@@ -80,7 +82,8 @@ def test_the_reproduction_reads_its_kinds_from_the_new_tag(name, era):
     """The copy of a run YAML: the data (P1: and the embedding) from the first production, the re-produced kinds and their
     friends from the new tag; skims, outputs, ML folds, galleries and payload paths under the new tag; the rest is the run
     of the first production (the about text aside, the recoil eras of the tau-ID measurement and, in the runs with the
-    embedding, tt from MC: switches.embedding [et, mt] and the matching web description)."""
+    embedding, tt from MC: switches.embedding [et, mt] and the matching web description; in the fake-factor runs the
+    uncertainties of the v7b studies, switches.study_uncertainties)."""
     production, _ = RUNS[name]
     tag, kinds = REPRODUCTION[production]
     first, again = load(name, era), load(REPRODUCED[name], era)
@@ -109,6 +112,14 @@ def test_the_reproduction_reads_its_kinds_from_the_new_tag(name, era):
             expected["web"]["description"] = expected["web"]["description"].replace(*TT_FROM_MC_TEXT)
     else:
         assert again.switches.get("embedding") == first.switches.get("embedding")
+    if name in STUDY_UNCERTAINTIES:
+        assert "study_uncertainties" not in first.switches and again.switches["study_uncertainties"] is True
+        expected["switches"]["study_uncertainties"] = True
+        # the fake-factor shifts symmetrised where one-sided or strongly asymmetric (2026-10-19)
+        assert "symmetrise_ff_shifts" not in first.switches and again.switches["symmetrise_ff_shifts"] is True
+        expected["switches"]["symmetrise_ff_shifts"] = True
+    else:
+        assert "study_uncertainties" not in again.switches and "symmetrise_ff_shifts" not in again.switches
     assert rest[1] == expected
     if name.endswith("_id_es"):  # the MET fix: the recoil shifts of DY and W in 2018 only; v1 has them in every era
         assert first.switches["recoil_eras"] == list(ERAS) and again.switches["recoil_eras"] == ["2018"]
