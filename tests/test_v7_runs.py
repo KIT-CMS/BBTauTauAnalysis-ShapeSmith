@@ -4,7 +4,8 @@ productions P1 smrun2_tau_id_v1 and P3 smrun2_binned_v7 with the friends ff_v7 a
 The re-production of 2026-10-18 (MET fix, POG muon trigger SF on MC): a copy of every run YAML that reads the MC and the
 embedding of P3 from smrun2_binned_v7b and the MC of P1 from smrun2_tau_id_v2 (ntuples.bases), with its own skims,
 outputs and galleries under the new tag. The decision of 2026-10-19 (E33: the tt-embedding closure failed in every era):
-the v7b runs with the embedding take the genuine taus of tt from MC, switches.embedding [et, mt] for [et, mt, tt]."""
+the v7b runs with the embedding take the genuine taus of tt from MC, switches.embedding [et, mt] for [et, mt, tt]. The
+v7b galleries of the eras are one site each (web.site, 2026-10-19): one page with an era switch and a title without the era."""
 import json
 from pathlib import Path
 
@@ -37,7 +38,17 @@ MEASUREMENTS = ("ff_smrun2_binned_v7", "ff_smrun2_binned_v7_w", "smrun2_tau_id_v
 COLUMNS = {"classic": "classic", "emb": "emb", "emb_ff": "emb ff", "emb_ff_w": "emb ff with W"}
 REPRODUCED = {name: name.replace(production, REPRODUCTION[production][0]) for name, (production, _) in RUNS.items()}  # v7 -> v7b
 TT_FROM_MC = ("smrun2_binned_v7", "smrun2_binned_v7_ff", "smrun2_binned_v7_ff_w", "ff_smrun2_binned_v7", "ff_smrun2_binned_v7_w")  # E33
-TT_FROM_MC_TEXT = ("in et, mt and tt", "in et and mt (tt: MC)")  # the web description of those runs says so
+TT_FROM_MC_TEXT = ("in et, mt and tt", "in et and mt (tt: MC)")  # the web description of the FF measurement says so
+
+
+def tt_from_mc(name: str, description: str) -> str:
+    """The v7b web description of a run with tt from MC (E33): the FF measurement names the subtracted channels; the
+    embedded columns of the control site hold et and mt (emb ff also em) and say where tt is, as in v6: classic, or the
+    column ff (the tt of the FF run, published with --channels tt --variant ff, README)."""
+    if name.startswith("ff_"):
+        return description.replace(*TT_FROM_MC_TEXT)
+    see = "classic" if name == "smrun2_binned_v7" else "ff"
+    return description.replace(" in et, mt and tt,", ",").removesuffix(".") + f"; et and mt only (tt has no embedding, see {see})."
 # the v7b fake-factor runs carry the uncertainties sized in the v7b studies (switch study_uncertainties, 2026-10-19)
 STUDY_UNCERTAINTIES = ("smrun2_binned_v7_ff", "smrun2_binned_v7_ff_w")
 RENAMED = {P3: (("ff_v7", "ff_v7b"),), P1: ()}  # the FF friends of v7b get their own names (ff_v7b, ff_v7b_w): P5 of v7 and v7b never overwrite each other
@@ -83,7 +94,7 @@ def test_the_reproduction_reads_its_kinds_from_the_new_tag(name, era):
     friends from the new tag; skims, outputs, ML folds, galleries and payload paths under the new tag; the rest is the run
     of the first production (the about text aside, the recoil eras of the tau-ID measurement and, in the runs with the
     embedding, tt from MC: switches.embedding [et, mt] and the matching web description; in the fake-factor runs the
-    uncertainties of the v7b studies, switches.study_uncertainties)."""
+    uncertainties of the v7b studies, switches.study_uncertainties; the galleries as eras of a site)."""
     production, _ = RUNS[name]
     tag, kinds = REPRODUCTION[production]
     first, again = load(name, era), load(REPRODUCED[name], era)
@@ -105,11 +116,16 @@ def test_the_reproduction_reads_its_kinds_from_the_new_tag(name, era):
         recoil = dump["switches"].pop("recoil_eras", None)
         assert recoil is None or name.endswith("_id_es")
     expected = moved(rest[0], production, tag, RENAMED[production])
+    if expected.get("web"):  # the gallery of the era is one era of the site, whose page names no era
+        assert "site" not in rest[0]["web"]
+        expected["web"]["site"] = str(Path(expected["web"]["dir"]).parent)
+        if expected["web"].get("title"):
+            expected["web"]["title"] = expected["web"]["title"].replace(f" {era} ", " ")
     if name in TT_FROM_MC:
         assert first.switches["embedding"] == ["et", "mt", "tt"] and again.switches["embedding"] == ["et", "mt"]
         expected["switches"]["embedding"] = ["et", "mt"]
         if expected.get("web"):  # the runs whose description names the embedded channels
-            expected["web"]["description"] = expected["web"]["description"].replace(*TT_FROM_MC_TEXT)
+            expected["web"]["description"] = tt_from_mc(name, expected["web"]["description"])
     else:
         assert again.switches.get("embedding") == first.switches.get("embedding")
     if name in STUDY_UNCERTAINTIES:
@@ -188,6 +204,19 @@ def test_the_galleries_of_an_era_and_their_columns():
                            "emb_ff": ["smrun2_binned_v7_ff"], "emb_ff_w": ["smrun2_binned_v7_ff_w"]}
         assert load("smrun2_binned_v7", era).web.title == f"smrun2_binned_v7 {era} · control plots"
         assert load("smrun2_binned_v7_noemb", era).web.description == load("smrun2_binned_v7_dilepton", era).web.description
+
+
+def test_the_v7b_galleries_are_the_eras_of_two_sites():
+    for era in ERAS:
+        for name in RUNS:
+            web = load(REPRODUCED[name], era).web
+            if web is None:
+                continue
+            site = "ff_smrun2_binned_v7b" if name in MEASUREMENTS else "smrun2_binned_v7b"
+            assert web.site == Path(f"/web/sdaigler/public_html/{site}") and web.dir == web.site / era
+            assert era not in (web.title or "")
+        assert load("smrun2_binned_v7b", era).web.title == "smrun2_binned_v7b · control plots"
+        assert load("ff_smrun2_binned_v7b", era).web.title == "smrun2_binned_v7b · fake factors"
 
 
 def test_the_runs_of_a_production_fit_together():

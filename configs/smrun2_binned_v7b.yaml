@@ -45,11 +45,12 @@ combine: {cmssw_dir: /work/sdaigler/smhtt_ul/CMSSW_14_1_9, scram_arch: el9_amd64
 # web gallery of the era (shapesmith publish), columns classic (smrun2_binned_v7b_noemb.yaml, smrun2_binned_v7b_dilepton.yaml),
 # emb (this run), emb ff (smrun2_binned_v7b_ff.yaml) and emb ff with W (smrun2_binned_v7b_ff_w.yaml); title and about here
 web:
+  site: /web/sdaigler/public_html/smrun2_binned_v7b  # one page with an era switch, the eras in its subdirectories
   dir: "/web/sdaigler/public_html/smrun2_binned_v7b/{era}"
   variant: emb
   label: emb
-  description: "τ-embedding for genuine ττ in et and mt (tt: MC), MC jet→τh fakes, QCD from the ABCD method (also in the control regions), DY corrected in n_jets × n_bjets."
-  title: "smrun2_binned_v7b {era} · control plots"
+  description: "τ-embedding for genuine ττ, MC jet→τh fakes, QCD from the ABCD method (also in the control regions), DY corrected in n_jets × n_bjets; et and mt only (tt has no embedding, see classic)."
+  title: "smrun2_binned_v7b · control plots"
   about: |
     HH→bbττ {era} (Run 2 UL, NanoAODv15), CROWN productions smrun2_binned_v7 (data) and smrun2_binned_v7b (MC and
     τ-embedding with the MET fix and the POG muon trigger SF on MC), nominal only; histograms and plots by ShapeSmith.

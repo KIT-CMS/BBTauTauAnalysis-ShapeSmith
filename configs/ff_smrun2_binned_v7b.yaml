@@ -39,15 +39,17 @@ workers: 12                                               # at most 24 on portal
 log_level: DEBUG
 # web gallery of the era (shapesmith publish): the plots of the measurement, one column per variant
 web:
+  site: /web/sdaigler/public_html/ff_smrun2_binned_v7b  # one page with an era switch, the eras in its subdirectories
   dir: "/web/sdaigler/public_html/ff_smrun2_binned_v7b/{era}"
   variant: ff_v7b
   label: ff_v7b (QCD, ttbar)
   description: "FF measurement on smrun2_binned_v7b {era}, QCD and ttbar fake factors, genuine τh subtracted with the τ-embedding in et and mt (tt: MC); the payload of the friend ff_v7b."
-  title: "smrun2_binned_v7b {era} · fake factors"
+  title: "smrun2_binned_v7b · fake factors"
   about: |
     Fake-factor measurement of the HH→bbττ analysis, era {era} (Run 2 UL, NanoAODv15, productions smrun2_binned_v7 and
     v7b) with ShapeSmith, the TauFakeFactors method: QCD fake factors from data, ttbar fake factors from MC times a data/MC factor,
     in the variant with W+jets also W+jets fake factors from data with a DR→SR correction from W MC; the process fractions,
-    the QCD DR→SR correction and the non-closure corrections in table order. 2016 is one measurement of both halves.
+    the QCD DR→SR correction and the non-closure corrections in table order. The era 2016 is one measurement of both halves, the payload
+    of the friend in 2016preVFP and 2016postVFP; the halves alone are its cross-check.
 
     Each correction shows its p-value against 1; a correction with p > 0.05 is set to 1.

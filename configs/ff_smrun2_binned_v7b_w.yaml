@@ -39,6 +39,7 @@ workers: 12                                               # at most 24 on portal
 log_level: DEBUG
 # web gallery of the era (shapesmith publish): the plots of the measurement, one column per variant
 web:
+  site: /web/sdaigler/public_html/ff_smrun2_binned_v7b  # one page with an era switch, the eras in its subdirectories
   dir: "/web/sdaigler/public_html/ff_smrun2_binned_v7b/{era}"
   variant: ff_v7b_w
   label: ff_v7b_w (QCD, W+jets, ttbar)

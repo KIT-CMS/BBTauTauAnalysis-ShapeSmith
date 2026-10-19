@@ -31,6 +31,7 @@ workers: 8                                                # the DY and data samp
 log_level: DEBUG
 # web gallery of the era: the dilepton channels of the column "classic"
 web:
+  site: /web/sdaigler/public_html/smrun2_binned_v7b  # one page with an era switch, the eras in its subdirectories
   dir: "/web/sdaigler/public_html/smrun2_binned_v7b/{era}"
   variant: classic
   label: classic

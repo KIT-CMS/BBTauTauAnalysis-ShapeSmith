@@ -151,10 +151,30 @@ skims, outputs and galleries under the new tag, so the v7 run YAMLs keep reprodu
 (`tests/test_v7_runs.py` checks that each copy is its v7 run otherwise): `smrun2_binned_v7b.yaml`, `_noemb`,
 `_dilepton`, `_ff`, `_ff_w`, `ff_smrun2_binned_v7b.yaml`, `ff_smrun2_binned_v7b_w.yaml`, `smrun2_tau_id_v2_id_es.yaml`
 (`recoil_eras: ["2018"]`; the v1 YAML sets every era) and `smrun2_tau_id_v2_trigger.yaml` (the ES payload of
-`smrun2_tau_id_v2`). The commands are those above with these YAMLs. `constants.DY_NJETS_BTAG` holds the tables of the
+`smrun2_tau_id_v2`). The commands are those above with these YAMLs. Their galleries are the eras of two sites
+(`web.site`), one page each with an era switch: https://web.etp.kit.edu/~sdaigler/smrun2_binned_v7b/ and
+https://web.etp.kit.edu/~sdaigler/ff_smrun2_binned_v7b/ (with 2016, the measurement of both halves); the commands
+below add or replace an era. `constants.DY_NJETS_BTAG` holds the tables of the
 `smrun2_binned_v7b_dilepton.yaml` runs (2026-10-19); they serve the v7 run YAMLs as well, so a v7 run with
 `dy_correction: njets_btag` no longer reproduces its v7 result exactly (the v7 MC is superseded; the v7 tables are in
 the git history, analysis abd7657).
+
+tt has no embedding in v7b (E33: genuine ττ from MC), so as in v6 the control site shows tt only in the columns classic
+and ff (the tt of the FF run; the same in `ff_v7b_w`, which has W+jets fake factors in et and mt only), and emb, emb ff
+and emb ff with W hold et and mt (the emb ff columns also em). Publish a column again with fewer channels and its other
+channels stay: to drop a channel, remove the era directory first and publish the era anew.
+
+```bash
+S="-s era=$E"; B=configs/smrun2_binned_v7b        # E: 2016preVFP, 2016postVFP, 2017, 2018 (FF measurement also 2016)
+shapesmith publish -c ${B}_noemb.yaml $S            # ~sdaigler/smrun2_binned_v7b/<era> (+ site page), column classic: et, mt, tt
+shapesmith publish -c ${B}_dilepton.yaml $S         # column classic: em, mm, ee
+shapesmith publish -c $B.yaml $S --channels et,mt   # column emb
+shapesmith publish -c ${B}_ff.yaml $S --channels et,mt,em     # column emb ff
+shapesmith publish -c ${B}_ff_w.yaml $S --channels et,mt,em   # column emb ff with W
+shapesmith publish -c ${B}_ff.yaml $S --channels tt --variant ff --label ff \
+                   --description "MC genuine ττ + jet→τh fakes from the fully corrected fake factor (friend ff_v7b; the same in ff_v7b_w, which has W+jets fake factors in et and mt only); tt only, it has no embedding."   # column ff: tt
+shapesmith publish -c configs/ff_smrun2_binned_v7b.yaml $S && shapesmith publish -c configs/ff_smrun2_binned_v7b_w.yaml $S   # ~sdaigler/ff_smrun2_binned_v7b
+```
 
 The v5 run YAMLs (`*v5*.yaml`, galleries `sm2018_binned_v5` and `ff_sm2018_binned_v5`, run as above) share one skim
 directory between the tau and the dilepton run. With the v6 code, `hist`, `estimate` and `plot` of tt, em, mm and ee

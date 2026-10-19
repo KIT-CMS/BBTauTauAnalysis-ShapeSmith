@@ -27,6 +27,7 @@ log_level: DEBUG
 combine: {cmssw_dir: /work/sdaigler/smhtt_ul/CMSSW_14_1_9, scram_arch: el9_amd64_gcc12}
 # web gallery of the era: the tau channels of the column "classic" (the dilepton run adds em, mm, ee)
 web:
+  site: /web/sdaigler/public_html/smrun2_binned_v7b  # one page with an era switch, the eras in its subdirectories
   dir: "/web/sdaigler/public_html/smrun2_binned_v7b/{era}"
   variant: classic
   label: classic
