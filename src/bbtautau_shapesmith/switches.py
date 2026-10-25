@@ -117,6 +117,15 @@ class TauSwitches(_EmbeddedChannels, _FakeFactorProcesses, BaseModel):
     # v7b fake-factor runs since 2026-10-19: the mt QCD non-closure shifts of 2017/2018 at -8/+28 % made robustHesse drop
     # them from the covariance); needs jet_fakes: ff
     symmetrise_ff_shifts: bool = False
+    # the systematics stages of the NN phase (nn_limit_spec.md 8, systematics.py): S0+ the top-pT shape of ttbar
+    # CMS_htt_ttbarShape (SH7) and the 30 % normalisation of the heavy-flavour component at >= 3 b tags
+    # CMS_htt_heavy_flavour (SH8; needs skims with bpair_hadronFlavour_{1,2}, as the re-skim of NN spec X8), on the
+    # tau channels and em; S1 the signal theory shapes normalised to the inclusive rate (SH14): qcd_scale (the CROWN
+    # shifts QCDscale_ren and QCDscale_fac of lhe_scale_weight), parton_shower and pdf (columns the shift production P6 is
+    # to add); they need crown_shifts: true and the powheg signal
+    ttbar_shape: bool = False
+    heavy_flavour: bool = False
+    signal_theory: list[Literal["qcd_scale", "parton_shower", "pdf"]] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _nn_categories_need_the_nn_friend(self) -> TauSwitches:
@@ -161,6 +170,16 @@ class TauSwitches(_EmbeddedChannels, _FakeFactorProcesses, BaseModel):
     def _symmetrised_shifts_need_fake_factors(self) -> TauSwitches:
         if self.symmetrise_ff_shifts and self.jet_fakes != "ff":
             raise ValueError("symmetrise_ff_shifts requires jet_fakes: ff")
+        return self
+
+    @model_validator(mode="after")
+    def _signal_theory_needs_the_shift_production(self) -> TauSwitches:
+        if len(set(self.signal_theory)) < len(self.signal_theory):
+            raise ValueError(f"signal_theory lists a kind twice: {self.signal_theory}")
+        if self.signal_theory and not self.crown_shifts:
+            raise ValueError("signal_theory requires crown_shifts: true (the theory weights come with the shift production P6)")
+        if self.signal_theory and self.signal_sample != "powheg":
+            raise ValueError("signal_theory requires signal_sample: powheg (the normalisation is that of the powheg sample)")
         return self
 
     @model_validator(mode="after")

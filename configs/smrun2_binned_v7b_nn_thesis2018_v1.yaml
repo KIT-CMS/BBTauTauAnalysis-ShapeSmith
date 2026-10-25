@@ -1,0 +1,38 @@
+# NN phase, step 1 (nn_limit_spec.md 4.2, 9; SH13): R3 and R4, the thesis recipe on v7b 2018 with the background model of
+# the thesis comparison: smrun2_binned_v7b_noemb.yaml (MC jet fakes, QCD from the ABCD method, no embedding, the DY
+# correction) with the NN categories of the six thesis classes (thesis6, the class order of the export) from the NN
+# friend FR1 nn_thesis2018_v1: CROWN sm_nn_classifier with the thesis recipe trained on the node_SM and on the powheg
+# signal, 2018 only, chained on the FastMTT friend; data under smrun2_binned_v7, MC (and embedding) under
+# smrun2_binned_v7b, as fastmtt. The tau channels only, as the thesis: the final state 'all' is et + mt + tt.
+#   shapesmith skim -c configs/smrun2_binned_v7b_nn_thesis2018_v1.yaml        # its own skims (the NN friend), 2018 only
+#   shapesmith hist / estimate / datacards / fit -c configs/smrun2_binned_v7b_nn_thesis2018_v1.yaml   # R4 (powheg)
+#   R3 (signal node_SM, N9): -s switches.signal_sample=node_sm \
+#       -s "output_dir=/ceph/sdaigler/shapesmith/smrun2_binned_v7b/output/tau_nn_thesis2018_v1_node_sm/{era}"
+# The model of a run is one column prefix of the friend (R3 the node_SM model, R4 the powheg model): the NN switches of
+# SH1-SH3 (feat/nn-categories) are added at the merge of the NN branches, e.g. nn_prefix: nn_thesis_powheg_ (R3:
+# nn_thesis_nodesm_; the prefixes of the friend's MODELS, CROWN bbtautau sm_nn_classifier.py), and the categories and
+# binning of the thesis (spec 4.1, 6.3 no. 8: nn_categories: thesis, nn_binning: thesis).
+# Systematics stage S0 (spec 8): the S0+ switches ttbar_shape (SH7) and heavy_flavour (SH8) are off; S0+ adds
+# -s switches.ttbar_shape=true -s switches.heavy_flavour=true. heavy_flavour reads bpair_hadronFlavour_{1,2} (MC): skim
+# with it on, so that one skim serves S0 and S0+.
+analysis: bbtautau_shapesmith.analysis:build
+era: "2018"                                               # FR1 is a 2018 production
+channels: [et, mt, tt]
+switches: {sample_lists: ["sm_{era}_binned", "sm_{era}_borrowed", "sm_{era}_embedding"], jet_fakes: mc, embedding: false, crown_shifts: false, nn_friend: true, fit_categories: nn, fastmtt_friend: true, control_regions: true, diagnostics: true, dy_correction: njets_btag}
+sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
+ntuples:
+  server: root://cmsdcache-kit-disk.gridka.de
+  base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7/CROWNRun      # the data
+  bases:                                                  # the MC and the embedding: the re-production
+    mc: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNRun
+    embedding: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNRun
+  friends:                                                # the tau channels only
+    - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7/CROWNFriend/fastmtt, applies_to: [data], channels: [et, mt, tt]}
+    - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNFriend/fastmtt, applies_to: [mc, embedding], channels: [et, mt, tt]}
+    - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7/CROWNFriend/nn_thesis2018_v1, applies_to: [data], channels: [et, mt, tt]}
+    - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNFriend/nn_thesis2018_v1, applies_to: [mc, embedding], channels: [et, mt, tt]}
+skim_dir: /ceph/sdaigler/shapesmith/smrun2_binned_v7b/skims/tau_control_nn_thesis2018_v1/{era}   # its own (NN friend)
+output_dir: /ceph/sdaigler/shapesmith/smrun2_binned_v7b/output/tau_nn_thesis2018_v1/{era}
+workers: 16                                               # at most 16 cores on deepthought2 (taskset -c 16-31)
+log_level: DEBUG
+combine: {cmssw_dir: /work/sdaigler/smhtt_ul/CMSSW_14_1_9, scram_arch: el9_amd64_gcc12}

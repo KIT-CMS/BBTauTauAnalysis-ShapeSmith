@@ -2,25 +2,27 @@
 configuration switches, with its ML export (ml.py)."""
 from __future__ import annotations
 
+import dataclasses
 import json
 from collections.abc import Iterable
 from pathlib import Path
 
 from shapesmith.config import RunConfig
-from shapesmith.model import ABCD, Analysis, AnalysisError, Category, Channel, DataMinus, Process, Sample, TemplateShift
+from shapesmith.model import ABCD, Analysis, AnalysisError, Category, Channel, CrossSection, DataMinus, Process, Sample, TemplateShift
 
 from bbtautau_shapesmith import cuts, dilepton
 from bbtautau_shapesmith.constants import BTAG_BINS, CONTROL_CHANNELS, LT_CHANNELS, LUMI_PB, PREFIRING_NUISANCE, TAU_CHANNELS, check_era
 from bbtautau_shapesmith.ml import ML_CLASSES, ml_config, raw_count_groups
 from bbtautau_shapesmith.processes import (
-    EMBEDDED, GENUINE, JET_FAKE, LEPTON_FAKE, NODE_SM, SIGNAL, SPLITS, available, backgrounds_in, tau_processes,
+    EMBEDDED, GENUINE, JET_FAKE, LEPTON_FAKE, NODE_SM, SIGNAL, SIGNAL_XS_FB, SIGNAL_XS_NUISANCES, SPLITS, available, backgrounds_in, tau_processes,
 )
 from bbtautau_shapesmith.samples import sample_database, samples
 from bbtautau_shapesmith.style import style
 from bbtautau_shapesmith.switches import TauSwitches, parse
 from bbtautau_shapesmith.systematics import (
-    Study, btag_variations, embedding_id_variations, embedding_ttbar_nuisance, embedding_variation_sums, embedding_variations, ff_dm_nonclosure_variations,
-    ff_variant, ff_variations, lnn, prefiring_variations,
+    HEAVY_FLAVOUR_WEIGHT, SIGNAL_THEORY_WEIGHT, Study, btag_variations, embedding_id_variations, embedding_ttbar_nuisance, embedding_variation_sums,
+    embedding_variations, ff_dm_nonclosure_variations, ff_variant, ff_variations, heavy_flavour_variations, lnn, prefiring_variations,
+    signal_theory_variations, ttbar_shape_variations, with_weights,
 )
 from bbtautau_shapesmith.variables import categories, control_variables, nominal_category
 
@@ -138,6 +140,22 @@ def channel(name: str, era: str, switches: TauSwitches, channel_samples: tuple[S
     )
 
 
+def with_stage_variations(channel: Channel, era: str, switches: TauSwitches) -> Channel:
+    """A tau or control channel with the weight variations of the NN systematics stages (nn_limit_spec.md 8):
+    ttbar_shape on the processes with the top-pT weight, heavy_flavour on the simulated backgrounds and signal_theory on
+    the signal, each of the last two with the nominal factor 1.0 it replaces (systematics.with_weights)."""
+    processes, variations = channel.processes, ()
+    if switches.ttbar_shape:
+        variations += ttbar_shape_variations(era)
+    if switches.heavy_flavour:
+        processes = with_weights(processes, {p.name for p in processes if p.role == "background" and p.group != EMBEDDED}, HEAVY_FLAVOUR_WEIGHT)
+        variations += heavy_flavour_variations(era)
+    if switches.signal_theory:
+        processes = with_weights(processes, {p.name for p in processes if p.role == "signal"}, SIGNAL_THEORY_WEIGHT)
+        variations += signal_theory_variations(era, switches.signal_theory)
+    return dataclasses.replace(channel, processes=processes, variations=channel.variations + variations) if variations else channel
+
+
 def symmetrised_ff_shifts(channels: Iterable[Channel], era: str, switches: TauSwitches) -> tuple[str, ...]:
     """With symmetrise_ff_shifts the names (without the direction) of the fake-factor friend shifts of the channels,
     which the datacards symmetrise where one-sided or strongly asymmetric; the other variations stay as they are."""
@@ -169,7 +187,9 @@ def build(config: RunConfig) -> Analysis:
     signal = NODE_SM if switches.signal_sample == "node_sm" else SIGNAL
     by_channel = samples(sample_database(config), switches.sample_lists, config.channels, era, signal)
     channels = {
-        name: dilepton.top_control_channel(by_channel[name], era, switches.dy_correction, switches.fit_categories == "nn") if name in CONTROL_CHANNELS else channel(name, era, switches, by_channel[name])
+        name: with_stage_variations(
+            dilepton.top_control_channel(by_channel[name], era, switches.dy_correction, switches.fit_categories == "nn") if name in CONTROL_CHANNELS else channel(name, era, switches, by_channel[name]), era, switches,
+        )
         for name in config.channels
     }
     tau_channels = [c for name, c in channels.items() if name not in CONTROL_CHANNELS]
@@ -187,4 +207,5 @@ def build(config: RunConfig) -> Analysis:
         style=style(era),
         # no NN training on a control channel
         ml=ml_config(process_union(tau_channels), switches),
+        signal_cross_section=CrossSection("ggF HH", SIGNAL_XS_FB, SIGNAL_XS_NUISANCES),  # ggF only (N23)
     )

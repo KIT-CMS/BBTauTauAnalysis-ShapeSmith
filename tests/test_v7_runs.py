@@ -20,6 +20,7 @@ from bbtautau_shapesmith.constants import DY_NJETS_BTAG, LUMI_PB
 from bbtautau_shapesmith.samples import inventory_names, inventory_path
 from tests.helpers import DATABASE, ERAS, REPO
 from tests.run2 import list_name
+from tests.test_nn_runs import NN_FRIEND_RUNS
 
 P1, P3 = "smrun2_tau_id_v1", "smrun2_binned_v7"
 REPRODUCTION = {P3: ("smrun2_binned_v7b", ("mc", "embedding")), P1: ("smrun2_tau_id_v2", ("mc",))}  # tag, re-produced kinds
@@ -79,7 +80,7 @@ def strings(value):
 
 
 def test_one_run_yaml_per_run_type():
-    assert {p.stem for p in (REPO / "configs").glob("*.yaml") if "smrun2" in p.stem} == set(RUNS) | set(REPRODUCED.values()) | set(NN_RUNS)
+    assert {p.stem for p in (REPO / "configs").glob("*.yaml") if "smrun2" in p.stem} == set(RUNS) | set(REPRODUCED.values()) | set(NN_RUNS) | set(NN_FRIEND_RUNS)
 
 
 def moved(value, old: str, new: str, renamed=()):
