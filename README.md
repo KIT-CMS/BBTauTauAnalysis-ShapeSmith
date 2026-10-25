@@ -48,7 +48,7 @@ shapesmith measure   -c configs/ff_sm2018_binned_v6.yaml && shapesmith measure -
 # fake-factor run (friend ff_v2) with em as the ttbar control channel: control plots, then the background-only fit
 shapesmith skim      -c configs/sm2018_binned_v6_ff.yaml
 shapesmith hist      -c configs/sm2018_binned_v6_ff.yaml --control --skip-systematics && shapesmith estimate -c configs/sm2018_binned_v6_ff.yaml --control
-shapesmith hist      -c configs/sm2018_binned_v6_ff.yaml --skip-systematics && shapesmith estimate -c configs/sm2018_binned_v6_ff.yaml   # categories nominal, em_tt
+shapesmith hist      -c configs/sm2018_binned_v6_ff.yaml && shapesmith estimate -c configs/sm2018_binned_v6_ff.yaml   # with systematics (the card shapes); categories nominal, em_tt
 shapesmith datacards -c configs/sm2018_binned_v6_ff.yaml && shapesmith fit -c configs/sm2018_binned_v6_ff.yaml --background-only   # -> datacards/background_fit.md
 # web galleries (after plot or measure; target, column and texts from the web: block of each run YAML), in this
 # order: the first publication fixes the order of the columns and channels
@@ -61,10 +61,10 @@ shapesmith publish   -c configs/sm2018_binned_v6_ff.yaml --channels tt --variant
                      --description "MC genuine ττ + jet→τh fakes from the fully corrected fake factor (friend ff_v2); tt only, it has no embedding."   # column ff: tt
 shapesmith publish   -c configs/ff_sm2018_binned_v6.yaml                 # ~sdaigler/ff_sm2018_binned_v6: the FF measurement
 shapesmith publish   -c configs/ff_sm2018_binned_v6_noemb.yaml           # its cross-check column
-# with NN friends (nn_friend: true, fit_categories: nn, friend under ntuples.friends, re-skim):
+# with NN friends (nn_friend: true, fit_categories: nn, friend under ntuples.friends, re-skim); hist with systematics:
 shapesmith hist      -c configs/sm2018_binned_v6_ff.yaml && shapesmith estimate -c configs/sm2018_binned_v6_ff.yaml
 shapesmith sync      -c configs/sm2018_binned_v6_ff.yaml && shapesmith datacards -c configs/sm2018_binned_v6_ff.yaml && shapesmith fit -c configs/sm2018_binned_v6_ff.yaml
-shapesmith ml-export -c configs/sm2018_binned_v6_ff.yaml
+# the NN training data: see "NN training data (ML export)"
 shapesmith inspect   output/sm2018_binned_v6_ff/shapes.root --unchanged   # variations equal to their nominal
 ```
 
@@ -122,7 +122,7 @@ shapesmith measure -c configs/ff_smrun2_binned_v7.yaml $S && shapesmith measure 
 for F in configs/smrun2_binned_v7_ff.yaml configs/smrun2_binned_v7_ff_w.yaml; do
   shapesmith skim -c $F $S
   shapesmith hist -c $F $S --control --skip-systematics && shapesmith estimate -c $F $S --control && shapesmith plot -c $F $S --control
-  shapesmith hist -c $F $S --skip-systematics && shapesmith estimate -c $F $S && shapesmith datacards -c $F $S && shapesmith fit -c $F $S --background-only
+  shapesmith hist -c $F $S && shapesmith estimate -c $F $S && shapesmith datacards -c $F $S && shapesmith fit -c $F $S --background-only   # hist with systematics: the card shapes
 done
 shapesmith combine -c configs/smrun2_binned_v7_ff.yaml --era 2016preVFP --era 2016postVFP --era 2017 --era 2018 \
                    -o /ceph/sdaigler/shapesmith/smrun2_binned_v7/combination/ff --background-only --validate
@@ -195,7 +195,10 @@ Switches of the tau run YAML (typed in `switches.py`; an unknown or mistyped swi
 | `embedding` | `false` (default), `true`, a list of channels (`[et, mt]`) | genuine ττ from the embedded samples (`EMB`) instead of the T parts of the MC, in every tau channel or in the listed ones (each a channel of the run); needs the embedding inventory in `sample_lists` |
 | `nn_friend` | `false` (default), `true` | NN categories from the NN friend |
 | `fastmtt_friend` | `false` (default), `true` | the control variables `m_fastmtt`, `pt_fastmtt`, `eta_fastmtt` and `phi_fastmtt` of et, mt and tt from the FastMTT friend (CROWN `sm_fastmtt`, tag `fastmtt`; em has none), which `ntuples.friends` must list for the tau channels |
-| `fit_categories` | `nn` (default), `control` | the categories of `hist`, `datacards` and `fit`: the NN classes (with `nn_friend`), or one category `nominal` per tau channel with the nominal region in one bin (`yield`), e.g. for `fit --background-only` without NN friends |
+| `fit_categories` | `nn` (default), `control`, `none` | the categories of `hist`, `datacards` and `fit`: the NN classes (needs `nn_friend: true`, else the run fails: without the friend there would be no tau category and cards with em only), one category `nominal` per tau channel with the nominal region in one bin (`yield`), e.g. for `fit --background-only` without NN friends, or none (a run of control plots) |
+| `ml_labels` | none (default), `thesis6`, `v7b5` | the ML export and its label profile (`ml.py`, see "NN training data"): `thesis6` needs `jet_fakes: mc`, `v7b5` `jet_fakes: ff`; the class order of the profile is also that of the NN categories (`predicted_class`; without the switch the profile of the jet-fake mode, `thesis6` with `mc`, `v7b5` with `ff`) |
+| `ml_variables` | none (default: every set), a list | the export variables: column names or the sets `thesis`, `objects`, `kinematics`, `reskim`, `truth` of `ml.py`; the skims of the run hold them (`reskim` and `truth` need the re-skim of NN spec X8); needs `ml_labels` |
+| `signal_sample` | `powheg` (default), `node_sm` | the signal `HH2B2Tau` from the powheg κλ = 1 sample, or from the madgraph node_SM sample of the master's thesis (R3, N9), the powheg sample then left out |
 | `control_regions` | `false` (default), `true` | wider skim plus the named pass/fail control regions; needs `jet_fakes: mc` |
 | `diagnostics` | `false` (default), `true` | QCD in the control regions (et/mt: same-sign data minus MC, tt: ABCD with the fail regions) and the variables `met_uncorrected`, `metphi_uncorrected`, `npv_good`, `rho` (the last two from production v6 on); needs `control_regions: true` |
 | `shape_systematics` | `true` (default), `false` | the CROWN shifts of the embedded samples and of the fake-factor friend as shape variations |
@@ -554,10 +557,63 @@ written again and the `V7_*` sets shrink to nothing; with the first v7 files `du
 channel of v4 (from the golden references of 2026-09-30); `tests/test_contracts_v4.py` checks that the v4 run YAMLs
 differ from them by exactly the changes since (so a v4 skim needs `skim --force`).
 
+## NN training data (ML export)
+
+The NN phase (`docs/nn_limit_spec.md` of the workspace, 3.1, X1-X11) trains on the events the analysis selects, exported
+by `shapesmith ml-export` per era (format: core README, "ML export"): one row per event of the nominal (signal) region,
+with its identifiers, class, signed weight and variables. Switch `ml_labels` turns the export on (`ml.py`):
+
+| Profile | Run YAML | Classes (in this order = class index = `predicted_class`) |
+|---|---|---|
+| `thesis6` (`jet_fakes: mc`, R3-R5) | `smrun2_binned_v7b_noemb.yaml` (the `tau_control` skims), `ml/thesis6/<era>` | `HH2B2Tau`; `DY` = ZTT, ZL, ZJ; `ST`; `TT`; `VV` (each with its J part); `Other` = W, TTV, EWK, single Higgs |
+| `v7b5` (`jet_fakes: ff`, R6 on, N3) | `smrun2_binned_v7b_ff_nn.yaml` (re-skim `tau_ff_nn`), `ml/v7b5/<era>` | `HH2B2Tau`; `tautau` = EMB in et and mt, ZTT, TTT, STT, VVT, TTVT, EWKT in tt; `Top` = TTL, STL; `jetFakes`; `Other` = ZL, VVL, TTVL, EWKL, single Higgs |
+
+- **jetFakes** (`v7b5`): the data of the anti-isolated region times the fake factor, as the class of the training
+  (N6), and the processes the estimate subtracts (EMB or the genuine MC and the lepton fakes) in that region as
+  subtraction rows (`is_subtraction`, negated weights, class `jetFakes`): with them the class is the datacard
+  template (10-14 % smaller), for the proxy limit and the check of N6.
+- **No QCD in `thesis6`**: the ABCD QCD of the `mc` mode is an estimate of data histograms, not of events, and is not
+  exported (as in the thesis); a proxy limit of R3-R5 lacks it.
+- **Signal**: the powheg κλ = 1 sample; for R3 the node_SM sample of the thesis, `-s switches.signal_sample=node_sm`
+  with its own `ml_dir` (the run YAML header has the command), the powheg sample is then left out of the run.
+- **Variables** (`ml_variables`, sets of `ml.py`): `thesis` (the 20 inputs of the thesis with the v15 names `n_bjets`,
+  `n_jets`; `mtt_coll_approx` does not exist in v15 and is computed in the model from the legs and the MET),
+  `objects` (pt, eta, phi, mass of both legs, `iso_1`, `tau_decaymode_1/2`, the b pair with `bpair_btag_value_*`, the
+  two leading jets, `met`, `metphi`, `metSumEt`, FastMTT), `kinematics` (`mt_1`, `mt_2`, `mt_tot`, `pzetamissvis`,
+  `mass_tautaubb`, `pt_tautaubb`, `deltaR_ditaupair`, `bpair_deltaR`), `reskim` (`bpair_mass_1/2`, `jtag_value_1/2`)
+  and `truth` (`bpair_hadronFlavour_1/2`, `jet_hadronFlavour_1/2`, MC only: NaN in data and embedding rows). The
+  skims of the run hold every export column; `reskim` and `truth` are in the v7b n-tuples but not in the skims before
+  the re-skim of X8, so the `v7b5` run has its own skim directory and `thesis6` uses the three other sets. Values are
+  those of the n-tuple, with the CROWN default -10 for an absent object (the second jet, the b pair). `iso_1` is the
+  light-lepton isolation in et and mt but the raw DeepTau vsJet score of the leading tau in tt, which defines the
+  anti-isolated region: never an NN input in tt; `tau_decaymode_1` is that of a tau only in tt.
+- **Folds**: none in the files. The trainer takes `event % n` on uint64 (n = 2 or 4, N28; the model of residue r
+  scores the events with `event % n == r`); `thesis_training` is the split of the thesis within a parity fold.
+- **Run 2**: `shapesmith ml-merge` puts the four eras into one file per channel (column `era`); the weights keep the
+  luminosity of their era, the class weights are the trainer's.
+
+```bash
+F=configs/smrun2_binned_v7b_ff_nn.yaml        # v7b5; the re-skim of X8 (new skim_dir), then the export of every era
+for E in 2016preVFP 2016postVFP 2017 2018; do
+  shapesmith skim -c $F -s era=$E && shapesmith ml-export -c $F -s era=$E; done
+shapesmith ml-merge -c $F --era 2016preVFP --era 2016postVFP --era 2017 --era 2018 -o /ceph/sdaigler/shapesmith/smrun2_binned_v7b/ml/v7b5/run2
+N=configs/smrun2_binned_v7b_noemb.yaml        # thesis6 on the stored tau_control skims (2018 for R3-R5)
+shapesmith ml-export -c $N -s era=2018
+shapesmith ml-export -c $N -s era=2018 -s switches.signal_sample=node_sm -s "ml_dir=/ceph/sdaigler/shapesmith/smrun2_binned_v7b/ml/thesis6_node_sm/{era}"   # R3
+```
+
+**The NN categories with systematics.** With the NN friend (`sm_nn_classifier`, data under v7, MC and embedding under
+v7b, chained on `fastmtt`): its entries under `ntuples.friends`, `nn_friend: true`, `fit_categories: nn`, then
+`skim --force` (the skim contract records the friends) and the chain of the cards with the shape variations: `hist`
+**without** `--skip-systematics` (which books no variation at all, neither weight variations nor CROWN or friend
+shifts, so the cards would have no shapes; it is for control plots only), `estimate`, `datacards`, `fit`, `combine`.
+
 ## Prerequisites outside this repository
 
-- NN friend trees (`predicted_class`, `predicted_max_value`) from a trained model + CROWN `sm_ml.py`. With embedding
-  shifts the NN friend must be produced with `--shifts all`, or the NN category and score stay nominal under them.
+- NN friend trees (`predicted_class`, `predicted_max_value`) from a trained model + the CROWN friend
+  `sm_nn_classifier` (NN spec 3.4; not written yet). `predicted_class` indexes the classes of the label profile
+  (`ml.ML_CLASSES`, the `classes` of the export's `classes.json`). With embedding shifts the NN friend must be produced
+  with `--shifts all`, or the NN category and score stay nominal under them.
 - Fake-factor friends (`fake_factor`, `fake_factor_1/2`, the raw `fake_factor_raw`, `fake_factor_1/2_raw` and their
   shifts) from CROWN `fake_factors_friend_config.py`, on data, MC and embedding. A new FF payload gets a new friend tag
   (a new `ntuples.friends` base); the skim contract records the friend bases, so the stored skims then need `skim --force`.

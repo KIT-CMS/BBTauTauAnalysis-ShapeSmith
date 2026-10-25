@@ -9,7 +9,7 @@
 # the ttbar control channel of the fits; the datacards of an era and the Run-2 combination (spec 6.9). One YAML for every era:
 #   shapesmith <command> -c configs/smrun2_binned_v7b_ff_w.yaml -s era=<era>
 #   hist --control --skip-systematics, estimate --control, plot --control      # gallery column "emb ff with W"
-#   hist --skip-systematics, estimate, datacards, fit --background-only        # categories nominal (tau channels), em_tt
+#   hist, estimate, datacards, fit --background-only      # with systematics (the shapes of the cards); nominal, em_tt
 #   shapesmith combine -c configs/smrun2_binned_v7b_ff_w.yaml --era 2016preVFP --era 2016postVFP --era 2017 --era 2018 \
 #       -o /ceph/sdaigler/shapesmith/smrun2_binned_v7b/combination/ff_w [--background-only] [--validate]
 # Switches (types and defaults in switches.py):

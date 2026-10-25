@@ -50,7 +50,7 @@ def test_the_switch_needs_fake_factors(run2):
 
 def test_only_the_v7b_fake_factor_runs_symmetrise():
     on = sorted(path.stem for path in (REPO / "configs").glob("*.yaml") if (yaml.safe_load(path.read_text()) or {}).get("switches", {}).get("symmetrise_ff_shifts"))
-    assert on == sorted(V7B_FF_RUNS)
+    assert on == sorted(V7B_FF_RUNS + ("smrun2_binned_v7b_ff_nn",))  # and the copy of the FF run with the NN export
 
 
 @pytest.mark.parametrize("era", ERAS)

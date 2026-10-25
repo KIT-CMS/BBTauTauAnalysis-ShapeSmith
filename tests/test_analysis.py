@@ -1,15 +1,17 @@
 import pytest
 from shapesmith.model import ABCD, AnalysisError, DataMinus, TemplateShift, Variable
-from shapesmith.skim import needed_columns
+from shapesmith.skim import exported_by, needed_columns
 from shapesmith.validate import validate
 
 from bbtautau_shapesmith import dilepton, ff_measurement
 from bbtautau_shapesmith.analysis import build, process_union
 from bbtautau_shapesmith.constants import FF_COLUMNS, FF_RAW_COLUMNS, LT_CHANNELS, NN_COLUMNS, TAU_CHANNELS
+from bbtautau_shapesmith.ml import KINEMATICS, ML_CLASSES, OBJECTS, RESKIM, THESIS_INPUTS, TRUTH
+from bbtautau_shapesmith.ml import variables as ml_variables
 from bbtautau_shapesmith.systematics import btag_variations, embedding_variation_sums, prefiring_variations
 from bbtautau_shapesmith.variables import DIAGNOSTIC_VARIABLES, FASTMTT_VARIABLES
 from bbtautau_shapesmith.weights import dy_njets_btag_weight, fake_factor_weight
-from tests.helpers import EMBEDDING_LIST, V6_COLUMNS, branches, config, embedded, embedding_branches
+from tests.helpers import EMBEDDING_LIST, V6_COLUMNS, branches, config, embedded, embedding_branches, sample_types
 
 COMBINATIONS = [(jet_fakes, embedding) for jet_fakes in ("mc", "ff") for embedding in (False, True, ["et", "mt"])]
 T_PARTS = {"ZTT", "TTT", "STT", "VVT", "TTVT", "EWKT"}
@@ -106,7 +108,7 @@ def test_raw_fake_factors_read_only_the_raw_friend_columns(channel):
 
 def test_embedding_per_channel():
     """embedding: [et, mt]: EMB and the ttbar contamination in et and mt, the MC T parts in tt."""
-    analysis = analysis_for("mc", ["et", "mt"])
+    analysis = analysis_for("mc", ["et", "mt"], ml_labels="thesis6", ml_variables=["kinematics"])
     for name in LT_CHANNELS:
         channel = analysis.channel(name)
         assert "EMB" in channel.backgrounds() and channel.process("TTT").role == "auxiliary" and not T_PARTS & set(channel.backgrounds())
@@ -172,7 +174,7 @@ def test_the_fastmtt_friend_adds_the_di_tau_variables_of_the_tau_channels():
 
 
 def test_em_is_the_ttbar_control_channel():
-    analysis = build(config(("et", "mt", "tt", "em"), jet_fakes="ff", embedding=["et", "mt"], fit_categories="control", sample_lists=["sm2018_binned_v3", EMBEDDING_LIST]))
+    analysis = build(config(("et", "mt", "tt", "em"), jet_fakes="ff", embedding=["et", "mt"], fit_categories="control", ml_labels="v7b5", ml_variables=["kinematics"], sample_lists=["sm2018_binned_v3", EMBEDDING_LIST]))
     validate(analysis)
     assert analysis.control_channels == ("em",)
     em = analysis.channel("em")
@@ -196,11 +198,58 @@ def test_other_channels_are_rejected():
 
 
 def test_ml_export_labels():
-    ml = analysis_for("ff", embedding=True).ml
-    assert "TTT" not in ml.processes and "data" not in ml.processes
-    assert ml.label_of["EMB"] == "is_DY" and ml.label_of["jetFakes"] == "is_jetFakes" and ml.region_of == {"jetFakes": "anti_iso"}
-    labels = analysis_for("mc").ml.label_of
-    assert labels["EWKJ"] == labels["W"] == "is_jetFakes" and labels["EWKT"] == "is_Other" and labels["ZTT"] == "is_DY"
+    """X4: the profile v7b5 (N3) in fake-factor mode, thesis6 (the classes of the thesis) in mc mode; QCD not exported."""
+    ml = analysis_for("ff", ["et", "mt"], ml_labels="v7b5", fastmtt_friend=True).ml
+    assert ml.classes == ("HH2B2Tau", "tautau", "Top", "jetFakes", "Other") and ml.profile == "v7b5"
+    assert "TTT" in ml.processes and "data" not in ml.processes and ml.region_of == {"jetFakes": "anti_iso"}
+    assert {name: ml.class_of[name] for name in ("HH2B2Tau", "EMB", "ZTT", "TTT", "VVT", "STT", "TTVT", "EWKT", "TTL", "STL", "jetFakes", "ZL", "VVL", "TTVL", "EWKL", "ggH125")} == {
+        "HH2B2Tau": "HH2B2Tau", "EMB": "tautau", "ZTT": "tautau", "TTT": "tautau", "VVT": "tautau", "STT": "tautau", "TTVT": "tautau", "EWKT": "tautau",
+        "TTL": "Top", "STL": "Top", "jetFakes": "jetFakes", "ZL": "Other", "VVL": "Other", "TTVL": "Other", "EWKL": "Other", "ggH125": "Other"}
+    et, tt = (analysis_for("ff", ["et", "mt"], ml_labels="v7b5", fastmtt_friend=True).channel(name) for name in ("et", "tt"))
+    assert {p for p in ml.exported(et) if ml.class_of[p] == "tautau"} == {"EMB"}  # TTT is the auxiliary template there
+    assert {p for p in ml.exported(tt) if ml.class_of[p] == "tautau"} == T_PARTS
+    thesis = analysis_for("mc", ml_labels="thesis6", ml_variables=["kinematics"]).ml
+    assert thesis.classes == ("HH2B2Tau", "DY", "ST", "TT", "VV", "Other") and not thesis.region_of and "QCD" not in thesis.processes
+    assert {name: thesis.class_of[name] for name in ("ZTT", "ZL", "ZJ", "TTJ", "STJ", "VVJ", "W", "EWKJ", "TTVT", "VH125")} == {
+        "ZTT": "DY", "ZL": "DY", "ZJ": "DY", "TTJ": "TT", "STJ": "ST", "VVJ": "VV", "W": "Other", "EWKJ": "Other", "TTVT": "Other", "VH125": "Other"}
+    assert analysis_for("mc").ml is None  # no export without ml_labels
+
+
+def test_ml_export_variables_and_identifiers():
+    """X1/X2: run, lumi and event; every variable set by default, the truth columns MC only; a list of sets or columns."""
+    ml = analysis_for("ff", ["et", "mt"], ml_labels="v7b5", fastmtt_friend=True).ml
+    assert ml.identifiers == ("run", "lumi", "event") and ml.variables == ml_variables(None)
+    assert set(ml.variables) >= set(THESIS_INPUTS) | set(OBJECTS) | set(KINEMATICS) | set(RESKIM) | set(TRUTH) and ml.mc_only == TRUTH
+    assert len(THESIS_INPUTS) == 19 and {"n_bjets", "n_jets", "m_fastmtt"} <= set(THESIS_INPUTS) and "mtt_coll_approx" not in ml.variables
+    assert not {"q_1", "q_2", "iso_2"} & set(ml.variables)  # no charge, no raw vsJet score of the second tau (spec 5.3)
+    chosen = analysis_for("ff", ["et", "mt"], ml_labels="v7b5", ml_variables=["thesis", "genjet_hadFlavour_1"], fastmtt_friend=True).ml
+    assert chosen.variables == THESIS_INPUTS + ("genjet_hadFlavour_1",) and chosen.mc_only == ("genjet_hadFlavour_1",)
+    with pytest.raises(AnalysisError, match="need the FastMTT friend"):
+        analysis_for("ff", ["et", "mt"], ml_labels="v7b5")
+    assert analysis_for("ff", ["et", "mt"], ml_labels="v7b5", ml_variables=["objects"], fastmtt_friend=True).ml.variables == OBJECTS
+
+
+def test_the_export_columns_exist_for_every_sample_kind():
+    """The skims read the export columns of a sample's kind; the n-tuples have them (truth: MC only)."""
+    analysis = analysis_for("ff", ["et", "mt"], ml_labels="v7b5", fastmtt_friend=True)
+    for name in TAU_CHANNELS:
+        channel = analysis.channel(name)
+        for sample in channel.samples:
+            columns = needed_columns(channel, sample, exported_by(analysis, channel))
+            assert set(TRUTH) <= columns if sample.kind == "mc" else not set(TRUTH) & columns, sample.nick
+            missing = columns - branches(name, "2018", sample_types()[sample.nick]) - {"npartons"} - set(FF_COLUMNS.values()) - set(FASTMTT_VARIABLES)
+            assert not missing, (sample.nick, missing)
+
+
+def test_the_nn_categories_follow_the_class_order_of_the_export():
+    """X3: predicted_class indexes the classes of the label profile, the order of the export (not alphabetical)."""
+    for jet_fakes, embedding, profile in (("ff", ["et", "mt"], "v7b5"), ("mc", False, "thesis6")):
+        analysis = analysis_for(jet_fakes, embedding, nn_friend=True, ml_labels=profile, fastmtt_friend=True)
+        categories = analysis.channel("mt").categories
+        assert [c.name for c in categories] == list(analysis.ml.classes)
+        assert [c.cut for c in categories] == [f"(predicted_class == {i})" for i in range(len(analysis.ml.classes))]
+    assert [c.name for c in analysis_for("ff", ["et", "mt"], nn_friend=True).channel("mt").categories] == list(ML_CLASSES["v7b5"])
+
 
 
 def test_processes_of_every_channel():
@@ -226,6 +275,13 @@ def test_processes_of_every_channel():
     ({"ff_type": "raw", "jet_fakes": "ff"}, "ff_type raw supports nominal control plots only; set shape_systematics: false"),
     ({"study_uncertainties": True, "crown_shifts": False}, "study_uncertainties requires jet_fakes: ff and crown_shifts: false"),
     ({"study_uncertainties": True, "jet_fakes": "ff"}, "study_uncertainties requires jet_fakes: ff and crown_shifts: false"),
+    ({"fit_categories": "nn"}, "fit_categories nn requires nn_friend: true"),
+    ({"fit_categories": "nn", "nn_friend": False}, "fit_categories nn requires nn_friend: true"),
+    ({"ml_labels": "v7b5"}, "ml_labels v7b5 requires jet_fakes: ff"),
+    ({"ml_labels": "thesis6", "jet_fakes": "ff"}, "ml_labels thesis6 requires jet_fakes: mc"),
+    ({"ml_labels": "v5"}, "ml_labels"),
+    ({"ml_variables": ["thesis"]}, "ml_variables requires ml_labels"),
+    ({"signal_sample": "madgraph"}, "signal_sample"),
 ])
 def test_invalid_switches_are_reported(switches, match):
     with pytest.raises(AnalysisError, match=match):

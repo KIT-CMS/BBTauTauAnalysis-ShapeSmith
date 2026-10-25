@@ -8,6 +8,7 @@ from pydantic import AfterValidator, BaseModel, ConfigDict, Field, ValidationErr
 from shapesmith.model import AnalysisError
 
 from bbtautau_shapesmith.constants import RECOIL_ERAS
+from bbtautau_shapesmith.ml import ML_PROFILES
 
 STRICT = ConfigDict(extra="forbid", strict=True, frozen=True)
 SampleLists = list[str]  # inventory/<name>.txt: the KingMaker sample lists of the production
@@ -69,10 +70,21 @@ class TauSwitches(_EmbeddedChannels, _FakeFactorProcesses, BaseModel):
     ff_type: Literal["corrected", "raw"] = "corrected"  # FF friend weight; raw: no DR->SR and non-closure corrections (needs jet_fakes: ff, shape_systematics: false)
     embedding: Embedding = False  # genuine tautau from the embedded samples instead of MC, in every tau channel or the listed ones
     nn_friend: bool = False  # NN categories from the NN friend
+    # the ML export (ml.py, NN spec 3.1): the label profile thesis6 (needs jet_fakes: mc) or v7b5 (needs jet_fakes: ff),
+    # none without an export; the class order of the profile is also that of the NN categories
+    ml_labels: Literal["thesis6", "v7b5"] | None = None
+    # the export variables: column names or the variable sets of ml.py (thesis, objects, kinematics, reskim, truth);
+    # none: every set (reskim and truth need the re-skim of X8)
+    ml_variables: list[str] | None = None
+    # the signal process HH2B2Tau from the powheg kappa_lambda = 1 sample (E23), or from the madgraph node_SM sample of
+    # the master's thesis (R3, N9; the powheg sample is then left out)
+    signal_sample: Literal["powheg", "node_sm"] = "powheg"
     # the control variables m, pt, eta and phi_fastmtt of the di-tau system from the FastMTT friend (CROWN sm_fastmtt,
     # tag fastmtt; et, mt and tt, em has none)
     fastmtt_friend: bool = False
-    fit_categories: Literal["nn", "control"] = "nn"  # nn: the NN categories (with nn_friend); control: one category 'nominal' per channel
+    # nn: the NN categories (needs nn_friend); control: one category 'nominal' per channel; none: no fit categories
+    # (a run of control plots)
+    fit_categories: Literal["nn", "control", "none"] = "nn"
     control_regions: bool = False  # wider skim plus the named pass/fail control regions (needs jet_fakes: mc)
     diagnostics: bool = False  # QCD in the control regions and the diagnostic variables (needs control_regions; npv_good, rho from v6)
     shape_systematics: bool = True  # the embedding and fake-factor shifts (column variations)
@@ -92,6 +104,21 @@ class TauSwitches(_EmbeddedChannels, _FakeFactorProcesses, BaseModel):
     # v7b fake-factor runs since 2026-10-19: the mt QCD non-closure shifts of 2017/2018 at -8/+28 % made robustHesse drop
     # them from the covariance); needs jet_fakes: ff
     symmetrise_ff_shifts: bool = False
+
+    @model_validator(mode="after")
+    def _nn_categories_need_the_nn_friend(self) -> TauSwitches:
+        # without the friend there would be no tau category at all, and datacards with em only (NN spec X9)
+        if self.fit_categories == "nn" and not self.nn_friend:
+            raise ValueError("fit_categories nn requires nn_friend: true (without the NN friend: control or none)")
+        return self
+
+    @model_validator(mode="after")
+    def _ml_labels_match_the_jet_fakes(self) -> TauSwitches:
+        if self.ml_labels is not None and ML_PROFILES[self.ml_labels] != self.jet_fakes:
+            raise ValueError(f"ml_labels {self.ml_labels} requires jet_fakes: {ML_PROFILES[self.ml_labels]}")
+        if self.ml_variables is not None and self.ml_labels is None:
+            raise ValueError("ml_variables requires ml_labels")
+        return self
 
     @model_validator(mode="after")
     def _controls_need_mc_fakes(self) -> TauSwitches:

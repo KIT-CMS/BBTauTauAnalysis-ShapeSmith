@@ -10,10 +10,17 @@
 # the switches are those of smrun2_binned_v7b.yaml with embedding: false.
 # 2026-10-20: the FastMTT friend (P4 fastmtt: data under v7, MC and embedding under v7b) for the control variables
 # m, pt, eta and phi_fastmtt of et, mt and tt (switch fastmtt_friend).
+# NN phase (nn_limit_spec.md X10, 2026-10-25): the ML export of the thesis comparison R3-R5 (jet_fakes mc), label profile
+# thesis6 (HH, DY = ZTT + ZL + ZJ, ST, TT, VV, Other incl. W; the ABCD QCD is not exported), into ml_dir:
+#   shapesmith ml-export -c configs/smrun2_binned_v7b_noemb.yaml -s era=2018
+#   R3 (signal node_SM): -s switches.signal_sample=node_sm -s "ml_dir=/ceph/sdaigler/shapesmith/smrun2_binned_v7b/ml/thesis6_node_sm/{era}"
+# ml_variables: the sets of ml.py these skims hold (thesis inputs, objects, kinematics; the re-skim columns of X8 are in
+# smrun2_binned_v7b_ff_nn.yaml), so the skims stay those of smrun2_binned_v7b.yaml. fit_categories: none (control plots;
+# NN categories need the NN friend, nn_friend: true and fit_categories: nn).
 analysis: bbtautau_shapesmith.analysis:build
 era: "2018"
 channels: [et, mt, tt]
-switches: {sample_lists: ["sm_{era}_binned", "sm_{era}_borrowed", "sm_{era}_embedding"], jet_fakes: mc, embedding: false, crown_shifts: false, nn_friend: false, fastmtt_friend: true, control_regions: true, diagnostics: true, dy_correction: njets_btag}
+switches: {sample_lists: ["sm_{era}_binned", "sm_{era}_borrowed", "sm_{era}_embedding"], jet_fakes: mc, embedding: false, crown_shifts: false, nn_friend: false, fit_categories: none, fastmtt_friend: true, control_regions: true, diagnostics: true, dy_correction: njets_btag, ml_labels: thesis6, ml_variables: [thesis, objects, kinematics]}
 sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
 ntuples:
   server: root://cmsdcache-kit-disk.gridka.de
@@ -26,6 +33,7 @@ ntuples:
     - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNFriend/fastmtt, applies_to: [mc, embedding], channels: [et, mt, tt]}
 skim_dir: /ceph/sdaigler/shapesmith/smrun2_binned_v7b/skims/tau_control/{era}      # shared with smrun2_binned_v7b.yaml
 output_dir: /ceph/sdaigler/shapesmith/smrun2_binned_v7b/output/tau_control_noemb/{era}
+ml_dir: /ceph/sdaigler/shapesmith/smrun2_binned_v7b/ml/thesis6/{era}          # <ml_dir>/<channel>/events.feather, classes.json
 workers: 16                                               # at most 24 on portal2
 log_level: DEBUG
 combine: {cmssw_dir: /work/sdaigler/smhtt_ul/CMSSW_14_1_9, scram_arch: el9_amd64_gcc12}

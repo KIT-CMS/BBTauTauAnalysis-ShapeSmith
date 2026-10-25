@@ -63,8 +63,8 @@ PREFIRING_WEIGHT = "prefiring_wgt"  # E11: L1PreFiringWeight_Nom on MC, 2016-201
 PREFIRING_VARIATIONS = {"Up": "L1PreFiringWeight_Up", "Down": "L1PreFiringWeight_Dn"}  # columns of the nominal tree (C11)
 PREFIRING_NUISANCE = "CMS_prefiring"  # one lnN for 2016-2018 (E11, E34)
 
-# NN output classes in training order: index = friend column predicted_class, datacard bin id = index + 1
-NN_CLASS_NAMES = ("HH2B2Tau", "DY", "ST", "TT", "VV", "jetFakes", "Other")
+# NN friend columns: the index of the predicted class (the class order of the ML export, ml.ML_CLASSES; datacard bin id
+# = index + 1) and its score
 NN_CLASS_COLUMN = "predicted_class"
 NN_SCORE_COLUMN = "predicted_max_value"
 NN_COLUMNS = frozenset((NN_CLASS_COLUMN, NN_SCORE_COLUMN))

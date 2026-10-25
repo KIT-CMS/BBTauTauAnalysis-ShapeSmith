@@ -4,16 +4,17 @@ from __future__ import annotations
 import numpy as np
 from shapesmith.model import Category, Variable
 
-from bbtautau_shapesmith.constants import NN_CLASS_COLUMN, NN_CLASS_NAMES, NN_SCORE_COLUMN
+from bbtautau_shapesmith.constants import NN_CLASS_COLUMN, NN_SCORE_COLUMN
 
 STANDARD_BINNING = tuple(float(round(x, 4)) for x in np.linspace(0.0, 1.0, 21))
 SIGNAL_BINNING = (0.0, 0.2, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.82, 0.84, 0.86, 0.88, 0.9, 0.92, 0.94, 0.96, 0.98, 1.0)
 
 
-def categories() -> tuple[Category, ...]:
+def categories(classes: tuple[str, ...]) -> tuple[Category, ...]:
+    """One NN category per class, predicted_class = the index of the class (the class order of the ML export)."""
     return tuple(
         Category(name, f"({NN_CLASS_COLUMN} == {index})", Variable("NN_score", NN_SCORE_COLUMN, SIGNAL_BINNING if name == "HH2B2Tau" else STANDARD_BINNING))
-        for index, name in enumerate(NN_CLASS_NAMES)
+        for index, name in enumerate(classes)
     )
 
 
