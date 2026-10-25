@@ -1,11 +1,13 @@
 """The NN categories of the tau channels (NN spec 6.2-6.4, SH1-SH6): the model's prefix and classes (checked against
 its manifest), the schemes thesis, K1 and K2, the data-blind or thesis binning resolved by datacards, the blinding of
-the HH categories, em_tt in btag1 and btag2, and the cards of a run with NN categories."""
+the HH categories, em_tt in btag1 and btag2, the cards of a run with NN categories and the blinding of the control
+variable NN_score."""
 import json
 
 import numpy as np
 import pytest
 from shapesmith.datacards import BLINDING, NN_RECORD, write_datacard
+from shapesmith.fill import run_hist
 from shapesmith.histogram import NOMINAL_VARIATION, HistKey, Histogram, HistogramSet, raw_variable
 from shapesmith.model import AnalysisError, ScoreBinning
 from shapesmith.nn_binning import BACKGROUND_RULES, SIGNAL_RULES, THESIS_HH_EDGES, THESIS_OTHER_EDGES
@@ -16,6 +18,7 @@ from bbtautau_shapesmith.ml import ML_CLASSES, raw_count_groups
 from bbtautau_shapesmith.variables import NN_FINE_BINNING
 from tests.helpers import EMBEDDING_LIST, config
 from tests.test_analysis import T_PARTS, analysis_for
+from tests.test_controls import only, write_rows
 
 V7B5 = ML_CLASSES["v7b5"]
 LT_GROUPS = {"Top": ("TTL", "STL"), "tautau": ("EMB",), "jetFakes": ("jetFakes",)}
@@ -77,7 +80,7 @@ def test_the_prefix_and_classes_select_one_model_of_the_friend():
     analysis = nn_analysis(nn_prefix="nn_m0_", nn_classes=thesis)
     mt = analysis.channel("mt")
     assert [(c.name, c.cut, c.variable.expr) for c in mt.categories] == [(name, f"(nn_m0_predicted_class == {i}) & (n_bjets < 3)", "nn_m0_predicted_max_value") for i, name in enumerate(thesis)]
-    assert mt.categories[0].variable.edges.rules.low == pytest.approx(1 / 6) and mt.variables["NN_score"].expr == "nn_m0_predicted_max_value"
+    assert mt.categories[0].variable.edges.rules.low == pytest.approx(1 / 6) and mt.variables["NN_score"].expr.startswith("nn_m0_predicted_max_value - 2 * ((nn_m0_predicted_class == 0) & ")
     columns = set().union(*(needed_columns(mt, sample) for sample in mt.samples))
     assert {"nn_m0_predicted_class", "nn_m0_predicted_max_value"} <= columns and not {"predicted_class", "predicted_max_value"} & columns
     assert analysis.ml is None  # the export classes stay those of ml_labels
@@ -179,3 +182,36 @@ def test_the_cards_of_a_run_with_nn_categories(tmp_path, scheme, bins, masked):
     record = json.loads((card.parent / NN_RECORD).read_text())
     assert set(record) == {"mt"} and all(entry["method"] == "data_blind" for entry in record["mt"].values())
     assert all(len(entry["edges"]) - 1 <= (15 if name.startswith("HH2B2Tau") else 5) for name, entry in record["mt"].items())
+
+
+# an mt event of the nominal region (2018), and what moves it into another region
+NOMINAL_MT = dict(q_1=-1, q_2=1, n_bjets=1, n_jets=2, bpair_pt_2=30, pt_1=40, pt_2=35, eta_1=0.5, eta_2=0.5, mt_1=30, iso_1=0.05, m_vis=60,
+                  extraelec_veto=0, extramuon_veto=0, dilepton_veto=0, hem_veto=0, id_tau_vsJet_Medium_2=1, id_tau_vsJet_VVVLoose_2=1)
+SAME_SIGN, ANTI_ISO, LEPTON_ANTI_ISO, BTAG0 = {"q_1": 1}, {"id_tau_vsJet_Medium_2": 0}, {"iso_1": 0.3}, {"n_bjets": 0}
+# (moved by, predicted class, score); class 0 is HH2B2Tau
+NN_EVENTS = [({}, 0, 0.91), ({}, 2, 0.62), (SAME_SIGN, 0, 0.83), (SAME_SIGN, 3, 0.46), (ANTI_ISO, 0, 0.74), (ANTI_ISO, 1, 0.55),
+             (LEPTON_ANTI_ISO, 0, 0.87), (BTAG0, 0, 0.93)]
+
+
+@pytest.mark.parametrize("jet_fakes,kept", [
+    ("ff", {"nominal": [0.62], "same_sign": [0.46, 0.83], "anti_iso": [0.55]}),
+    ("mc", {"nominal": [0.62], "abcd_anti_iso": [0.55], "abcd_same_sign": [0.46, 0.83], "lepton_antiiso": [0.87], "btag1_os_pass": [0.62],
+            "btag0_os_pass": [0.93]}),
+])
+def test_the_control_variable_nn_score_leaves_out_the_signal_category(tmp_path, jet_fakes, kept):
+    """Spec 6.4 (2026-10-25, only the signal category is blinded): NN_score has no event predicted as HH2B2Tau in the
+    nominal region nor in the anti-isolated region that is its jet-fake estimate, also where a control region overlaps
+    them (btag1_os_pass); same sign, lepton anti-isolation and btag0 keep every event, and m_vis every event of a region."""
+    switches = {"embedding": ["mt"], "sample_lists": ["sm2018_binned_v3", EMBEDDING_LIST]} if jet_fakes == "ff" else {"control_regions": True, "sample_lists": ["sm2018_binned_v3"]}
+    cfg = config(["mt"], jet_fakes=jet_fakes, nn_friend=True, **switches).model_copy(update={"skim_dir": tmp_path / "skim", "output_dir": tmp_path / "out", "workers": 1})
+    analysis = only(build(cfg), "mt", "data")
+    channel = analysis.channel("mt")
+    write_rows(cfg, channel, lambda sample, row: [row | NOMINAL_MT | moved | {"predicted_class": cls, "predicted_max_value": score} for moved, cls, score in NN_EVENTS])
+    hists = run_hist(cfg, analysis, ["mt"], control=True, variables=["NN_score", "m_vis"], systematics=False, processes=None,
+                     output=cfg.output_dir / "controls.root", regions=list(kept))
+
+    for region, expected in kept.items():
+        filled = hists[HistKey("mt", "inclusive", "data", region, NOMINAL_VARIATION, "NN_score")]
+        assert filled.values.tolist() == Histogram.fill(filled.edges, expected).values.tolist(), region
+    every = {region: hists[HistKey("mt", "inclusive", "data", region, NOMINAL_VARIATION, "m_vis")].sum() for region in kept}
+    assert every["nominal"] == 2 and (every.get("same_sign") or every.get("abcd_same_sign")) == 2

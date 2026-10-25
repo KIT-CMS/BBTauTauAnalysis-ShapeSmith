@@ -1,0 +1,30 @@
+# NN phase, input validation (nn_limit_spec.md 7.1, NV2, NV3; nn_validation.py): the dilepton controls of
+# smrun2_binned_v7b_dilepton.yaml with >= 2 jets in every channel (em top, mm and ee Z + light jets), the b-tag scores
+# bpair_btag_value_{1,2}, jtag_value_{1,2} and the jet variables as control variables, the flavour templates of the
+# diagnostics and the inputs of FastMTT kept (switch nn_validation); its own re-skim and outputs under
+# /ceph/sdaigler/shapesmith_test/nn-validate:
+#   shapesmith skim -c configs/smrun2_binned_v7b_dilepton_nn_validation.yaml -s era=<era>
+#   shapesmith hist -c configs/smrun2_binned_v7b_dilepton_nn_validation.yaml -s era=<era> --control --regions nominal,btag1,btag2
+analysis: bbtautau_shapesmith.dilepton:build
+era: "2018"
+channels: [em, mm, ee]
+switches: {sample_lists: ["sm_{era}_binned", "sm_{era}_borrowed"], diagnostics: true, nn_validation: true}
+sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
+ntuples:
+  server: root://cmsdcache-kit-disk.gridka.de
+  base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7/CROWNRun      # the data
+  bases:                                                  # the MC and the embedding: the re-production
+    mc: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNRun
+    embedding: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNRun
+  friends: []
+skim_dir: /ceph/sdaigler/shapesmith_test/nn-validate/skims/dilepton_nn/{era}
+output_dir: /ceph/sdaigler/shapesmith_test/nn-validate/output/dilepton_nn/{era}
+workers: 8                                                # the DY and data samples need much memory per worker
+log_level: INFO
+# Migrad again with strategy 0 when a fit fails (status -1): a failed observed fit gives a saturated statistic of
+# ~1000 and frequentist toys generated around the failed fit (input-gof; NV3: FastMTT in em and mm)
+combine:
+  cmssw_dir: /work/sdaigler/smhtt_ul/CMSSW_14_1_9
+  scram_arch: el9_amd64_gcc12
+  parallel: 16
+  minimizer: --cminFallbackAlgo Minuit2,Migrad,0:0.1

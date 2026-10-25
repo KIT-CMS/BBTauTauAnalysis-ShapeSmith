@@ -15,6 +15,7 @@ from shapesmith.model import Analysis, AnalysisError, Category, Channel, Region,
 
 from bbtautau_shapesmith.constants import BTAG_BINS, DILEPTON_CHANNELS, LUMI_PB, NJETS_BINS, PREFIRING_NUISANCE, check_era
 from bbtautau_shapesmith.cuts import B_TAGGING, era_cuts
+from bbtautau_shapesmith.nn_validation import FASTMTT_INPUTS, dilepton_validation_variables
 from bbtautau_shapesmith.processes import SIGNAL, available, dilepton_processes
 from bbtautau_shapesmith.samples import sample_database, samples
 from bbtautau_shapesmith.style import style
@@ -31,7 +32,8 @@ PLOT_VARIABLES = (
 )
 
 
-def baseline_cuts(channel: str, era: str) -> dict[str, str]:
+def baseline_cuts(channel: str, era: str, min_jets: int = 0) -> dict[str, str]:
+    """The selection of a channel; `min_jets` (the input validation: 2) requires the jets in mm and ee as well."""
     trigger = TRIGGER[era][channel]
     return {
         "os": "(q_1 * q_2) < 0",
@@ -41,7 +43,7 @@ def baseline_cuts(channel: str, era: str) -> dict[str, str]:
         "pt_selection": trigger.thresholds,
         "trigger": trigger.cut,
         "mass_window": "True" if channel == "em" else "(m_vis > 70) & (m_vis < 110)",
-        "jets": "n_jets >= 2" if channel == "em" else "True",
+        "jets": "n_jets >= 2" if channel == "em" else (f"n_jets >= {min_jets}" if min_jets else "True"),
         "b_tagging": "True",
         **era_cuts(era),
     }
@@ -57,11 +59,13 @@ def regions(diagnostics: bool = False) -> tuple[Region, ...]:
     return result
 
 
-def channel(name: str, era: str, channel_samples: tuple[Sample, ...], dy_correction: str = "none", diagnostics: bool = False) -> Channel:
+def channel(name: str, era: str, channel_samples: tuple[Sample, ...], dy_correction: str = "none", diagnostics: bool = False, nn_validation: bool = False) -> Channel:
+    """A dilepton channel; with nn_validation >= 2 jets and the variables of the input validation (nn_validation.py)."""
     table = available(dilepton_processes(name, era, dy_correction, flavours=diagnostics), channel_samples)
     groups = {p.group for p in table}
-    cuts = baseline_cuts(name, era)
+    cuts = baseline_cuts(name, era, 2 if nn_validation else 0)
     variables = control_variables(diagnostics=diagnostics)
+    shown = {variable: variables[variable] for variable in PLOT_VARIABLES + (DIAGNOSTIC_VARIABLES if diagnostics else ())}
     return Channel(
         name=name,
         samples=tuple(s for s in channel_samples if s.group in groups),
@@ -69,9 +73,9 @@ def channel(name: str, era: str, channel_samples: tuple[Sample, ...], dy_correct
         cuts=cuts,
         processes=table,
         regions=regions(diagnostics),
-        variables={variable: variables[variable] for variable in PLOT_VARIABLES + (DIAGNOSTIC_VARIABLES if diagnostics else ())},
+        variables=dilepton_validation_variables() if nn_validation else shown,
         variations=btag_variations(era) + prefiring_variations(),  # the variations of the tau channels, so that they correlate
-        keep_columns=("event", "run", "lumi"),
+        keep_columns=("event", "run", "lumi") + (FASTMTT_INPUTS if nn_validation else ()),
     )
 
 
@@ -97,7 +101,7 @@ def build(config: RunConfig) -> Analysis:
         era=era,
         lumi_pb=LUMI_PB[era],
         signal=SIGNAL,
-        channels={name: channel(name, era, by_channel[name], switches.dy_correction, switches.diagnostics) for name in config.channels},
+        channels={name: channel(name, era, by_channel[name], switches.dy_correction, switches.diagnostics, switches.nn_validation) for name in config.channels},
         lnn_variations=(PREFIRING_NUISANCE,),
         style=style(era),
     )

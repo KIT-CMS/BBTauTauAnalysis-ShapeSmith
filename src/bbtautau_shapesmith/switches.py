@@ -130,6 +130,17 @@ class TauSwitches(_EmbeddedChannels, _FakeFactorProcesses, BaseModel):
     ttbar_shape: bool = False
     heavy_flavour: bool = False
     signal_theory: list[Literal["qcd_scale", "parton_shower", "pdf"]] = Field(default_factory=list)
+    # the input validation of the NN phase (nn_validation.py, nn_limit_spec.md 7.1, NV1-NV3): the control variables are
+    # the NN inputs of each channel in fine bins (shapesmith input-gof merges them), the eta-phi occupancy of the legs and
+    # jets and yield; the skims keep the inputs of FastMTT with the MET covariance (a refit, scripts/fastmtt_refit.py)
+    nn_validation: bool = False
+    # PRELIMINARY pseudo-shifts of the jet (3 %) and tau_h (1.5 %) energies with the MET propagated, as shape nuisances of
+    # the jet, MET and FastMTT inputs until P6 (NV1 with NV9 size, nn_validation.py), symmetrised in the datacards; needs
+    # nn_validation
+    pseudo_shifts: bool = False
+    # the anti-isolated region anti_iso with the fake-factor weight of the friend and its shifts in mc mode: the shapes
+    # of the MC jet fakes there against the nominal region (NV1); needs jet_fakes: mc and the fake-factor friend
+    ff_transfer: bool = False
 
     @model_validator(mode="after")
     def _nn_categories_need_the_nn_friend(self) -> TauSwitches:
@@ -194,6 +205,14 @@ class TauSwitches(_EmbeddedChannels, _FakeFactorProcesses, BaseModel):
         return self
 
     @model_validator(mode="after")
+    def _validation_switches(self) -> TauSwitches:
+        if self.pseudo_shifts and not self.nn_validation:
+            raise ValueError("pseudo_shifts requires nn_validation: true (preliminary nuisances of the input validation only)")
+        if self.ff_transfer and self.jet_fakes != "mc":
+            raise ValueError("ff_transfer requires jet_fakes: mc (the MC jet fakes in the anti-isolated region)")
+        return self
+
+    @model_validator(mode="after")
     def _raw_fake_factors_are_nominal_only(self) -> TauSwitches:
         if self.ff_type == "raw" and self.jet_fakes != "ff":
             raise ValueError("ff_type raw requires jet_fakes: ff")
@@ -221,6 +240,9 @@ class DileptonSwitches(BaseModel):
     sample_lists: SampleLists = Field(min_length=1)
     dy_correction: DyCorrection = "none"  # none to derive the table, njets_btag for its closure
     diagnostics: bool = False  # n_jets regions, flavour templates of DY (mm, ee) and ttbar (em), the diagnostic variables
+    # the input validation of the NN phase (NV2, NV3): >= 2 jets in every channel, the b-tag scores and jet variables of
+    # nn_validation.py as control variables, the inputs of FastMTT with the MET covariance kept (a refit)
+    nn_validation: bool = False
 
 
 class TauIdSwitches(BaseModel):

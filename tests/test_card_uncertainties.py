@@ -18,6 +18,7 @@ from bbtautau_shapesmith.dy_correction import TableUncertainty, table_uncertaint
 from bbtautau_shapesmith.processes import EMBEDDED
 from tests.helpers import REPO, config
 from tests.test_nn_runs import NN_FRIEND_RUNS
+from tests.test_nn_validation import VALIDATION_RUNS
 from tests.run2 import install, list_name
 from tests.test_run2 import run2, tau  # noqa: F401 (the fixture)
 
@@ -52,7 +53,8 @@ def test_the_switch_needs_fake_factors(run2):
 def test_only_the_v7b_fake_factor_runs_symmetrise():
     on = sorted(path.stem for path in (REPO / "configs").glob("*.yaml") if (yaml.safe_load(path.read_text()) or {}).get("switches", {}).get("symmetrise_ff_shifts"))
     nn = tuple(name for name in NN_FRIEND_RUNS if "_ff" in name)  # and the copies of the FF runs with the NN export and the NN friends
-    assert on == sorted(V7B_FF_RUNS + ("smrun2_binned_v7b_ff_nn",) + nn)
+    validation = tuple(name for name in VALIDATION_RUNS if "_ff" in name)  # and the input validation of the FF run
+    assert on == sorted(V7B_FF_RUNS + ("smrun2_binned_v7b_ff_nn",) + nn + validation)
 
 
 @pytest.mark.parametrize("era", ERAS)

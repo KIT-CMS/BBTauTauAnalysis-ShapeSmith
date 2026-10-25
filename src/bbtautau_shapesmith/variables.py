@@ -13,13 +13,17 @@ background uncertainty, <= 15 bins; background categories: 5 equal-background st
 edges of the HH category and 20 equal bins elsewhere, merged by the AutoRebin(1.0, 0.9) of the thesis. Every HH
 category is blinded from the first bin with S/B(mu=1) > 0.5 % (N14); the jet-fake estimate is clipped after the
 rebinning (SH6).
+
+The control variable NN_score (the score of the predicted class over every event) leaves out the events predicted as
+the signal class in the nominal region (spec 6.4, decided 2026-10-25: only the signal category is blinded) and in the
+regions that estimate it (nn_score_blinding).
 """
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 
 import numpy as np
-from shapesmith.model import Category, ScoreBinning, Variable
+from shapesmith.model import ABCD, NOMINAL, NOMINAL_REGION, Category, DataMinus, Estimator, Region, ScoreBinning, Variable
 from shapesmith.nn_binning import BLINDING_S_OVER_B, THESIS_HH_EDGES, THESIS_OTHER_EDGES, category_rules
 
 from bbtautau_shapesmith.constants import NN_CLASS_COLUMN, NN_SCORE_COLUMN
@@ -55,6 +59,34 @@ def categories(classes: tuple[str, ...], scheme: str = "k1", binning: str = "dat
         else:
             result.append(Category(name, f"{cut} & {NN_NO_BTAG3P}", variable))
     return tuple(result)
+
+
+def nn_score_blinding(classes: tuple[str, ...], prefix: str, cuts: Mapping[str, str], regions: Iterable[Region], estimators: Iterable[Estimator]) -> str:
+    """The events that the control variable NN_score leaves out: those predicted as the signal class (the signal
+    category before its n_bjets cut) in the nominal region and in the regions whose histograms are the shape of an
+    estimate of the nominal region (the anti-isolated region of the fake factors, region b of ABCD), so that its
+    jet-fake prediction holds the same events as its data and simulation. Per event: an event of any region passes
+    every cut that no region replaces, so each of these regions is its version of the cuts that some region replaces
+    (`cuts`: the nominal ones). A region that overlaps them loses those events too (with control_regions the os pass and
+    fail regions of btag1, btag2 and btag3p); every other region (same sign, lepton anti-isolation, ...) keeps every
+    event."""
+    regions = tuple(regions)
+    signal = f"({prefix}{NN_CLASS_COLUMN} == {classes.index(NN_SIGNAL_CLASS)})"
+    replaced = {name for region in regions for name in region.replace_cuts}
+    if not replaced:
+        return signal
+    by_name = {region.name: region for region in regions}
+    shapes = [e.region if isinstance(e, DataMinus) else e.b for e in estimators if isinstance(e, (DataMinus, ABCD)) and e.target == NOMINAL]
+    selections = []
+    for region in (NOMINAL_REGION, *(by_name[name] for name in dict.fromkeys(shapes))):
+        selected = {**cuts, **region.replace_cuts}
+        selections.append(" & ".join(f"({expr})" for name, expr in selected.items() if name in replaced))
+    return f"{signal} & ({' | '.join(f'({selection})' for selection in selections)})"
+
+
+def blinded_score(score: str, blinded: str) -> str:
+    """The score with the events of `blinded` moved below every axis (score - 2 <= -1, out of every histogram)."""
+    return f"{score} - 2 * ({blinded})"
 
 
 def nominal_category() -> tuple[Category, ...]:
@@ -137,14 +169,16 @@ _EXPRESSIONS = {"yield": "1.0", "sum_deltaR_tt_bb": "bpair_deltaR + deltaR_ditau
 _EXPRESSION_BINNING = {"yield": (0.5, 1.5), "sum_deltaR_tt_bb": np.arange(0, 10.6, 0.2), "NN_score": np.linspace(0.0, 1.0, 21)}
 
 
-def control_variables(nn_friend: bool = False, diagnostics: bool = False, fastmtt: bool = False, nn_prefix: str = "") -> dict[str, Variable]:
+def control_variables(nn_friend: bool = False, diagnostics: bool = False, fastmtt: bool = False, nn_prefix: str = "", nn_blinded: str | None = None) -> dict[str, Variable]:
     """Control variables (`yield` is the one-bin event count); the NN score (of the model with the column prefix
-    nn_prefix) only when the NN friend tree is part of the run (nn_friend), the diagnostic variables only with
-    diagnostics, the FastMTT variables only with its friend."""
+    nn_prefix, without the events of nn_blinded: nn_score_blinding) only when the NN friend tree is part of the run
+    (nn_friend), the diagnostic variables only with diagnostics, the FastMTT variables only with its friend."""
     binning = {**_BINNING, **(_DIAGNOSTIC_BINNING if diagnostics else {}), **(_FASTMTT_BINNING if fastmtt else {})}
     variables = {name: Variable(name, name, _edges(edges)) for name, edges in binning.items()}
     for name, expr in _EXPRESSIONS.items():
         if name == "NN_score" and not nn_friend:
             continue
-        variables[name] = Variable(name, f"{nn_prefix}{expr}" if name == "NN_score" else expr, _edges(_EXPRESSION_BINNING[name]))
+        if name == "NN_score":
+            expr = f"{nn_prefix}{expr}" if nn_blinded is None else blinded_score(f"{nn_prefix}{expr}", nn_blinded)
+        variables[name] = Variable(name, expr, _edges(_EXPRESSION_BINNING[name]))
     return variables

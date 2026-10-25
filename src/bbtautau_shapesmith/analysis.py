@@ -15,6 +15,7 @@ from bbtautau_shapesmith.constants import (
     BTAG_BINS, CONTROL_CHANNELS, LT_CHANNELS, LUMI_PB, NN_CLASS_COLUMN, NN_SCORE_COLUMN, PREFIRING_NUISANCE, TAU_CHANNELS, check_era,
 )
 from bbtautau_shapesmith.ml import ML_CLASSES, ml_config, raw_count_groups
+from bbtautau_shapesmith.nn_validation import FASTMTT_INPUTS, pseudo_shift_names, pseudo_shift_variations, validation_variables
 from bbtautau_shapesmith.processes import (
     EMBEDDED, GENUINE, JET_FAKE, LEPTON_FAKE, NODE_SM, SIGNAL, SIGNAL_XS_FB, SIGNAL_XS_NUISANCES, SPLITS, available, backgrounds_in, tau_processes,
 )
@@ -26,7 +27,7 @@ from bbtautau_shapesmith.systematics import (
     embedding_variations, ff_dm_nonclosure_variations, ff_variant, ff_variations, heavy_flavour_variations, lnn, prefiring_variations,
     signal_theory_variations, ttbar_shape_variations, with_weights,
 )
-from bbtautau_shapesmith.variables import categories, control_variables, nominal_category
+from bbtautau_shapesmith.variables import categories, control_variables, nn_score_blinding, nominal_category
 
 def process_union(channels: Iterable[Channel]) -> tuple[Process, ...]:
     """The processes of all channels, each name once in channel order; a process that is auxiliary in one channel and
@@ -82,10 +83,11 @@ def column_variations(name: str, era: str, switches: TauSwitches) -> tuple:
     embedding = embedding_variations(name, era) if switches.embedded(name) and switches.crown_shifts else ()
     if switches.study_uncertainties and switches.embedded(name) and not switches.crown_shifts and name in LT_CHANNELS:
         embedding += embedding_id_variations(name, era)
-    fakes = ff_variations(name, era, switches.wjets) if switches.jet_fakes == "ff" else ()
+    fakes = ff_variations(name, era, switches.wjets) if switches.jet_fakes == "ff" or switches.ff_transfer else ()
     if switches.study_uncertainties and switches.jet_fakes == "ff":
         fakes += ff_dm_nonclosure_variations(name, era, ff_variant(switches.wjets))
-    return embedding + fakes
+    pseudo = pseudo_shift_variations(name, era, switches.embedded(name)) if switches.pseudo_shifts else ()
+    return embedding + fakes + pseudo
 
 
 def study(switches: TauSwitches, channels: Iterable[str]) -> Study | None:
@@ -133,20 +135,35 @@ def fit_categories(switches: TauSwitches, processes: tuple[Process, ...]) -> tup
 
 
 def channel(name: str, era: str, switches: TauSwitches, channel_samples: tuple[Sample, ...]) -> Channel:
+    """A tau channel; with the NN friend the control variable NN_score leaves out the events of the signal category
+    (variables.nn_score_blinding)."""
     table = available(tau_processes(name, era, switches.jet_fakes, switches.embedded(name), switches.dy_correction), channel_samples)
     groups = {p.group for p in table}
+    baseline = cuts.baseline_cuts(name, era)
+    regions = (
+        cuts.regions(name, switches.jet_fakes, switches.ff_type)
+        + (cuts.diagnostic_regions(name) if switches.control_regions else ())
+        + ((cuts.fake_factor_region(name, switches.ff_type),) if switches.ff_transfer else ())
+    )
+    estimates = estimators(name, era, table, switches)
+    blinded = nn_score_blinding(nn_classes(switches), switches.nn_prefix, baseline, regions, estimates) if switches.nn_friend else None
+    variables = (
+        validation_variables(name, switches.fastmtt_friend)
+        if switches.nn_validation
+        else control_variables(switches.nn_friend, switches.diagnostics, switches.fastmtt_friend, switches.nn_prefix, blinded)
+    )
     return Channel(
         name=name,
         samples=tuple(s for s in channel_samples if s.group in groups),
         skim=cuts.skim_cuts(name, era, switches.control_regions),
-        cuts=cuts.baseline_cuts(name, era),
+        cuts=baseline,
         processes=table,
-        regions=cuts.regions(name, switches.jet_fakes, switches.ff_type) + (cuts.diagnostic_regions(name) if switches.control_regions else ()),
+        regions=regions,
         categories=fit_categories(switches, table),
-        variables=control_variables(switches.nn_friend, switches.diagnostics, switches.fastmtt_friend, switches.nn_prefix),
+        variables=variables,
         variations=btag_variations(era) + prefiring_variations() + column_variations(name, era, switches),
-        estimators=estimators(name, era, table, switches),
-        keep_columns=("event", "run", "lumi", *nn_friend_columns(switches)),
+        estimators=estimates,
+        keep_columns=("event", "run", "lumi", *nn_friend_columns(switches)) + (FASTMTT_INPUTS if switches.nn_validation else ()),
     )
 
 
@@ -213,7 +230,7 @@ def build(config: RunConfig) -> Analysis:
         # the channels can differ in their processes
         lnn=lnn(process_union(channels.values()), jet_fakes_output(switches.jet_fakes), era, borrowed_processes(channels.values()), study(switches, config.channels), switches.dy_correction),
         lnn_variations=(PREFIRING_NUISANCE,),
-        symmetrised_variations=symmetrised_ff_shifts(tau_channels, era, switches),
+        symmetrised_variations=symmetrised_ff_shifts(tau_channels, era, switches) + pseudo_shift_names(era, any(switches.embedded(c.name) for c in tau_channels), switches.pseudo_shifts),
         style=style(era),
         # no NN training on a control channel
         ml=ml_config(process_union(tau_channels), switches),
