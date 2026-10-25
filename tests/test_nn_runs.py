@@ -4,8 +4,9 @@ the thesis recipe; R3 and R4 with the background model of the thesis comparison,
 (data under smrun2_binned_v7, MC and embedding under smrun2_binned_v7b, after the friends it chains on), nn_friend: true,
 fit_categories: nn, the model of the run (nn_prefix) among the models of its friend (nn_friend_prefixes, whose columns
 the skims keep), the categories and binning of the thesis (R3-R5) or K1 with the data-blind binning (R6-R8), and its own
-skims and outputs, without ML export and gallery. The friends do not exist yet, so the YAMLs are checked offline; every
-run YAML stays at the systematics stage S0 (no stage switch on)."""
+skims and outputs, without ML export and gallery, and the minimizer fallback of the validation runs (a failed fit to the
+data again with Migrad at strategy 0). The friends do not exist yet, so the YAMLs are checked offline; every run YAML
+stays at the systematics stage S0 (no stage switch on)."""
 import json
 from pathlib import Path
 
@@ -41,6 +42,7 @@ ROOT = Path("/ceph/sdaigler/shapesmith/smrun2_binned_v7b")
 EXPORT_SWITCHES = ("ml_labels", "ml_variables")  # the ML export of the copied run, not of a run with the NN friend
 STAGE_SWITCHES = ("ttbar_shape", "heavy_flavour", "signal_theory")
 S0_PLUS = ("switches.ttbar_shape=true", "switches.heavy_flavour=true")
+FALLBACK = "--cminFallbackAlgo Minuit2,Migrad,0:0.1"  # combine.minimizer of the NN runs and of the validation runs
 
 
 def load(name: str, era: str, *overrides: str):
@@ -65,6 +67,8 @@ def test_each_nn_run_is_its_run_with_the_nn_friend(name, era):
         expected["switches"].pop(key, None)
     expected["switches"].update(nn_friend=True, fit_categories="nn", **NN_SWITCHES[name])
     expected["ntuples"]["friends"] = actual["ntuples"]["friends"]
+    assert run.combine.minimizer == "" and nn.combine.minimizer == FALLBACK
+    expected["combine"]["minimizer"] = FALLBACK
     assert actual == expected
     assert nn.ml_dir is None and nn.web is None and nn.workers <= 16
 

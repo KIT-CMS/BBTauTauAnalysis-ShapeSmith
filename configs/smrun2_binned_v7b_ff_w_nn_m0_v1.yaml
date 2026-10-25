@@ -33,4 +33,6 @@ skim_dir: /ceph/sdaigler/shapesmith/smrun2_binned_v7b/skims/tau_ff_w_nn_m0_v1/{e
 output_dir: /ceph/sdaigler/shapesmith/smrun2_binned_v7b/output/tau_ff_w_nn_m0_v1/{era}
 workers: 16                                               # at most 16 cores on deepthought2 (taskset -c 16-31)
 log_level: DEBUG
-combine: {cmssw_dir: /work/sdaigler/smhtt_ul/CMSSW_14_1_9, scram_arch: el9_amd64_gcc12}
+# a failed fit (Migrad status -1) again with Migrad at strategy 0: combine's default reports it as it is (a fit to the
+# data, NV1: a saturated statistic of ~1000); a fit that converges, as every Asimov limit so far, stays the same
+combine: {cmssw_dir: /work/sdaigler/smhtt_ul/CMSSW_14_1_9, scram_arch: el9_amd64_gcc12, minimizer: "--cminFallbackAlgo Minuit2,Migrad,0:0.1"}

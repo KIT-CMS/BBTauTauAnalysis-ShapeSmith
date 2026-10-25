@@ -40,7 +40,8 @@ def test_k1_is_the_argmax_without_btag3p():
         signal = category.name == "HH2B2Tau"
         rules = binning.rules
         assert rules.low == pytest.approx(0.2) and rules.required == LT_GROUPS
-        assert (rules.max_rel_uncertainty, rules.max_bins, rules.start, rules.n_start) == ((0.3, 15, "signal", 50) if signal else (0.1, 5, "background", 5))
+        assert (rules.max_rel_uncertainty, rules.max_bins, rules.start, rules.n_start) == ((0.5, 15, "signal", 50) if signal else (0.1, 5, "background", 5))
+        assert (rules.min_background, rules.min_raw, rules.raw_min_share, rules.negative_share) == (1.0, 1.0, 0.1, 0.01)  # rule set C'
         assert binning.blinding == (0.005 if signal else None)
 
 

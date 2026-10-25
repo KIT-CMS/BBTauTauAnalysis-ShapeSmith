@@ -725,16 +725,21 @@ decisions N1-N28 of 2026-10-25): the categories, their binning and blinding (SH1
    `HH2B2Tau lo`, `HH2B2Tau hi`, `tautau`, ...
 5. **Binning** (`nn_binning`, spec 6.3, the same data-blind algorithm for every model from R6 on): `datacards` resolves
    the edges after `estimate` from the nominal templates (the rules need the jetFakes template; data are never read).
-   `data_blind`: the HH category starts from 50 bins of equal signal on P(HH) in [1/K, 1] and merges from the top until
-   every bin has a total background ≥ 1.0 weighted events with a relative statistical uncertainty ≤ 30 %, ≥ 1
-   unweighted event of each raw-count group and no negative process template; the remaining low bins join the lowest
-   accepted bin, at most 15 bins. The background categories start from 5 bins of equal background with ≤ 10 % and ≤ 5
-   bins. The raw-count groups follow the background model (`ml.raw_count_groups`): Top (TTL, STL), tautau (EMB or the
-   genuine MC di-tau) and jetFakes (its anti-isolated data) with fake factors; TT, DY and the ABCD QCD in `mc` mode.
+   `data_blind` (rule set C', decided 2026-10-26): the HH category starts from 50 bins of equal signal on P(HH) in
+   [1/K, 1] and merges from the top until every bin has a total background ≥ 1.0 weighted events with a relative
+   statistical uncertainty ≤ 50 %, ≥ 1 unweighted event of each raw-count group whose share of the category's
+   background (nominal templates, P ≥ 1/K) is ≥ 10 % (in tt Top, 3-4 %, is exempt), and no template (signal, every
+   background, jetFakes) below -1 % of the bin's total background; the remaining low bins join the lowest accepted
+   bin, at most 15 bins. The background categories start from 5 bins of equal background, with the same raw-count and
+   negative rules, ≤ 10 % and ≤ 5 bins. The rules before C' (≤ 30 %, every raw-count group, every template ≥ 0) cost
+   ×1.27 on the limit of R6_wp, almost all in tt. The raw-count groups follow the background model
+   (`ml.raw_count_groups`): Top (TTL, STL), tautau (EMB or the genuine MC di-tau) and jetFakes (its anti-isolated
+   data) with fake factors; TT, DY and the ABCD QCD in `mc` mode.
    jetFakes (QCD in `mc` mode) is clipped at 0 after the rebinning (SH6, listed under `clipped` in
    `template_changes.json`). `thesis`: the custom edges of the thesis (HH) and 20 equal bins (others), merged by the
    AutoRebin(1.0, 0.9) of the thesis, for R3-R5 and as the cross-check of R6 and R7. The edges per channel and category
-   go to `<card dir>/nn_binning.json`; datacards warns when a blinded category has fewer than 3 bins (N11: the 2016
+   go to `<card dir>/nn_binning.json` (with the rules, the share of every raw-count group and the exempt groups);
+   datacards warns when a blinded category has fewer than 3 bins (N11: the 2016
    halves stay separate cards).
 6. **Blinding** (spec 6.4, N14), see the rules below.
 7. **Statistics** (spec 7.2, commands of the core README, all with `--variant KEY`): `fit` gives the prefit Asimov
@@ -746,7 +751,9 @@ decisions N1-N28 of 2026-10-25): the categories, their binning and blinding (SH1
    saturated GoF with toys per channel, era and combined; `impacts` (data or `--asimov`) with pull plots; `limit-overview`
    the table and Brazil plot per channel, era and combined. `datacards --variant stat_only --no-systematics` puts the
    "statistics only" cards beside S0; the r range, minimizer, timeout and parallel jobs are `combine:` options of the run
-   YAML.
+   YAML. The NN run YAMLs set the fallback of the validation runs, `--cminFallbackAlgo Minuit2,Migrad,0:0.1`: combine's
+   default reports a failed fit to the data as it is; a fit that converges (the Asimov limits) stays the same. `fit
+   --limits-only` (and `combine --limits-only`) leaves out the significance and the best fit.
 8. **Units** (N23): μ = σ/σ_SM of ggF HH → bbττ first; σ(ggF HH) = r × 30.40 fb (`Analysis.signal_cross_section`), from
    a second limit with the cross-section theory nuisances of the signal (`QCDscale_HH`, `PDF_alphas_HH`) frozen and its
    acceptance, shape and BR uncertainties kept; ggF only, named so. Every result is reported with "statistics only"

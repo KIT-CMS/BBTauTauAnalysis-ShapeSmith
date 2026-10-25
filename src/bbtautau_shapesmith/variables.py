@@ -7,9 +7,10 @@ nominal templates (shapesmith ScoreBinning):
 - thesis: the categories of the master's thesis, argmax only (R3-R5);
 - k1: argmax with n_bjets >= 3 cut out (N12, the baseline has n_bjets >= 1);
 - k2: k1 with the HH category split into HH2B2Tau_btag1 (n_bjets == 1) and HH2B2Tau_btag2 (n_bjets == 2), N10.
-Binning: data_blind, the rules of shapesmith.nn_binning (HH: 50 equal-signal start bins on [1/K, 1], <= 30 %
-background uncertainty, <= 15 bins; background categories: 5 equal-background start bins, <= 10 %, <= 5 bins; per bin
->= 1 background event, >= 1 unweighted event of every raw-count group, no negative template); or thesis, the custom
+Binning: data_blind, the rules of shapesmith.nn_binning, rule set C' of spec 6.3 (HH: 50 equal-signal start bins on
+[1/K, 1], <= 50 % background uncertainty, <= 15 bins; background categories: 5 equal-background start bins, <= 10 %,
+<= 5 bins; per bin >= 1 background event, >= 1 unweighted event of every raw-count group with >= 10 % of the
+category's background, no template below -1 % of the bin's background); or thesis, the custom
 edges of the HH category and 20 equal bins elsewhere, merged by the AutoRebin(1.0, 0.9) of the thesis. Every HH
 category is blinded from the first bin with S/B(mu=1) > 0.5 % (N14); the jet-fake estimate is clipped after the
 rebinning (SH6).
