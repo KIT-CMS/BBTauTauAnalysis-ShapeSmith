@@ -5,20 +5,22 @@
 # signal, 2018 only, chained on the FastMTT friend; data under smrun2_binned_v7, MC (and embedding) under
 # smrun2_binned_v7b, as fastmtt. The tau channels only, as the thesis: the final state 'all' is et + mt + tt.
 #   shapesmith skim -c configs/smrun2_binned_v7b_nn_thesis2018_v1.yaml        # its own skims (the NN friend), 2018 only
+#   shapesmith skim -c configs/smrun2_binned_v7b_nn_thesis2018_v1.yaml -s switches.signal_sample=node_sm   # + node_SM
 #   shapesmith hist / estimate / datacards / fit -c configs/smrun2_binned_v7b_nn_thesis2018_v1.yaml   # R4 (powheg)
-#   R3 (signal node_SM, N9): -s switches.signal_sample=node_sm \
-#       -s "output_dir=/ceph/sdaigler/shapesmith/smrun2_binned_v7b/output/tau_nn_thesis2018_v1_node_sm/{era}"
-# The model of a run is one column prefix of the friend (R3 the node_SM model, R4 the powheg model): the NN switches of
-# SH1-SH3 (feat/nn-categories) are added at the merge of the NN branches, e.g. nn_prefix: nn_thesis_powheg_ (R3:
-# nn_thesis_nodesm_; the prefixes of the friend's MODELS, CROWN bbtautau sm_nn_classifier.py), and the categories and
-# binning of the thesis (spec 4.1, 6.3 no. 8: nn_categories: thesis, nn_binning: thesis).
+#   R3 (signal node_SM, N9), the node_SM model of the friend: -s switches.signal_sample=node_sm \
+#       -s switches.nn_prefix=nn_thesis_nodesm_ -s "output_dir=/ceph/sdaigler/shapesmith/smrun2_binned_v7b/output/tau_nn_thesis2018_v1_node_sm/{era}"
+# The model of a run is one column prefix of the friend (nn_prefix; the prefixes of the friend's MODELS, CROWN bbtautau
+# sm_nn_classifier.py): R4 the powheg model nn_thesis_powheg_, R3 the node_SM model nn_thesis_nodesm_. The skims keep
+# the columns of both (nn_friend_prefixes), so R3 reuses them. The categories and binning of the thesis (spec 4.1, 6.3
+# no. 8): nn_categories thesis (argmax), nn_binning thesis; the six thesis classes of the mc mode (thesis6).
 # Systematics stage S0 (spec 8): the S0+ switches ttbar_shape (SH7) and heavy_flavour (SH8) are off; S0+ adds
 # -s switches.ttbar_shape=true -s switches.heavy_flavour=true. heavy_flavour reads bpair_hadronFlavour_{1,2} (MC): skim
 # with it on, so that one skim serves S0 and S0+.
 analysis: bbtautau_shapesmith.analysis:build
 era: "2018"                                               # FR1 is a 2018 production
 channels: [et, mt, tt]
-switches: {sample_lists: ["sm_{era}_binned", "sm_{era}_borrowed", "sm_{era}_embedding"], jet_fakes: mc, embedding: false, crown_shifts: false, nn_friend: true, fit_categories: nn, fastmtt_friend: true, control_regions: true, diagnostics: true, dy_correction: njets_btag}
+switches: {sample_lists: ["sm_{era}_binned", "sm_{era}_borrowed", "sm_{era}_embedding"], jet_fakes: mc, embedding: false, crown_shifts: false, nn_friend: true, fit_categories: nn, fastmtt_friend: true, control_regions: true, diagnostics: true, dy_correction: njets_btag,
+           nn_prefix: nn_thesis_powheg_, nn_friend_prefixes: [nn_thesis_nodesm_, nn_thesis_powheg_], nn_categories: thesis, nn_binning: thesis}
 sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
 ntuples:
   server: root://cmsdcache-kit-disk.gridka.de

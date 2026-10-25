@@ -11,7 +11,9 @@ from shapesmith.config import RunConfig
 from shapesmith.model import ABCD, Analysis, AnalysisError, Category, Channel, CrossSection, DataMinus, Process, Sample, TemplateShift
 
 from bbtautau_shapesmith import cuts, dilepton
-from bbtautau_shapesmith.constants import BTAG_BINS, CONTROL_CHANNELS, LT_CHANNELS, LUMI_PB, PREFIRING_NUISANCE, TAU_CHANNELS, check_era
+from bbtautau_shapesmith.constants import (
+    BTAG_BINS, CONTROL_CHANNELS, LT_CHANNELS, LUMI_PB, NN_CLASS_COLUMN, NN_SCORE_COLUMN, PREFIRING_NUISANCE, TAU_CHANNELS, check_era,
+)
 from bbtautau_shapesmith.ml import ML_CLASSES, ml_config, raw_count_groups
 from bbtautau_shapesmith.processes import (
     EMBEDDED, GENUINE, JET_FAKE, LEPTON_FAKE, NODE_SM, SIGNAL, SIGNAL_XS_FB, SIGNAL_XS_NUISANCES, SPLITS, available, backgrounds_in, tau_processes,
@@ -113,6 +115,14 @@ def check_manifest(manifest: str, channels: Iterable[str], classes: tuple[str, .
             raise AnalysisError(f"nn_manifest: {path} lists the classes {listed}, the run has {list(classes)} (nn_classes or the label profile, in the order of predicted_class)")
 
 
+def nn_friend_columns(switches: TauSwitches) -> tuple[str, ...]:
+    """The NN friend columns a tau skim keeps besides those the run reads: the class and score of every model of the
+    friend production (nn_friend_prefixes), so that the runs of all its models share one skim."""
+    if not switches.nn_friend:
+        return ()
+    return tuple(f"{prefix}{column}" for prefix in switches.nn_friend_prefixes for column in (NN_CLASS_COLUMN, NN_SCORE_COLUMN))
+
+
 def fit_categories(switches: TauSwitches, processes: tuple[Process, ...]) -> tuple[Category, ...]:
     if switches.fit_categories == "control":
         return nominal_category()
@@ -136,7 +146,7 @@ def channel(name: str, era: str, switches: TauSwitches, channel_samples: tuple[S
         variables=control_variables(switches.nn_friend, switches.diagnostics, switches.fastmtt_friend, switches.nn_prefix),
         variations=btag_variations(era) + prefiring_variations() + column_variations(name, era, switches),
         estimators=estimators(name, era, table, switches),
-        keep_columns=("event", "run", "lumi"),
+        keep_columns=("event", "run", "lumi", *nn_friend_columns(switches)),
     )
 
 

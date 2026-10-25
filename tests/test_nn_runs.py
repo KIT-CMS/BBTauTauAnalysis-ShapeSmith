@@ -2,8 +2,10 @@
 the thesis recipe; R3 and R4 with the background model of the thesis comparison, R5 with the final one) and FR2 nn_m0_v1
 (Run 2, M0 and M0-k4; R6-R8 with the fake-factor variants ff and ff_w, N7). Each is the run it copies with the NN friend
 (data under smrun2_binned_v7, MC and embedding under smrun2_binned_v7b, after the friends it chains on), nn_friend: true,
-fit_categories: nn and its own skims and outputs, without ML export and gallery. The friends do not exist yet, so the
-YAMLs are checked offline; every run YAML stays at the systematics stage S0 (no stage switch on)."""
+fit_categories: nn, the model of the run (nn_prefix) among the models of its friend (nn_friend_prefixes, whose columns
+the skims keep), the categories and binning of the thesis (R3-R5) or K1 with the data-blind binning (R6-R8), and its own
+skims and outputs, without ML export and gallery. The friends do not exist yet, so the YAMLs are checked offline; every
+run YAML stays at the systematics stage S0 (no stage switch on)."""
 import json
 from pathlib import Path
 
@@ -25,6 +27,15 @@ NN_FRIEND_RUNS = {  # run YAML -> (friend tag, the run it copies, the eras of th
     "smrun2_binned_v7b_ff_w_nn_m0_v1": ("nn_m0_v1", "smrun2_binned_v7b_ff_w", ERAS),
 }
 RUNS = [(name, era) for name, (_, _, eras) in NN_FRIEND_RUNS.items() for era in eras]
+FR1_PREFIXES = ["nn_thesis_nodesm_", "nn_thesis_powheg_"]  # the node_SM (R3) and the powheg (R4, R5) model
+FR2_PREFIXES = ["nn_m0_", "nn_m0k4_"]  # M0 and M0-k4 (R8, N28)
+THESIS = {"nn_categories": "thesis", "nn_binning": "thesis"}  # spec 4.1, 6.3 no. 8
+NN_SWITCHES = {  # run YAML -> its NN switches (SH1-SH3): the model of the run and every model of its friend
+    "smrun2_binned_v7b_nn_thesis2018_v1": {"nn_prefix": "nn_thesis_powheg_", "nn_friend_prefixes": FR1_PREFIXES, **THESIS},
+    "smrun2_binned_v7b_ff_nn_thesis2018_v1": {"nn_prefix": "nn_thesis_powheg_", "nn_friend_prefixes": FR1_PREFIXES, "nn_classes": list(ML_CLASSES["thesis6"]), **THESIS},
+    "smrun2_binned_v7b_ff_nn_m0_v1": {"nn_prefix": "nn_m0_", "nn_friend_prefixes": FR2_PREFIXES, "nn_categories": "k1", "nn_binning": "data_blind"},
+    "smrun2_binned_v7b_ff_w_nn_m0_v1": {"nn_prefix": "nn_m0_", "nn_friend_prefixes": FR2_PREFIXES, "nn_categories": "k1", "nn_binning": "data_blind"},
+}
 STORE = "/store/user/sdaigler/CROWN/ntuples"
 ROOT = Path("/ceph/sdaigler/shapesmith/smrun2_binned_v7b")
 EXPORT_SWITCHES = ("ml_labels", "ml_variables")  # the ML export of the copied run, not of a run with the NN friend
@@ -52,7 +63,7 @@ def test_each_nn_run_is_its_run_with_the_nn_friend(name, era):
     expected, actual = dump(run), dump(nn)
     for key in EXPORT_SWITCHES:
         expected["switches"].pop(key, None)
-    expected["switches"].update(nn_friend=True, fit_categories="nn")
+    expected["switches"].update(nn_friend=True, fit_categories="nn", **NN_SWITCHES[name])
     expected["ntuples"]["friends"] = actual["ntuples"]["friends"]
     assert actual == expected
     assert nn.ml_dir is None and nn.web is None and nn.workers <= 16
@@ -74,19 +85,46 @@ def test_the_nn_runs_have_their_own_skims_and_outputs(name, era):
 def test_the_nn_runs_build_with_the_nn_categories(name, era, stage):
     config = load(name, era, *(S0_PLUS if stage == "S0+" else ()))
     analysis = load_analysis(config)
-    classes = ML_CLASSES["thesis6" if config.switches["jet_fakes"] == "mc" else "v7b5"]  # the NN column switch of SH1 follows
+    switches = NN_SWITCHES[name]
+    classes = ML_CLASSES["thesis6" if name.endswith("thesis2018_v1") else "v7b5"]  # R5: the thesis model on the ff background model
+    prefix = switches["nn_prefix"]
     for channel_name in TAU_CHANNELS:
         channel = analysis.channel(channel_name)
-        assert tuple(category.name for category in channel.categories) == classes
+        assert [category.name for category in channel.categories] == list(classes)
+        assert [category.cut for category in channel.categories] == [
+            f"({prefix}predicted_class == {index})" + ("" if switches["nn_categories"] == "thesis" else " & (n_bjets < 3)") for index in range(len(classes))
+        ]
+        binning = channel.categories[0].variable.edges
+        assert channel.categories[0].variable.expr == f"{prefix}predicted_max_value" and (binning.thesis is None) == (switches["nn_binning"] == "data_blind")
         simulated = {p.group for p in channel.processes if p.role == "background" and p.group != EMBEDDED}
-        for sample in channel.samples:  # every kind reads the NN friend, the simulated backgrounds of S0+ the b-pair flavour
-            assert NN_COLUMNS <= needed_columns(channel, sample), sample.nick
-            assert ("bpair_hadronFlavour_1" in needed_columns(channel, sample)) == (stage == "S0+" and sample.group in simulated), sample.nick
+        for sample in channel.samples:  # every kind reads the NN friend (all its models), the simulated backgrounds of S0+ the b-pair flavour
+            columns = needed_columns(channel, sample)
+            assert {f"{p}{c}" for p in switches["nn_friend_prefixes"] for c in NN_COLUMNS} <= columns and not NN_COLUMNS & columns, sample.nick
+            assert ("bpair_hadronFlavour_1" in columns) == (stage == "S0+" and sample.group in simulated), sample.nick
     varied = {v.name for channel in analysis.channels.values() for v in channel.variations}
     assert ({"CMS_htt_ttbarShapeUp", "CMS_htt_heavy_flavourUp"} <= varied) == (stage == "S0+")
     assert analysis.control_channels == (("em",) if "em" in config.channels else ())
     # the thesis comparison: the final state 'all' of et, mt and tt without em (datacards --channels et,mt,tt)
     assert _final_states(list(TAU_CHANNELS), analysis.control_channels)["all"] == list(TAU_CHANNELS)
+
+
+@pytest.mark.parametrize("name", sorted(NN_SWITCHES))
+def test_the_runs_of_every_model_of_a_friend_share_the_skims(name):
+    """The skims of a run hold the columns of every model of its friend: the run of another model (-s
+    switches.nn_prefix=..., as the YAML headers name them; R3 also with its node_SM signal) needs exactly the columns of
+    the same samples, so the stored skims serve it without skim --force."""
+    era = NN_FRIEND_RUNS[name][2][-1]
+    run = load_analysis(load(name, era))
+    for prefix in NN_SWITCHES[name]["nn_friend_prefixes"]:
+        signal = ("switches.signal_sample=node_sm",) if prefix == "nn_thesis_nodesm_" and name == "smrun2_binned_v7b_nn_thesis2018_v1" else ()
+        other = load_analysis(load(name, era, f"switches.nn_prefix={prefix}", *signal))
+        for channel_name in TAU_CHANNELS:
+            mine = {sample.nick: sample for sample in run.channel(channel_name).samples}
+            shared = [sample for sample in other.channel(channel_name).samples if sample.nick in mine]
+            assert len(shared) >= len(mine) - 1  # R3 swaps the signal sample only
+            for sample in shared:
+                assert needed_columns(other.channel(channel_name), sample) == needed_columns(run.channel(channel_name), mine[sample.nick]), (prefix, sample.nick)
+            assert other.channel(channel_name).categories[0].cut.startswith(f"({prefix}predicted_class == 0)")
 
 
 def test_the_thesis_runs_are_2018_only():

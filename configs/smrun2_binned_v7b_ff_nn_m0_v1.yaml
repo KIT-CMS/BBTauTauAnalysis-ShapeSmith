@@ -8,17 +8,20 @@
 #   shapesmith hist / estimate / datacards / fit -c configs/smrun2_binned_v7b_ff_nn_m0_v1.yaml -s era=<era>
 #   shapesmith combine -c configs/smrun2_binned_v7b_ff_nn_m0_v1.yaml --era 2016preVFP --era 2016postVFP --era 2017 \
 #       --era 2018 -o /ceph/sdaigler/shapesmith/smrun2_binned_v7b/combination/ff_nn_m0_v1
-# The model of a run is one column prefix of the friend (M0 or M0-k4, e.g. nn_m0_ and nn_m0k4_ as in the example of the
-# friend's MODELS): the NN switches of SH1-SH3 (feat/nn-categories) are added at the merge of the NN branches, e.g.
-# nn_prefix: nn_m0_, nn_categories: k1 (k2 if R7 chooses it, N10), nn_binning: data_blind; M0-k4 runs with its own
-# output_dir (-s "output_dir=/ceph/sdaigler/shapesmith/smrun2_binned_v7b/output/tau_ff_nn_m0k4_v1/{era}").
+# The model of a run is one column prefix of the friend (nn_prefix; nn_m0_ and nn_m0k4_ as in the example of the
+# friend's MODELS, CROWN bbtautau sm_nn_classifier.py): M0 here; the skims keep the columns of both (nn_friend_prefixes),
+# so M0-k4 (R8) reuses them with its own output_dir:
+#   -s switches.nn_prefix=nn_m0k4_ -s "output_dir=/ceph/sdaigler/shapesmith/smrun2_binned_v7b/output/tau_ff_nn_m0k4_v1/{era}"
+# The categories K1 (nn_categories k1; k2 if R7 chooses it, N10: -s switches.nn_categories=k2 with its own output_dir)
+# with the data-blind binning (nn_binning data_blind, spec 6.3).
 # Systematics stage S0 (spec 8): the S0+ switches ttbar_shape (SH7) and heavy_flavour (SH8) are off; S0+ adds
 # -s switches.ttbar_shape=true -s switches.heavy_flavour=true. heavy_flavour reads bpair_hadronFlavour_{1,2} (MC): skim
 # with it on, so that one skim serves S0 and S0+. S1 (with the shift production P6) adds signal_theory.
 analysis: bbtautau_shapesmith.analysis:build
 era: "2018"
 channels: [et, mt, tt, em]                                # em: the ttbar control channel (in every final state)
-switches: {sample_lists: ["sm_{era}_binned", "sm_{era}_borrowed", "sm_{era}_embedding"], jet_fakes: ff, embedding: [et, mt], crown_shifts: false, nn_friend: true, fastmtt_friend: true, fit_categories: nn, control_regions: false, dy_correction: njets_btag, study_uncertainties: true, symmetrise_ff_shifts: true, ff_processes: [QCD, ttbar]}
+switches: {sample_lists: ["sm_{era}_binned", "sm_{era}_borrowed", "sm_{era}_embedding"], jet_fakes: ff, embedding: [et, mt], crown_shifts: false, nn_friend: true, fastmtt_friend: true, fit_categories: nn, control_regions: false, dy_correction: njets_btag, study_uncertainties: true, symmetrise_ff_shifts: true, ff_processes: [QCD, ttbar],
+           nn_prefix: nn_m0_, nn_friend_prefixes: [nn_m0_, nn_m0k4_], nn_categories: k1, nn_binning: data_blind}
 sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
 ntuples:
   server: root://cmsdcache-kit-disk.gridka.de

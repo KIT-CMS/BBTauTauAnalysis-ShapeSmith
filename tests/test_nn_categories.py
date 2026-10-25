@@ -83,6 +83,19 @@ def test_the_prefix_and_classes_select_one_model_of_the_friend():
     assert analysis.ml is None  # the export classes stay those of ml_labels
 
 
+def test_the_skims_keep_the_columns_of_every_model_of_the_friend():
+    """nn_friend_prefixes: the runs of the models of one friend production share their skims."""
+    models = ["nn_m0_", "nn_m0k4_"]
+    for prefix in models:
+        mt = nn_analysis(nn_prefix=prefix, nn_friend_prefixes=models).channel("mt")
+        assert set(mt.keep_columns) >= {f"{p}{c}" for p in models for c in ("predicted_class", "predicted_max_value")}
+        columns = [needed_columns(mt, sample) for sample in mt.samples]
+        assert all({"nn_m0k4_predicted_class", "nn_m0_predicted_max_value"} <= c for c in columns)
+    assert nn_analysis(nn_prefix="nn_m0_").channel("mt").keep_columns == ("event", "run", "lumi")  # the run's model only
+    control = build(config(("mt",), jet_fakes="ff", embedding=["mt"], fit_categories="control", nn_prefix="nn_m0_", nn_friend_prefixes=models, sample_lists=["sm2018_binned_v3", EMBEDDING_LIST]))
+    assert control.channel("mt").keep_columns == ("event", "run", "lumi")  # no NN friend, no NN columns
+
+
 def _manifest(tmp_path, channel, classes):
     path = tmp_path / "m0" / "2018" / channel / "manifest.json"
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -111,6 +124,9 @@ def test_the_manifest_must_list_the_classes_of_the_run(tmp_path):
     ({"nn_prefix": "nn-m0"}, "nn_prefix"),
     ({"nn_categories": "k3"}, "nn_categories"),
     ({"nn_binning": "equal"}, "nn_binning"),
+    ({"nn_prefix": "nn_m0_", "nn_friend_prefixes": ["nn_m0k4_"]}, "contain nn_prefix 'nn_m0_'"),
+    ({"nn_prefix": "nn_m0_", "nn_friend_prefixes": ["nn_m0_", "nn_m0_"]}, "nn_friend_prefixes must be distinct"),
+    ({"nn_friend_prefixes": ["nn-m0"]}, "nn_friend_prefixes"),
 ])
 def test_invalid_nn_switches_are_reported(switches, match):
     with pytest.raises(AnalysisError, match=match):

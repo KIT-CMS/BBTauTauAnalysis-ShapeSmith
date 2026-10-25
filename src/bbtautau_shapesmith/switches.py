@@ -78,6 +78,10 @@ class TauSwitches(_EmbeddedChannels, _FakeFactorProcesses, BaseModel):
     nn_prefix: Annotated[str, Field(pattern=r"^[A-Za-z0-9_]*$")] = ""
     nn_classes: list[str] | None = None
     nn_manifest: str | None = None
+    # the column prefixes of every model of the NN friend production (the MODELS of its CROWN configuration): the skims
+    # keep <prefix>predicted_class and <prefix>predicted_max_value of each, so that one skim serves the run of every
+    # model (nn_prefix picks it, -s switches.nn_prefix=...); empty: the columns of nn_prefix only
+    nn_friend_prefixes: list[Annotated[str, Field(pattern=r"^[A-Za-z0-9_]*$")]] = Field(default_factory=list)
     # the NN categories (variables.py): thesis (argmax, R3-R5), k1 (argmax without n_bjets >= 3, N12) or k2 (k1 with the
     # HH category split by n_bjets == 1 / == 2, N10); their binning, resolved by datacards: data_blind (NN spec 6.3) or
     # thesis (the custom edges and AutoRebin(1.0, 0.9) of the thesis)
@@ -138,6 +142,13 @@ class TauSwitches(_EmbeddedChannels, _FakeFactorProcesses, BaseModel):
     def _nn_classes_hold_the_signal_once(self) -> TauSwitches:
         if self.nn_classes is not None and (self.nn_classes.count("HH2B2Tau") != 1 or len(set(self.nn_classes)) != len(self.nn_classes)):
             raise ValueError(f"nn_classes must be distinct and contain HH2B2Tau (the signal category), got {self.nn_classes}")
+        return self
+
+    @model_validator(mode="after")
+    def _nn_prefix_is_a_model_of_the_friend(self) -> TauSwitches:
+        prefixes = self.nn_friend_prefixes
+        if prefixes and (self.nn_prefix not in prefixes or len(set(prefixes)) < len(prefixes)):
+            raise ValueError(f"nn_friend_prefixes must be distinct and contain nn_prefix '{self.nn_prefix}', got {prefixes}")
         return self
 
     @model_validator(mode="after")

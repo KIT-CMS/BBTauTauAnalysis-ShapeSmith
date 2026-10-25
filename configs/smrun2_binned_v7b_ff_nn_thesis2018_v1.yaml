@@ -5,17 +5,19 @@
 #   shapesmith skim -c configs/smrun2_binned_v7b_ff_nn_thesis2018_v1.yaml     # its own skims (the NN friend, em)
 #   shapesmith hist / estimate / datacards / fit -c configs/smrun2_binned_v7b_ff_nn_thesis2018_v1.yaml
 #   datacards --channels et,mt,tt: the final state 'all' without em, as the thesis (R3, R4)
-# The thesis model has the six thesis classes, but the fake-factor background model gives the export profile v7b5: the
-# NN switches of SH1-SH3 (feat/nn-categories), added at the merge of the NN branches, name the prefix, the classes, the
-# categories and the binning, e.g. nn_prefix: nn_thesis_powheg_, nn_classes: [HH2B2Tau, DY, ST, TT, VV, Other] (thesis6),
-# nn_categories: thesis, nn_binning: thesis; without them the categories follow v7b5 (analysis.nn_classes).
+# The model is the powheg model of the friend (nn_prefix nn_thesis_powheg_; the skims keep the columns of both models of
+# the friend, nn_friend_prefixes). It has the six thesis classes, but the fake-factor background model would give the
+# classes of v7b5, so nn_classes names them (thesis6, the order of predicted_class); the categories and binning of the
+# thesis: nn_categories thesis (argmax), nn_binning thesis.
 # Systematics stage S0 (spec 8): the S0+ switches ttbar_shape (SH7) and heavy_flavour (SH8) are off; S0+ adds
 # -s switches.ttbar_shape=true -s switches.heavy_flavour=true. heavy_flavour reads bpair_hadronFlavour_{1,2} (MC): skim
 # with it on, so that one skim serves S0 and S0+.
 analysis: bbtautau_shapesmith.analysis:build
 era: "2018"                                               # FR1 is a 2018 production
 channels: [et, mt, tt, em]                                # em: the ttbar control channel (in every final state)
-switches: {sample_lists: ["sm_{era}_binned", "sm_{era}_borrowed", "sm_{era}_embedding"], jet_fakes: ff, embedding: [et, mt], crown_shifts: false, nn_friend: true, fastmtt_friend: true, fit_categories: nn, control_regions: false, dy_correction: njets_btag, study_uncertainties: true, symmetrise_ff_shifts: true, ff_processes: [QCD, ttbar]}
+switches: {sample_lists: ["sm_{era}_binned", "sm_{era}_borrowed", "sm_{era}_embedding"], jet_fakes: ff, embedding: [et, mt], crown_shifts: false, nn_friend: true, fastmtt_friend: true, fit_categories: nn, control_regions: false, dy_correction: njets_btag, study_uncertainties: true, symmetrise_ff_shifts: true, ff_processes: [QCD, ttbar],
+           nn_prefix: nn_thesis_powheg_, nn_friend_prefixes: [nn_thesis_nodesm_, nn_thesis_powheg_], nn_classes: [HH2B2Tau, DY, ST, TT, VV, Other],
+           nn_categories: thesis, nn_binning: thesis}
 sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
 ntuples:
   server: root://cmsdcache-kit-disk.gridka.de
