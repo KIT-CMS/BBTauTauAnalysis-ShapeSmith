@@ -1,21 +1,60 @@
-"""The fit categories (NN classes or one nominal category) and the control variables with their binning."""
+"""The fit categories (NN classes or one nominal category) and the control variables with their binning.
+
+NN categories (NN spec 6.2, 6.3; switches nn_categories, nn_binning): one per class of the model, the events whose
+predicted_class is the class index (the class order of the model and of the ML export), the discriminant its score
+predicted_max_value (in the HH category P(HH)), filled in 1000 bins on [0, 1] whose edges datacards resolve from the
+nominal templates (shapesmith ScoreBinning):
+- thesis: the categories of the master's thesis, argmax only (R3-R5);
+- k1: argmax with n_bjets >= 3 cut out (N12, the baseline has n_bjets >= 1);
+- k2: k1 with the HH category split into HH2B2Tau_btag1 (n_bjets == 1) and HH2B2Tau_btag2 (n_bjets == 2), N10.
+Binning: data_blind, the rules of shapesmith.nn_binning (HH: 50 equal-signal start bins on [1/K, 1], <= 30 %
+background uncertainty, <= 15 bins; background categories: 5 equal-background start bins, <= 10 %, <= 5 bins; per bin
+>= 1 background event, >= 1 unweighted event of every raw-count group, no negative template); or thesis, the custom
+edges of the HH category and 20 equal bins elsewhere, merged by the AutoRebin(1.0, 0.9) of the thesis. Every HH
+category is blinded from the first bin with S/B(mu=1) > 0.5 % (N14); the jet-fake estimate is clipped after the
+rebinning (SH6).
+"""
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 import numpy as np
-from shapesmith.model import Category, Variable
+from shapesmith.model import Category, ScoreBinning, Variable
+from shapesmith.nn_binning import BLINDING_S_OVER_B, THESIS_HH_EDGES, THESIS_OTHER_EDGES, category_rules
 
 from bbtautau_shapesmith.constants import NN_CLASS_COLUMN, NN_SCORE_COLUMN
 
-STANDARD_BINNING = tuple(float(round(x, 4)) for x in np.linspace(0.0, 1.0, 21))
-SIGNAL_BINNING = (0.0, 0.2, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.82, 0.84, 0.86, 0.88, 0.9, 0.92, 0.94, 0.96, 0.98, 1.0)
+NN_FINE_BINNING = tuple(float(round(x, 6)) for x in np.linspace(0.0, 1.0, 1001))
+NN_SIGNAL_CLASS = "HH2B2Tau"
+NN_BTAG_SPLIT = {"btag1": "(n_bjets == 1)", "btag2": "(n_bjets == 2)"}  # K2
+NN_NO_BTAG3P = "(n_bjets < 3)"  # K1, K2 (N12)
 
 
-def categories(classes: tuple[str, ...]) -> tuple[Category, ...]:
-    """One NN category per class, predicted_class = the index of the class (the class order of the ML export)."""
-    return tuple(
-        Category(name, f"({NN_CLASS_COLUMN} == {index})", Variable("NN_score", NN_SCORE_COLUMN, SIGNAL_BINNING if name == "HH2B2Tau" else STANDARD_BINNING))
-        for index, name in enumerate(classes)
-    )
+def nn_binning(classes: tuple[str, ...], signal: bool, method: str, required: Mapping[str, tuple[str, ...]], clip: tuple[str, ...]) -> ScoreBinning:
+    """The binning of an NN category: the fine bins, the data-blind rules or the thesis start edges, the blinding of
+    an HH category and the processes clipped after the rebinning."""
+    blinding = BLINDING_S_OVER_B if signal else None
+    if method == "thesis":
+        return ScoreBinning(NN_FINE_BINNING, thesis=THESIS_HH_EDGES if signal else THESIS_OTHER_EDGES, blinding=blinding, clip=clip)
+    return ScoreBinning(NN_FINE_BINNING, rules=category_rules(len(classes), signal, required), blinding=blinding, clip=clip)
+
+
+def categories(classes: tuple[str, ...], scheme: str = "k1", binning: str = "data_blind", prefix: str = "", required: Mapping[str, tuple[str, ...]] | None = None,
+               clip: tuple[str, ...] = ()) -> tuple[Category, ...]:
+    """The NN categories (module docstring) of the classes in the order of predicted_class, from the friend columns of
+    the model with the column prefix `prefix`; `required`: the raw-count groups of the data-blind rules."""
+    result = []
+    for index, name in enumerate(classes):
+        cut = f"({prefix}{NN_CLASS_COLUMN} == {index})"
+        signal = name == NN_SIGNAL_CLASS
+        variable = Variable("NN_score", f"{prefix}{NN_SCORE_COLUMN}", nn_binning(classes, signal, binning, required or {}, clip))
+        if scheme == "thesis":
+            result.append(Category(name, cut, variable))
+        elif scheme == "k2" and signal:
+            result += [Category(f"{name}_{btag}", f"{cut} & {btags}", variable) for btag, btags in NN_BTAG_SPLIT.items()]
+        else:
+            result.append(Category(name, f"{cut} & {NN_NO_BTAG3P}", variable))
+    return tuple(result)
 
 
 def nominal_category() -> tuple[Category, ...]:
@@ -98,13 +137,14 @@ _EXPRESSIONS = {"yield": "1.0", "sum_deltaR_tt_bb": "bpair_deltaR + deltaR_ditau
 _EXPRESSION_BINNING = {"yield": (0.5, 1.5), "sum_deltaR_tt_bb": np.arange(0, 10.6, 0.2), "NN_score": np.linspace(0.0, 1.0, 21)}
 
 
-def control_variables(nn_friend: bool = False, diagnostics: bool = False, fastmtt: bool = False) -> dict[str, Variable]:
-    """Control variables (`yield` is the one-bin event count); the NN score only when the NN friend tree is part of the
-    run (nn_friend), the diagnostic variables only with diagnostics, the FastMTT variables only with its friend."""
+def control_variables(nn_friend: bool = False, diagnostics: bool = False, fastmtt: bool = False, nn_prefix: str = "") -> dict[str, Variable]:
+    """Control variables (`yield` is the one-bin event count); the NN score (of the model with the column prefix
+    nn_prefix) only when the NN friend tree is part of the run (nn_friend), the diagnostic variables only with
+    diagnostics, the FastMTT variables only with its friend."""
     binning = {**_BINNING, **(_DIAGNOSTIC_BINNING if diagnostics else {}), **(_FASTMTT_BINNING if fastmtt else {})}
     variables = {name: Variable(name, name, _edges(edges)) for name, edges in binning.items()}
     for name, expr in _EXPRESSIONS.items():
         if name == "NN_score" and not nn_friend:
             continue
-        variables[name] = Variable(name, expr, _edges(_EXPRESSION_BINNING[name]))
+        variables[name] = Variable(name, f"{nn_prefix}{expr}" if name == "NN_score" else expr, _edges(_EXPRESSION_BINNING[name]))
     return variables

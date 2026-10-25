@@ -75,14 +75,15 @@ def channel(name: str, era: str, channel_samples: tuple[Sample, ...], dy_correct
     )
 
 
-def top_control_channel(channel_samples: tuple[Sample, ...], era: str, dy_correction: str = "none") -> Channel:
+def top_control_channel(channel_samples: tuple[Sample, ...], era: str, dy_correction: str = "none", btag_split: bool = False) -> Channel:
     """em as the ttbar control channel of the tau analysis: the em selection (>= 2 jets) with the b tag of the tau
-    baseline as its one category, counted in one bin, without further regions."""
-    return dataclasses.replace(
-        channel("em", era, channel_samples, dy_correction),
-        regions=(),
-        categories=(Category("em_tt", B_TAGGING, control_variables()["yield"]),),
-    )
+    baseline as its one category, counted in one bin, without further regions; with btag_split (the NN categories,
+    SH4, N12) the categories em_tt_btag1 and em_tt_btag2 (n_bjets == 1, == 2) instead, without n_bjets >= 3."""
+    yields = control_variables()["yield"]
+    categories = (Category("em_tt", B_TAGGING, yields),)
+    if btag_split:
+        categories = tuple(Category(f"em_tt_{name}", f"{B_TAGGING} & ({BTAG_BINS[name]})", yields) for name in ("btag1", "btag2"))
+    return dataclasses.replace(channel("em", era, channel_samples, dy_correction), regions=(), categories=categories)
 
 
 def build(config: RunConfig) -> Analysis:

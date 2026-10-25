@@ -57,6 +57,12 @@ VARIABLE_SETS = {
 # the generator-truth columns of the simulated samples only (the GenJet flavour as in processes.HADRON_FLAVOURS)
 MC_ONLY = frozenset(TRUTH) | {"genjet_hadFlavour_1", "genjet_hadFlavour_2"}
 FASTMTT_COLUMNS = frozenset({"m_fastmtt", "pt_fastmtt", "eta_fastmtt", "phi_fastmtt"})  # from the FastMTT friend
+# the groups of the raw-count rule of the data-blind NN binning (spec 6.3: >= 1 unweighted event of Top, tautau and
+# jetFakes per bin), by the jet-fake mode of the background model: with fake factors the v7b5 classes Top (TTL + STL)
+# and tautau (EMB or the genuine MC processes) and the jetFakes estimate (its anti-isolated data); in mc mode the
+# corresponding major backgrounds of the thesis classes, TT (TTT + TTL + TTJ) and DY (ZTT or EMB, ZL, ZJ), and the QCD of
+# the ABCD method (its data of the anti-isolated region)
+RAW_COUNT_CLASSES = {"ff": ("v7b5", ("Top", "tautau"), "jetFakes"), "mc": ("thesis6", ("TT", "DY"), "QCD")}
 
 
 def variables(names: list[str] | None) -> tuple[str, ...]:
@@ -95,3 +101,12 @@ def ml_config(processes: tuple[Process, ...], switches: TauSwitches) -> MLExport
         variables=columns, classes=ML_CLASSES[profile], class_of=classes, region_of=region_of,
         identifiers=ML_IDENTIFIERS, mc_only=tuple(v for v in columns if v in MC_ONLY), profile=profile,
     )
+
+
+def raw_count_groups(processes: tuple[Process, ...], jet_fakes: str) -> dict[str, tuple[str, ...]]:
+    """The raw-count groups (RAW_COUNT_CLASSES) of a channel's process table: label -> its background processes; a
+    class without one is left out."""
+    profile, labels, output = RAW_COUNT_CLASSES[jet_fakes]
+    backgrounds = [p for p in processes if p.role == "background"]
+    groups = {label: tuple(p.name for p in backgrounds if class_of(p, profile) == label) for label in labels}
+    return {**{label: names for label, names in groups.items() if names}, output: (output,)}

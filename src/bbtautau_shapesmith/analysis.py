@@ -2,14 +2,16 @@
 configuration switches, with its ML export (ml.py)."""
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable
+from pathlib import Path
 
 from shapesmith.config import RunConfig
 from shapesmith.model import ABCD, Analysis, AnalysisError, Category, Channel, DataMinus, Process, Sample, TemplateShift
 
 from bbtautau_shapesmith import cuts, dilepton
 from bbtautau_shapesmith.constants import BTAG_BINS, CONTROL_CHANNELS, LT_CHANNELS, LUMI_PB, PREFIRING_NUISANCE, TAU_CHANNELS, check_era
-from bbtautau_shapesmith.ml import ML_CLASSES, ml_config
+from bbtautau_shapesmith.ml import ML_CLASSES, ml_config, raw_count_groups
 from bbtautau_shapesmith.processes import (
     EMBEDDED, GENUINE, JET_FAKE, LEPTON_FAKE, NODE_SM, SIGNAL, SPLITS, available, backgrounds_in, tau_processes,
 )
@@ -91,15 +93,31 @@ def study(switches: TauSwitches, channels: Iterable[str]) -> Study | None:
 
 
 def nn_classes(switches: TauSwitches) -> tuple[str, ...]:
-    """The NN classes in the order of the friend's predicted_class: those of the label profile of the export, by
-    default the profile of the jet-fake mode (thesis6 with mc, v7b5 with ff)."""
+    """The NN classes in the order of the friend's predicted_class: nn_classes, else those of the label profile of the
+    export, by default the profile of the jet-fake mode (thesis6 with mc, v7b5 with ff)."""
+    if switches.nn_classes is not None:
+        return tuple(switches.nn_classes)
     return ML_CLASSES[switches.ml_labels or {"mc": "thesis6", "ff": "v7b5"}[switches.jet_fakes]]
 
 
-def fit_categories(switches: TauSwitches) -> tuple[Category, ...]:
+def check_manifest(manifest: str, channels: Iterable[str], classes: tuple[str, ...]) -> None:
+    """The model manifest (nn_manifest, {channel} filled per tau channel) lists exactly the NN classes of the run."""
+    for name in channels:
+        path = Path(manifest.replace("{channel}", name))
+        if not path.is_file():
+            raise AnalysisError(f"nn_manifest: {path} does not exist")
+        listed = json.loads(path.read_text()).get("classes")
+        if listed is None or tuple(listed) != classes:
+            raise AnalysisError(f"nn_manifest: {path} lists the classes {listed}, the run has {list(classes)} (nn_classes or the label profile, in the order of predicted_class)")
+
+
+def fit_categories(switches: TauSwitches, processes: tuple[Process, ...]) -> tuple[Category, ...]:
     if switches.fit_categories == "control":
         return nominal_category()
-    return categories(nn_classes(switches)) if switches.fit_categories == "nn" else ()
+    if switches.fit_categories != "nn":
+        return ()
+    groups = raw_count_groups(processes, switches.jet_fakes)
+    return categories(nn_classes(switches), switches.nn_categories, switches.nn_binning, switches.nn_prefix, groups, clip=(jet_fakes_output(switches.jet_fakes),))
 
 
 def channel(name: str, era: str, switches: TauSwitches, channel_samples: tuple[Sample, ...]) -> Channel:
@@ -112,8 +130,8 @@ def channel(name: str, era: str, switches: TauSwitches, channel_samples: tuple[S
         cuts=cuts.baseline_cuts(name, era),
         processes=table,
         regions=cuts.regions(name, switches.jet_fakes, switches.ff_type) + (cuts.diagnostic_regions(name) if switches.control_regions else ()),
-        categories=fit_categories(switches),
-        variables=control_variables(switches.nn_friend, switches.diagnostics, switches.fastmtt_friend),
+        categories=fit_categories(switches, table),
+        variables=control_variables(switches.nn_friend, switches.diagnostics, switches.fastmtt_friend, switches.nn_prefix),
         variations=btag_variations(era) + prefiring_variations() + column_variations(name, era, switches),
         estimators=estimators(name, era, table, switches),
         keep_columns=("event", "run", "lumi"),
@@ -146,10 +164,12 @@ def build(config: RunConfig) -> Analysis:
     if not config.channels or set(config.channels) - set(TAU_CHANNELS + CONTROL_CHANNELS):
         raise AnalysisError(f"the tau analysis supports the channels {', '.join(TAU_CHANNELS)} and the control channels {', '.join(CONTROL_CHANNELS)}")
     switches.check_embedding(config.channels)
+    if switches.nn_manifest is not None:
+        check_manifest(switches.nn_manifest, [name for name in config.channels if name in TAU_CHANNELS], nn_classes(switches))
     signal = NODE_SM if switches.signal_sample == "node_sm" else SIGNAL
     by_channel = samples(sample_database(config), switches.sample_lists, config.channels, era, signal)
     channels = {
-        name: dilepton.top_control_channel(by_channel[name], era, switches.dy_correction) if name in CONTROL_CHANNELS else channel(name, era, switches, by_channel[name])
+        name: dilepton.top_control_channel(by_channel[name], era, switches.dy_correction, switches.fit_categories == "nn") if name in CONTROL_CHANNELS else channel(name, era, switches, by_channel[name])
         for name in config.channels
     }
     tau_channels = [c for name, c in channels.items() if name not in CONTROL_CHANNELS]

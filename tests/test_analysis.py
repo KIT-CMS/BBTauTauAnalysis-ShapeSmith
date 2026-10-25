@@ -242,9 +242,10 @@ def test_the_export_columns_exist_for_every_sample_kind():
 
 
 def test_the_nn_categories_follow_the_class_order_of_the_export():
-    """X3: predicted_class indexes the classes of the label profile, the order of the export (not alphabetical)."""
+    """X3: predicted_class indexes the classes of the label profile, the order of the export (not alphabetical); the
+    thesis categories are the argmax alone (K1 and K2: test_nn_categories.py)."""
     for jet_fakes, embedding, profile in (("ff", ["et", "mt"], "v7b5"), ("mc", False, "thesis6")):
-        analysis = analysis_for(jet_fakes, embedding, nn_friend=True, ml_labels=profile, fastmtt_friend=True)
+        analysis = analysis_for(jet_fakes, embedding, nn_friend=True, ml_labels=profile, fastmtt_friend=True, nn_categories="thesis")
         categories = analysis.channel("mt").categories
         assert [c.name for c in categories] == list(analysis.ml.classes)
         assert [c.cut for c in categories] == [f"(predicted_class == {i})" for i in range(len(analysis.ml.classes))]

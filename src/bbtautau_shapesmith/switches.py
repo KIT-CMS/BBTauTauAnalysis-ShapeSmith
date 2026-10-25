@@ -70,6 +70,19 @@ class TauSwitches(_EmbeddedChannels, _FakeFactorProcesses, BaseModel):
     ff_type: Literal["corrected", "raw"] = "corrected"  # FF friend weight; raw: no DR->SR and non-closure corrections (needs jet_fakes: ff, shape_systematics: false)
     embedding: Embedding = False  # genuine tautau from the embedded samples instead of MC, in every tau channel or the listed ones
     nn_friend: bool = False  # NN categories from the NN friend
+    # the model of the NN friend (SH1): the column prefix of the model (one friend can hold several models; columns
+    # <prefix>predicted_class, <prefix>predicted_max_value, <prefix>nn_score_<class>, -1 outside its gate) and its
+    # classes in the order of predicted_class (none: those of the label profile, ml_labels or else thesis6 with
+    # jet_fakes mc and v7b5 with ff); nn_manifest: the manifest.json of the model's CROWN payload ({channel} replaced by
+    # every tau channel of the run), whose "classes" must be exactly these classes
+    nn_prefix: Annotated[str, Field(pattern=r"^[A-Za-z0-9_]*$")] = ""
+    nn_classes: list[str] | None = None
+    nn_manifest: str | None = None
+    # the NN categories (variables.py): thesis (argmax, R3-R5), k1 (argmax without n_bjets >= 3, N12) or k2 (k1 with the
+    # HH category split by n_bjets == 1 / == 2, N10); their binning, resolved by datacards: data_blind (NN spec 6.3) or
+    # thesis (the custom edges and AutoRebin(1.0, 0.9) of the thesis)
+    nn_categories: Literal["thesis", "k1", "k2"] = "k1"
+    nn_binning: Literal["data_blind", "thesis"] = "data_blind"
     # the ML export (ml.py, NN spec 3.1): the label profile thesis6 (needs jet_fakes: mc) or v7b5 (needs jet_fakes: ff),
     # none without an export; the class order of the profile is also that of the NN categories
     ml_labels: Literal["thesis6", "v7b5"] | None = None
@@ -110,6 +123,12 @@ class TauSwitches(_EmbeddedChannels, _FakeFactorProcesses, BaseModel):
         # without the friend there would be no tau category at all, and datacards with em only (NN spec X9)
         if self.fit_categories == "nn" and not self.nn_friend:
             raise ValueError("fit_categories nn requires nn_friend: true (without the NN friend: control or none)")
+        return self
+
+    @model_validator(mode="after")
+    def _nn_classes_hold_the_signal_once(self) -> TauSwitches:
+        if self.nn_classes is not None and (self.nn_classes.count("HH2B2Tau") != 1 or len(set(self.nn_classes)) != len(self.nn_classes)):
+            raise ValueError(f"nn_classes must be distinct and contain HH2B2Tau (the signal category), got {self.nn_classes}")
         return self
 
     @model_validator(mode="after")
