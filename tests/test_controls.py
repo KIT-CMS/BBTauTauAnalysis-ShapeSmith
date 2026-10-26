@@ -175,11 +175,16 @@ def only(analysis, channel_name, *processes):
 
 
 def write_rows(cfg, channel, rows_of):
+    """One skim file per sample with the rows `rows_of(sample, row)` makes from a row of 1 in every needed column; rows
+    that share an event get their own event numbers 1, 2, ... (data and embedding are read without repeated events)."""
     for sample in channel.samples:
         row = {column: 1. for column in needed_columns(channel, sample)}
         row.update(sample_nick=sample.nick, norm_weight=1. if sample.kind == "data" else 2., is_data=sample.kind == "data",
                    is_mc=sample.kind == "mc", is_embedding=False)
-        write_skim(pd.DataFrame(rows_of(sample, row)), cfg.skim_dir / channel.name / sample.nick / "events.parquet")
+        frame = pd.DataFrame(rows_of(sample, row))
+        if "event" in frame and frame["event"].nunique() < len(frame):
+            frame["event"] = np.arange(1, len(frame) + 1, dtype=np.float64)
+        write_skim(frame, cfg.skim_dir / channel.name / sample.nick / "events.parquet")
 
 
 def test_tau_data_and_mc_control_histograms_from_parquet(tmp_path):

@@ -12,7 +12,7 @@ from shapesmith.model import ABCD, Analysis, AnalysisError, Category, Channel, C
 
 from bbtautau_shapesmith import cuts, dilepton
 from bbtautau_shapesmith.constants import (
-    BTAG_BINS, CONTROL_CHANNELS, LT_CHANNELS, LUMI_PB, NN_CLASS_COLUMN, NN_SCORE_COLUMN, PREFIRING_NUISANCE, TAU_CHANNELS, check_era,
+    BTAG_BINS, CONTROL_CHANNELS, EVENT_KEY, LT_CHANNELS, LUMI_PB, NN_CLASS_COLUMN, NN_SCORE_COLUMN, PREFIRING_NUISANCE, TAU_CHANNELS, check_era,
 )
 from bbtautau_shapesmith.ml import ML_CLASSES, ml_config, raw_count_groups
 from bbtautau_shapesmith.nn_validation import FASTMTT_INPUTS, pseudo_shift_names, pseudo_shift_variations, validation_variables
@@ -235,4 +235,5 @@ def build(config: RunConfig) -> Analysis:
         # no NN training on a control channel
         ml=ml_config(process_union(tau_channels), switches),
         signal_cross_section=CrossSection("ggF HH", SIGNAL_XS_FB, SIGNAL_XS_NUISANCES),  # ggF only (N23)
+        event_key=EVENT_KEY,  # data and embedding without repeated events
     )

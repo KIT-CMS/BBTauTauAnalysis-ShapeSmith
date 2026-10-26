@@ -235,4 +235,6 @@ def build(config: RunConfig) -> Analysis:
         signal=None,
         channels={name: channel(name, era, switches, by_channel[name], measurement) for name in config.channels},
         measurement=measurement,
+        # no event_key: the ff_measurement skims hold no run and lumi (keep_columns), so the repeated events of the 2018D
+        # mutau embedding stay in (252 of its 147 416 mt rows repeat an event number); EVENT_KEY here needs a new skim
     )

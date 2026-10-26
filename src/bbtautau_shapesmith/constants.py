@@ -6,6 +6,10 @@ ERAS = ("2016preVFP", "2016postVFP", "2017", "2018")
 # 2018 with the new normtag; Run 2 = 137.96 fb-1, labelled 138 fb-1
 LUMI_PB = {"2016preVFP": 19520.0, "2016postVFP": 16810.0, "2017": 42070.0, "2018": 59560.0}
 YEAR = {"2016preVFP": "2016", "2016postVFP": "2016", "2017": "2017", "2018": "2018"}  # the calendar year of an era
+# an event of the n-tuples (Analysis.event_key, decided 2026-10-26): every data and embedding sample is read without
+# the skim rows that repeat the event of an earlier row of the sample (2018D mutau embedding: the input files nano_35 and
+# nano_53 share 44 497 events); the skims keep every row
+EVENT_KEY = ("run", "lumi", "event")
 # eras measured together (v7 spec E18, 6.8): one fake-factor measurement and payload of 2016 on both halves, every
 # sample normalised to the luminosity of its own half
 COMBINED_ERAS = {"2016": ("2016preVFP", "2016postVFP")}

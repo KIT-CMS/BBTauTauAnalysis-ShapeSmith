@@ -53,6 +53,10 @@ def analysis_for(**switches):
     return analysis
 
 
+def test_data_and_embedding_are_read_without_repeated_events():
+    assert analysis_for().event_key == ("run", "lumi", "event")
+
+
 def test_mt_selection_is_the_predecessors():
     # smhtt_ul config/shapes/channel_selection.py, special "TauID_ES", 2018 mt; bbtautau names dilepton_veto, id_tau_vsMu_Tight_2
     assert analysis_for(vsjet_wp="Medium", vsele_wp="Tight").channel("mt").cuts == {

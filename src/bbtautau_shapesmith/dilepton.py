@@ -13,7 +13,7 @@ import dataclasses
 from shapesmith.config import RunConfig
 from shapesmith.model import Analysis, AnalysisError, Category, Channel, Region, Sample
 
-from bbtautau_shapesmith.constants import BTAG_BINS, DILEPTON_CHANNELS, LUMI_PB, NJETS_BINS, PREFIRING_NUISANCE, check_era
+from bbtautau_shapesmith.constants import BTAG_BINS, DILEPTON_CHANNELS, EVENT_KEY, LUMI_PB, NJETS_BINS, PREFIRING_NUISANCE, check_era
 from bbtautau_shapesmith.cuts import B_TAGGING, era_cuts
 from bbtautau_shapesmith.nn_validation import FASTMTT_INPUTS, dilepton_validation_variables
 from bbtautau_shapesmith.processes import SIGNAL, available, dilepton_processes
@@ -104,4 +104,5 @@ def build(config: RunConfig) -> Analysis:
         channels={name: channel(name, era, by_channel[name], switches.dy_correction, switches.diagnostics, switches.nn_validation) for name in config.channels},
         lnn_variations=(PREFIRING_NUISANCE,),
         style=style(era),
+        event_key=EVENT_KEY,
     )

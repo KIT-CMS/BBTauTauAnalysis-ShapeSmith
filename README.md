@@ -299,6 +299,14 @@ holds only the samples of its processes. The skim contract records `nevents` for
 corrected count, and re-skim a skim made with the old one once with
 `shapesmith skim --force --samples EmbeddingRun2018D_cwinter-embedding_2018UL_mutau`.
 
+Repeated events (decided 2026-10-26): the tau, dilepton, tau-ID and trigger analyses set `event_key` = (run, lumi,
+event) (`constants.EVENT_KEY`), so every data and embedding sample is read without the skim rows that repeat an event of
+an earlier row of the sample, in file order (core README, "Steps"); the skims keep every row, and `hist`, `measure` and
+`ml-export` list the dropped rows in `repeated_events.json`. The only case in v7b is the mutau 2018D embedding: its
+input files `nano_35` and `nano_53` share 44 497 events, which leaves 59 repeated rows in the `tau_ff`/`tau_ff_nn`
+skims (2018 mt) and 243 in `tau_control`; every other data and embedding sample of the `tau_ff_nn`, `tau_control` and
+`dilepton` skims has none. The fake-factor measurement keeps them: its skims hold no run and lumi.
+
 `tests/fixtures/datasets.json` holds the database entries of exactly the nicks in `inventory/`, taken from the sibling
 checkout `KingMaker_sample_database` at `feat-run2-nanoaodv15-samples` `0de63ebe` (the v7 registration and the HH-WG
 2026 / YR4 mH = 125.00 cross sections; `tests/test_inventory.py` compares them with the sibling checkout when it
@@ -598,6 +606,11 @@ with its identifiers, class, signed weight and variables. Switch `ml_labels` tur
   those of the n-tuple, with the CROWN default -10 for an absent object (the second jet, the b pair). `iso_1` is the
   light-lepton isolation in et and mt but the raw DeepTau vsJet score of the leading tau in tt, which defines the
   anti-isolated region: never an NN input in tt; `tau_decaymode_1` is that of a tau only in tt.
+- **Repeated events**: none in data and embedding rows (`event_key`, "Sample lists"; `<ml_dir>/repeated_events.json`).
+  The export `ml/v7b5` of 2026-10-25 predates it: its mt 2018 file repeats 52 rows of the mutau 2018D embedding (36 of
+  the class tautau, 16 subtraction rows of jetFakes). `ml/v7b5_dedupe` (2026-10-26, the same skims) is that export
+  without them, otherwise equal but for `row` and the `thesis_training` split of the later mt 2018 EMB rows (241 rows);
+  the M0 trainings read `ml/v7b5`, the proxy of the bbtautau-nn ladder `ml/v7b5_dedupe`.
 - **Folds**: none in the files. The trainer takes `event % n` on uint64 (n = 2 or 4, N28; the model of residue r
   scores the events with `event % n == r`); `thesis_training` is the split of the thesis within a parity fold.
 - **Run 2**: `shapesmith ml-merge` puts the four eras into one file per channel (column `era`); the weights keep the

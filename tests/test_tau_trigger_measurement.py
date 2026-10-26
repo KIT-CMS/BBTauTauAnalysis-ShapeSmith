@@ -57,8 +57,9 @@ def test_the_measurement_builds_in_every_era_and_reads_only_produced_columns(run
     channel = analysis.channel("mt")
     assert set(MONITOR_FLAGS[YEAR[era]].values()) | set(TRIGGER_OBJECT.values()) <= tau_id_branches("mt", era, "data")  # 12.4, C13
     types = sample_types()
+    assert analysis.event_key == ("run", "lumi", "event")  # data and embedding without repeated events
     for sample in channel.samples:  # the columns of the tau-ID production (P1) of the sample's type
-        missing = needed_columns(channel, sample) - tau_id_branches("mt", era, types[sample.nick])
+        missing = needed_columns(channel, sample, None, analysis.event_key) - tau_id_branches("mt", era, types[sample.nick])
         assert not missing, (sample.nick, sorted(missing))
     assert channel.skim["tau_iso"] == "(id_tau_vsJet_VVVLoose_2 > 0.5)" and "os" not in channel.skim  # both classes and charges
 

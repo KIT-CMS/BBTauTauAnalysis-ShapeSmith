@@ -24,7 +24,7 @@ from shapesmith.measurements.tau_id_es import TauIdEsMeasurement
 from shapesmith.measurements.tau_id_es.grid import CATEGORIES, CONTROL_CATEGORY, SIGNAL, factor, grid, grid_name
 from shapesmith.model import Analysis, Category, Channel, ColumnVariation, DataMinus, Process, Region, Sample, Selection, TemplateShift, Variable
 
-from bbtautau_shapesmith.constants import LUMI_PB, check_era
+from bbtautau_shapesmith.constants import EVENT_KEY, LUMI_PB, check_era
 from bbtautau_shapesmith.cuts import SAME_SIGN, era_cuts
 from bbtautau_shapesmith.samples import sample_database, samples
 from bbtautau_shapesmith.switches import TauIdSwitches, parse
@@ -231,4 +231,5 @@ def build(config: RunConfig) -> Analysis:
         signal=None,  # the fitted EMB is a background here; MorphingTauID2017 makes it the signal of its datacards
         channels={"mt": mt_channel(switches, era, by_channel["mt"]), "mm": mm_channel(era, by_channel["mm"])},
         measurement=TauIdEsMeasurement(switches.vsjet_wp, switches.vsele_wp, ES_GRID),
+        event_key=EVENT_KEY,
     )

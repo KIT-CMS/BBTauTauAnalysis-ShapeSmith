@@ -5,7 +5,7 @@ from shapesmith.validate import validate
 
 from bbtautau_shapesmith import dilepton, ff_measurement
 from bbtautau_shapesmith.analysis import build, process_union
-from bbtautau_shapesmith.constants import FF_COLUMNS, FF_RAW_COLUMNS, LT_CHANNELS, NN_COLUMNS, TAU_CHANNELS
+from bbtautau_shapesmith.constants import EVENT_KEY, FF_COLUMNS, FF_RAW_COLUMNS, LT_CHANNELS, NN_COLUMNS, TAU_CHANNELS
 from bbtautau_shapesmith.ml import KINEMATICS, ML_CLASSES, OBJECTS, RESKIM, THESIS_INPUTS, TRUTH
 from bbtautau_shapesmith.ml import variables as ml_variables
 from bbtautau_shapesmith.systematics import btag_variations, embedding_variation_sums, prefiring_variations
@@ -138,6 +138,20 @@ def test_dy_correction_weights_the_dy_processes_only():
     assert corrected(fake_factors) == {(name, p) for name in TAU_CHANNELS for p in ("ZTT", "ZL", "ZJ")}
     controls = dilepton.build(config(["em", "mm", "ee"], "bbtautau_shapesmith.dilepton:build", dy_correction="njets_btag"))
     assert corrected(controls) == {(name, "DY") for name in ("em", "mm", "ee")}
+
+
+def test_data_and_embedding_are_read_without_repeated_events():
+    """event_key (run, lumi, event) in the tau and the dilepton analysis, whose skims keep these columns for data and
+    embedding; not in the fake-factor measurement, whose skims hold no run and lumi."""
+    tau = analysis_for("ff", ["et", "mt"])
+    controls = dilepton.build(config(["em", "mm", "ee"], "bbtautau_shapesmith.dilepton:build"))
+    fake_factors = ff_measurement.build(config(analysis="bbtautau_shapesmith.ff_measurement:build", sample_lists=["sm2018_binned_v3"]))
+    assert tau.event_key == controls.event_key == EVENT_KEY == ("run", "lumi", "event") and fake_factors.event_key == ()
+    for analysis in (tau, controls):
+        for channel in analysis.channels.values():
+            for sample in channel.samples:
+                if sample.kind != "mc":
+                    assert set(EVENT_KEY) <= needed_columns(channel, sample, exported_by(analysis, channel), analysis.event_key)
 
 
 def test_diagnostics_estimate_qcd_in_the_control_regions():
