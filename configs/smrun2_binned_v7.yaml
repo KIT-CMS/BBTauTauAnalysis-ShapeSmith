@@ -1,0 +1,50 @@
+# HH->bbtautau tau channels on smrun2_binned_v7 (v7 production P3: Run 2 UL NanoAODv15, all four eras under one tag,
+# data/MC in six scopes and the embedding in et/mt/tt, nominal only, E34). One YAML for every era (v7 spec 6.11):
+#   shapesmith <command> -c configs/smrun2_binned_v7.yaml -s era=<2016preVFP | 2016postVFP | 2017 | 2018>
+# {era} in paths, sample lists and web texts is filled with the era of the run.
+# Control run, gallery column "emb": MC jet fakes and ABCD QCD, genuine tautau from the embedding in et, mt and tt (tt:
+# the closure of E33 decides whether tt keeps the embedding; without it -s switches.embedding=[et,mt]), QCD in the
+# control regions, DY corrected in n_jets x n_bjets. The column "classic" is smrun2_binned_v7_noemb.yaml on the same skims.
+# Switches (types and defaults in switches.py):
+#   sample_lists:      the inventories of the era: sm_<era>_binned and sm_<era>_embedding (copies of the CROWN lists)
+#                      and sm_<era>_borrowed (2016postVFP: VH -> tautau of 2016preVFP, spec 3.3; empty otherwise)
+#   jet_fakes:         mc (MC jet fakes + ABCD QCD)
+#   embedding:         [et, mt, tt]
+#   crown_shifts:      false (nominal-only production, E34: no embedding tau shifts; b-tag and prefiring weight
+#                      variations and the FF friend shifts stay)
+#   control_regions:   true (wider skim plus the named control regions), diagnostics: true (QCD there, npv_good, rho, ...)
+#   dy_correction:     njets_btag (DY_NJETS_BTAG of the era: since 2026-10-19 the tables of the v7b dilepton runs, so the
+#                      v7 results with this switch no longer reproduce exactly; the v7 tables are those of analysis abd7657)
+analysis: bbtautau_shapesmith.analysis:build
+era: "2018"
+channels: [et, mt, tt]
+switches: {sample_lists: ["sm_{era}_binned", "sm_{era}_borrowed", "sm_{era}_embedding"], jet_fakes: mc, embedding: [et, mt, tt], crown_shifts: false, nn_friend: false, control_regions: true, diagnostics: true, dy_correction: njets_btag}
+sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout (feat-run2-nanoaodv15-samples 0de63ebe or later); relative to this file
+ntuples:
+  server: root://cmsdcache-kit-disk.gridka.de
+  base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7/CROWNRun   # <base>/<era>/<nick>/<channel>/
+  friends: []
+  # - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7/CROWNFriend/fastmtt, applies_to: [mc, data, embedding], channels: [et, mt, tt]}
+skim_dir: /ceph/sdaigler/shapesmith/smrun2_binned_v7/skims/tau_control/{era}      # shared with smrun2_binned_v7_noemb.yaml
+output_dir: /ceph/sdaigler/shapesmith/smrun2_binned_v7/output/tau_control_emb/{era}
+ml_dir: /ceph/sdaigler/shapesmith/smrun2_binned_v7/ml/tau_control/{era}
+workers: 16                                               # at most 24 on portal2
+log_level: DEBUG                                          # DEBUG | INFO | WARNING | ERROR; console and <output_dir>/logs/<command>_<time>.log
+combine: {cmssw_dir: /work/sdaigler/smhtt_ul/CMSSW_14_1_9, scram_arch: el9_amd64_gcc12}
+# web gallery of the era (shapesmith publish), columns classic (smrun2_binned_v7_noemb.yaml, smrun2_binned_v7_dilepton.yaml),
+# emb (this run), emb ff (smrun2_binned_v7_ff.yaml) and emb ff with W (smrun2_binned_v7_ff_w.yaml); title and about here
+web:
+  dir: "/web/sdaigler/public_html/smrun2_binned_v7/{era}"
+  variant: emb
+  label: emb
+  description: "τ-embedding for genuine ττ in et, mt and tt, MC jet→τh fakes, QCD from the ABCD method (also in the control regions), DY corrected in n_jets × n_bjets."
+  title: "smrun2_binned_v7 {era} · control plots"
+  about: |
+    HH→bbττ {era} (Run 2 UL, NanoAODv15), CROWN production smrun2_binned_v7 (nominal only); histograms and plots by ShapeSmith.
+    Columns: classic (MC genuine ττ, MC jet fakes; et, mt, tt and the dilepton controls em, mm, ee), emb (τ-embedding in
+    et, mt and tt), emb ff (τ-embedding + fake factors ff_v7: QCD and ttbar; em as the ttbar control) and emb ff with W
+    (τ-embedding + fake factors ff_v7_w: QCD, W+jets and ttbar).
+
+    Nominal region: opposite sign, b pair with ≥ 1 b-tag (WPs T and M), isolated τh, mT < 70 GeV, |η(τh)| < 2.3 and
+    |η(ℓ)| < 2.1 in et and mt; the HEM veto in 2018. Regions btag0_os_pass to btag3p_os_pass in classic and emb.
+    Plots are prefit, without systematic uncertainties.

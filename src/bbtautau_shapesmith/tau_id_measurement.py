@@ -1,4 +1,4 @@
-"""The tau-ID scale factor and energy scale measurement of the embedded taus, 2018 (successor of smhtt_ul tauID_SFs_dev).
+"""The tau-ID scale factor and energy scale measurement of the embedded taus per era (successor of smhtt_ul tauID_SFs_dev).
 
 Tag and probe in mt: the muon tags a Z->tautau->mu tau_h event, the tau is probed in nine decay-mode (and pT)
 categories; the Z->mumu control region in mm shares the Z normalisation. Selections and weights are those of
@@ -10,7 +10,11 @@ The embedded signal carries no tau ID or ES correction. Its energy scale is a gr
 the nominal columns: the tau four-momentum scaled by s (pt_2, mass_2, m_vis), the MET corrected by (1 - s) times the
 tau pT, and mt_1 from that MET.
 
-The MC is normalised to the analysis luminosity, 59.83 fb-1 (constants.LUMI_PB); the predecessor used 59.56 fb-1.
+Per era (v7 spec 6.1, 6.2): the single-muon trigger of the era with its threshold and scale factor (triggers.TRIGGER
+[era]["tau_id"]: 2016 the IsoMu22 family from 24 GeV, 2017 IsoMu27 from 29 GeV, 2018 IsoMu24 or IsoMu27 from 25 GeV; E5:
+on MC the POG muon_Z SF from smrun2_tau_id_v2 on, the KIT SF before, on the embedding the KIT SF),
+the muon within |eta| < 2.1 in mt and mm (E2, E31: the embedding acceptance), the HEM veto in 2018 (E29), the
+prefiring weight on the MC of every era (E11). The MC is normalised to the luminosity of the era (constants.LUMI_PB).
 The embedded samples are data-driven and unaffected.
 """
 from __future__ import annotations
@@ -20,21 +24,28 @@ from shapesmith.measurements.tau_id_es import TauIdEsMeasurement
 from shapesmith.measurements.tau_id_es.grid import CATEGORIES, CONTROL_CATEGORY, SIGNAL, factor, grid, grid_name
 from shapesmith.model import Analysis, Category, Channel, ColumnVariation, DataMinus, Process, Region, Sample, Selection, TemplateShift, Variable
 
-from bbtautau_shapesmith.constants import ERA, LUMI_PB
-from bbtautau_shapesmith.cuts import SAME_SIGN
+from bbtautau_shapesmith.constants import LUMI_PB, check_era
+from bbtautau_shapesmith.cuts import SAME_SIGN, era_cuts
 from bbtautau_shapesmith.samples import sample_database, samples
 from bbtautau_shapesmith.switches import TauIdSwitches, parse
 from bbtautau_shapesmith.tau_id_binning import CONTROL_REGION_EDGES, M_VIS_BINNING
 from bbtautau_shapesmith.tau_id_systematics import ERA_TAG, mc_variation_sums, mc_variations
-from bbtautau_shapesmith.weights import TOP_PT
+from bbtautau_shapesmith.triggers import TRIGGER
+from bbtautau_shapesmith.weights import PREFIRING, TOP_PT
 
 ES_GRID = grid(-200, 200, 2)  # +-20 % in steps of 0.2 %, as the predecessor's 2018 measurement
 VS_MU_WP = "Tight"
 MEASURED_WPS = {"vsjet": ("Medium", "Tight"), "vsele": ("VVLoose", "Tight")}
 MUON_EMBEDDED = "MUEMB"
-TRIGGER = "((trg_single_mu27 > 0.5) | (trg_single_mu24 > 0.5))"
-# the predecessor's (smhtt_ul config/shapes/process_selection.py), with its gap at pt_1 == 28 exactly
-TRIGGER_WEIGHT = "((pt_1 >= 25) & (pt_1 < 28)) * trg_wgt_single_mu24 + (pt_1 > 28) * trg_wgt_single_mu27"
+MUON_ETA = "(abs(eta_1) < 2.1)"  # E2 (2016 trigger), E31 (embedding acceptance), in every era
+
+
+def trigger_cut(era: str) -> str:
+    return TRIGGER[era]["tau_id"].cut
+
+
+def trigger_weight(era: str) -> str:
+    return TRIGGER[era]["tau_id"].mc_weight
 
 DECAY_MODE_CUTS = {"DM0": "(tau_decaymode_2 == 0)", "DM1": "(tau_decaymode_2 == 1)", "DM1011": "((tau_decaymode_2 == 10) | (tau_decaymode_2 == 11))"}
 PT_CUTS = {"": "(pt_2 >= 20)", "_PT20_40": "(pt_2 >= 20) & (pt_2 < 40)", "_PT40_200": "(pt_2 >= 40) & (pt_2 <= 200)"}
@@ -46,7 +57,7 @@ SPLITS_MT = {"DY": {"ZL": "L", "ZJ": "J"}, "TT": {"TTT": "T", "TTL": "L", "TTJ":
 PART_CUTS_MT = {"T": GENUINE, "L": f"(~{GENUINE} & ~{JET_FAKE})", "J": JET_FAKE}
 
 
-def mt_cuts(vsjet: str, vsele: str) -> dict[str, str]:
+def mt_cuts(vsjet: str, vsele: str, era: str) -> dict[str, str]:
     return {
         "os": "((q_1 * q_2) < 0)",
         "tau_decay_mode": "((tau_decaymode_2 == 0) | (tau_decaymode_2 == 1) | (tau_decaymode_2 == 10) | (tau_decaymode_2 == 11))",
@@ -59,16 +70,20 @@ def mt_cuts(vsjet: str, vsele: str) -> dict[str, str]:
         "tau_iso": f"(id_tau_vsJet_{vsjet}_2 > 0.5)",
         "muon_iso": "(iso_1 < 0.15)",
         "mt_cut": "(mt_1 < 65)",
-        "trg_selection": f"(pt_2 > 20) & (pt_1 >= 25) & {TRIGGER}",
+        "muon_eta": MUON_ETA,
+        "trg_selection": f"(pt_2 > 20) & {trigger_cut(era)}",
+        **era_cuts(era),
     }
 
 
-def mm_cuts() -> dict[str, str]:
+def mm_cuts(era: str) -> dict[str, str]:
     return {
         "os": "((q_1 * q_2) < 0)",
         "m_vis": "(m_vis > 70) & (m_vis < 110)",
         "muon_iso": "(iso_1 < 0.15) & (iso_2 < 0.15)",
-        "trg_selection": f"(pt_2 > 15) & (pt_1 >= 25) & {TRIGGER}",
+        "muon_eta": MUON_ETA,
+        "trg_selection": f"(pt_2 > 15) & {trigger_cut(era)}",
+        **era_cuts(era),
     }
 
 
@@ -79,12 +94,12 @@ def skim_cuts(cuts: dict[str, str]) -> dict[str, str]:
     return {name: loose.get(name, expr) for name, expr in cuts.items() if name != "os"}
 
 
-def working_point_regions() -> tuple[Region, ...]:
+def working_point_regions(era: str) -> tuple[Region, ...]:
     """The selection of every measured working-point combination as a region: its columns are in the skim, so one
     skim serves all four, and any of them can be filled from it (`hist --regions`)."""
     return tuple(
         Region(f"wp_{vsjet}_{vsele}", replace_cuts={"tau_iso": f"(id_tau_vsJet_{vsjet}_2 > 0.5)", "against_electron": f"(id_tau_vsEle_{vsele}_2 > 0.5)"},
-               replace_weights={"tau_id": mc_weights(vsjet, vsele)["tau_id"], "vs_ele": mc_weights(vsjet, vsele)["vs_ele"]})
+               replace_weights={"tau_id": mc_weights(vsjet, vsele, era)["tau_id"], "vs_ele": mc_weights(vsjet, vsele, era)["vs_ele"]})
         for vsjet in MEASURED_WPS["vsjet"] for vsele in MEASURED_WPS["vsele"]
     )
 
@@ -115,7 +130,7 @@ def es_variation(shift: int) -> ColumnVariation:
     return ColumnVariation(grid_name(shift), derived=derived, applies_to=("embedding",), regions=("nominal",))
 
 
-def mc_weights(vsjet: str, vsele: str) -> dict[str, str]:
+def mc_weights(vsjet: str, vsele: str, era: str) -> dict[str, str]:
     return {
         "puweight": "puweight",
         "id": "id_wgt_mu_1",
@@ -123,18 +138,19 @@ def mc_weights(vsjet: str, vsele: str) -> dict[str, str]:
         "tau_id": f"((gen_match_2 == 5) * id_wgt_tau_vsJet_{vsjet}_2 + (gen_match_2 != 5))",
         "vs_mu": f"id_wgt_tau_vsMu_{VS_MU_WP}_2",
         "vs_ele": f"id_wgt_tau_vsEle_{vsele}_2",
-        "trigger": TRIGGER_WEIGHT,
+        "trigger": trigger_weight(era),
+        **PREFIRING,
     }
 
 
-def mm_weights() -> dict[str, str]:
-    return {"puweight": "puweight", "id": "id_wgt_mu_1 * id_wgt_mu_2", "iso": "iso_wgt_mu_1 * iso_wgt_mu_2", "trigger": TRIGGER_WEIGHT}
+def mm_weights(era: str) -> dict[str, str]:
+    return {"puweight": "puweight", "id": "id_wgt_mu_1 * id_wgt_mu_2", "iso": "iso_wgt_mu_1 * iso_wgt_mu_2", "trigger": trigger_weight(era), **PREFIRING}
 
 
-def embedding_weights(channel: str) -> dict[str, str]:
-    """The embedding selection weights and the muon SFs (both legs in mm); no tau ID or ES correction."""
+def embedding_weights(channel: str, era: str) -> dict[str, str]:
+    """The embedding selection weights and the muon SFs (both legs in mm); no tau ID or ES correction, no prefiring."""
     muons = {"mt": {"emb_id": "id_wgt_mu_1", "emb_iso": "iso_wgt_mu_1"}, "mm": {"emb_id": "id_wgt_mu_1 * id_wgt_mu_2", "emb_iso": "iso_wgt_mu_1 * iso_wgt_mu_2"}}[channel]
-    return {"emb_genweight": "emb_genweight", "emb_selection": "emb_idsel_wgt_1 * emb_idsel_wgt_2 * emb_triggersel_wgt", **muons, "emb_trigger": TRIGGER_WEIGHT}
+    return {"emb_genweight": "emb_genweight", "emb_selection": "emb_idsel_wgt_1 * emb_idsel_wgt_2 * emb_triggersel_wgt", **muons, "emb_trigger": TRIGGER[era]["tau_id"].embedding_weight}
 
 
 def _mc(name: str, group: str, weights: dict[str, str], cut: str | None = None, role: str = "background", jet_fake: bool = False) -> Process:
@@ -144,23 +160,23 @@ def _mc(name: str, group: str, weights: dict[str, str], cut: str | None = None, 
     return Process(name, group, role, group, Selection(cuts={"genmatch": cut} if cut else {}, weights={**weights, **extra}))
 
 
-def mt_processes(vsjet: str, vsele: str) -> tuple[Process, ...]:
+def mt_processes(vsjet: str, vsele: str, era: str) -> tuple[Process, ...]:
     """Data, the embedded signal, the MC lepton and jet fakes, W; genuine ttbar is the template of the embedding ttbar
     contamination."""
-    weights = mc_weights(vsjet, vsele)
-    result = [Process("data", "data", "data", "data"), Process(SIGNAL, "EMB", "background", "EMB", Selection(cuts={"genmatch": GENUINE}, weights=embedding_weights("mt")))]
+    weights = mc_weights(vsjet, vsele, era)
+    result = [Process("data", "data", "data", "data"), Process(SIGNAL, "EMB", "background", "EMB", Selection(cuts={"genmatch": GENUINE}, weights=embedding_weights("mt", era)))]
     for group, parts in SPLITS_MT.items():
         result += [_mc(name, group, weights, PART_CUTS_MT[part], "auxiliary" if part == "T" else "background", part == "J") for name, part in parts.items()]
     result.append(_mc("W", "W", weights, jet_fake=True))
     return tuple(result)
 
 
-def mm_processes() -> tuple[Process, ...]:
+def mm_processes(era: str) -> tuple[Process, ...]:
     """Data, the embedded muons (both genuine prompt muons), W and the MC ttbar and diboson without Z->tautau->mumu."""
-    weights, no_tautau = mm_weights(), "~((gen_match_1 == 4) & (gen_match_2 == 4))"
+    weights, no_tautau = mm_weights(era), "~((gen_match_1 == 4) & (gen_match_2 == 4))"
     return (
         Process("data", "data", "data", "data"),
-        Process(MUON_EMBEDDED, MUON_EMBEDDED, "background", "EMB", Selection(cuts={"genmatch": "(gen_match_1 == 2) & (gen_match_2 == 2)"}, weights=embedding_weights("mm"))),
+        Process(MUON_EMBEDDED, MUON_EMBEDDED, "background", "EMB", Selection(cuts={"genmatch": "(gen_match_1 == 2) & (gen_match_2 == 2)"}, weights=embedding_weights("mm", era))),
         _mc("W", "W", weights), _mc("TTL", "TT", weights, no_tautau), _mc("VVL", "VV", weights, no_tautau),
     )
 
@@ -179,38 +195,40 @@ def _channel(name: str, cuts: dict[str, str], processes: tuple[Process, ...], ch
     )
 
 
-def mt_channel(switches: TauIdSwitches, channel_samples: tuple[Sample, ...]) -> Channel:
-    processes = mt_processes(switches.vsjet_wp, switches.vsele_wp)
+def mt_channel(switches: TauIdSwitches, era: str, channel_samples: tuple[Sample, ...]) -> Channel:
+    processes = mt_processes(switches.vsjet_wp, switches.vsele_wp, era)
     subtract = tuple(p.name for p in processes if p.role == "background")
+    tau_id_weight = mc_weights(switches.vsjet_wp, switches.vsele_wp, era)["tau_id"]
     return _channel(
-        "mt", mt_cuts(switches.vsjet_wp, switches.vsele_wp), processes, channel_samples, working_point_regions(),
+        "mt", mt_cuts(switches.vsjet_wp, switches.vsele_wp, era), processes, channel_samples, working_point_regions(era),
         categories=categories(),
-        variations=tuple(es_variation(shift) for shift in ES_GRID) + (mc_variations(mc_weights(switches.vsjet_wp, switches.vsele_wp)["tau_id"]) if switches.shape_systematics else ()),
+        variations=tuple(es_variation(shift) for shift in ES_GRID) + (mc_variations(tau_id_weight, era, switches.recoil_eras) if switches.shape_systematics else ()),
         estimators=(
             DataMinus("QCD", "same_sign", subtract, clip_negative=True),
-            *(mc_variation_sums() if switches.shape_systematics else ()),
-            TemplateShift(f"CMS_emb_ttbar_contamination_{ERA_TAG}", SIGNAL, "TTT", 0.1),
+            *(mc_variation_sums(era) if switches.shape_systematics else ()),
+            TemplateShift(f"CMS_emb_ttbar_contamination_{ERA_TAG[era]}", SIGNAL, "TTT", 0.1),
         ),
     )
 
 
-def mm_channel(channel_samples: tuple[Sample, ...]) -> Channel:
-    processes = mm_processes()
+def mm_channel(era: str, channel_samples: tuple[Sample, ...]) -> Channel:
+    processes = mm_processes(era)
     return _channel(
-        "mm", mm_cuts(), processes, channel_samples,
+        "mm", mm_cuts(era), processes, channel_samples,
         categories=(Category(CONTROL_CATEGORY, "(m_vis > 70) & (m_vis < 110)", Variable("m_vis", "m_vis", CONTROL_REGION_EDGES)),),
         estimators=(DataMinus("QCD", "same_sign", (MUON_EMBEDDED, "W"), clip_negative=True),),
     )
 
 
 def build(config: RunConfig) -> Analysis:
+    era = check_era(config.era)
     switches = parse(TauIdSwitches, config.switches)
-    by_channel = samples(sample_database(config), switches.sample_lists, ["mt", "mm"])
+    by_channel = samples(sample_database(config), switches.sample_lists, ["mt", "mm"], era)
     return Analysis(
-        name="tau_id_es_embedding_2018",
-        era=ERA,
-        lumi_pb=LUMI_PB,
+        name=f"tau_id_es_embedding_{era}",
+        era=era,
+        lumi_pb=LUMI_PB[era],
         signal=None,  # the fitted EMB is a background here; MorphingTauID2017 makes it the signal of its datacards
-        channels={"mt": mt_channel(switches, by_channel["mt"]), "mm": mm_channel(by_channel["mm"])},
+        channels={"mt": mt_channel(switches, era, by_channel["mt"]), "mm": mm_channel(era, by_channel["mm"])},
         measurement=TauIdEsMeasurement(switches.vsjet_wp, switches.vsele_wp, ES_GRID),
     )

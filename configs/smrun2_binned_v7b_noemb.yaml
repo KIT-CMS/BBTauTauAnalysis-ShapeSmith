@@ -1,0 +1,38 @@
+# v7b: the MC and the embedding re-produced as smrun2_binned_v7b (the MET fix of 2026-10-18: DY and W recoil-corrected
+# in 2018 only, without recoil correction in 2016 and 2017; the POG muon_Z trigger SF on MC, E5), the data stay in
+# smrun2_binned_v7: ntuples.base is the data production, ntuples.bases the MC and embedding one, and every friend is
+# split by applies_to likewise. Skims, outputs and galleries under smrun2_binned_v7b; the smrun2_binned_v7 run YAMLs
+# keep reproducing the v7 results.
+# HH->bbtautau tau channels on smrun2_binned_v7b without embedding (v7 spec 6.11 "noemb"), one YAML for every era:
+#   shapesmith <command> -c configs/smrun2_binned_v7b_noemb.yaml -s era=<era>
+# Control run, gallery column "classic": genuine tautau and jet fakes from MC, QCD from the ABCD method, DY corrected.
+# The same skims as smrun2_binned_v7b.yaml (one skim holds the embedded samples and every MC part), its own output_dir;
+# the switches are those of smrun2_binned_v7b.yaml with embedding: false.
+# 2026-10-20: the FastMTT friend (P4 fastmtt: data under v7, MC and embedding under v7b) for the control variables
+# m, pt, eta and phi_fastmtt of et, mt and tt (switch fastmtt_friend).
+analysis: bbtautau_shapesmith.analysis:build
+era: "2018"
+channels: [et, mt, tt]
+switches: {sample_lists: ["sm_{era}_binned", "sm_{era}_borrowed", "sm_{era}_embedding"], jet_fakes: mc, embedding: false, crown_shifts: false, nn_friend: false, fastmtt_friend: true, control_regions: true, diagnostics: true, dy_correction: njets_btag}
+sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
+ntuples:
+  server: root://cmsdcache-kit-disk.gridka.de
+  base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7/CROWNRun      # the data
+  bases:                                                  # the MC and the embedding: the re-production
+    mc: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNRun
+    embedding: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNRun
+  friends:                                                # the tau channels only
+    - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7/CROWNFriend/fastmtt, applies_to: [data], channels: [et, mt, tt]}
+    - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNFriend/fastmtt, applies_to: [mc, embedding], channels: [et, mt, tt]}
+skim_dir: /ceph/sdaigler/shapesmith/smrun2_binned_v7b/skims/tau_control/{era}      # shared with smrun2_binned_v7b.yaml
+output_dir: /ceph/sdaigler/shapesmith/smrun2_binned_v7b/output/tau_control_noemb/{era}
+workers: 16                                               # at most 24 on portal2
+log_level: DEBUG
+combine: {cmssw_dir: /work/sdaigler/smhtt_ul/CMSSW_14_1_9, scram_arch: el9_amd64_gcc12}
+# web gallery of the era: the tau channels of the column "classic" (the dilepton run adds em, mm, ee)
+web:
+  site: /web/sdaigler/public_html/smrun2_binned_v7b  # one page with an era switch, the eras in its subdirectories
+  dir: "/web/sdaigler/public_html/smrun2_binned_v7b/{era}"
+  variant: classic
+  label: classic
+  description: "MC for genuine ττ and jet→τh fakes, QCD from the ABCD method; the dilepton controls em, mm and ee (MC, DY uncorrected)."

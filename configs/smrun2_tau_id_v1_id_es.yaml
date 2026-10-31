@@ -1,0 +1,33 @@
+# Tau-ID scale factor and energy scale of the embedded taus (tau_id_measurement.py; v7 spec 5.4, E16), per era and
+# 2016 half, on the tau-ID production smrun2_tau_id_v1 (P1: CROWN sm_tau_id_measurement_config, sample lists
+# sm_<era>_tau_id_measurement.txt, scopes mt and mm, MC with all shifts, the embedding nominal). One YAML for every era:
+#   shapesmith skim -c configs/smrun2_tau_id_v1_id_es.yaml -s era=<era>
+#   for jet in Medium Tight; do for ele in VVLoose Tight; do
+#     shapesmith measure -c configs/smrun2_tau_id_v1_id_es.yaml -s era=<era> -s switches.vsjet_wp=$jet -s switches.vsele_wp=$ele; done; done
+#   shapesmith measure -c configs/smrun2_tau_id_v1_id_es.yaml -s era=<era> --merge
+# -> <output_dir>/tau_id_es/<era>/<vsjet>_<vsele>/ and the payload DeepTau2018v2p5_id_es_embedding<era>UL.json.gz (U11:
+# intervals from profile scans; `measure --refit` repeats the fits from the stored synced/ shapes). The tt-trigger
+# measurement (smrun2_tau_id_v1_trigger.yaml) takes this payload as the energy scale of the embedded taus.
+# Switches (types and defaults in switches.py):
+#   sample_lists:      the tau-ID inventory of the era (W 0J/1J/2J, E17)
+#   vsjet_wp:          Medium | Tight, the measured DeepTau vsJet working point
+#   vsele_wp:          VVLoose | Tight, the DeepTau vsEle working point it is measured with
+#   shape_systematics: true (default): the MC shape uncertainties of the shifts of P1 (E34 exception)
+#   recoil_eras:       every era: smrun2_tau_id_v1 has the recoil shifts of DY and W in every era (before the MET fix;
+#                      the default is constants.RECOIL_ERAS, 2018 only)
+# combine.cmssw_dir: a CMSSW_14_1_0_pre4 with CombineHarvester and TauIDSFMeasurement tauID_ES plus
+# patches/TauIDSFMeasurement-tauID_ES.patch and SMRun2Legacy (patches/README.md).
+analysis: bbtautau_shapesmith.tau_id_measurement:build
+era: "2018"
+channels: [mt, mm]
+switches: {sample_lists: ["sm_{era}_tau_id_measurement"], vsjet_wp: Tight, vsele_wp: VVLoose, recoil_eras: ["2016preVFP", "2016postVFP", "2017", "2018"]}
+sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
+ntuples:
+  server: root://cmsdcache-kit-disk.gridka.de
+  base: /store/user/sdaigler/CROWN/ntuples/smrun2_tau_id_v1/CROWNRun
+  friends: []
+skim_dir: /ceph/sdaigler/shapesmith/smrun2_tau_id_v1/skims/tau_id_es/{era}      # one skim for the four working-point combinations
+output_dir: /ceph/sdaigler/shapesmith/smrun2_tau_id_v1/output                   # -> tau_id_es/<era>/
+workers: 9                                                                       # also the categories fitted in parallel; at most 24 on portal2
+log_level: DEBUG
+combine: {cmssw_dir: /work/sdaigler/tau_id_es/CMSSW_14_1_0_pre4, scram_arch: el9_amd64_gcc12}

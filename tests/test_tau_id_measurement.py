@@ -18,25 +18,33 @@ from shapesmith.validate import validate
 
 from bbtautau_shapesmith.tau_id_binning import M_VIS_BINNING
 from bbtautau_shapesmith.tau_id_measurement import ES_GRID, build, es_variation
-from bbtautau_shapesmith.tau_id_systematics import SUMMED_SHIFTS, UNUSED_SHIFTS, WEIGHT_SHIFTS, mc_variation_sums
-from tests.helpers import DATABASE, REPO, config
+from bbtautau_shapesmith.tau_id_systematics import mc_variation_sums, summed_shifts, unused_shifts, weight_shifts
+from tests.helpers import DATABASE, ERAS, REPO, config
+from tests.run2 import list_name
 from tests.test_controls import only, write_rows
 
 WPS = (("Medium", "VVLoose"), ("Medium", "Tight"), ("Tight", "VVLoose"), ("Tight", "Tight"))
 # the predecessor's trigger weight (smhtt_ul config/shapes/process_selection.py, 2018 mt and mm)
 TRIGGER_WEIGHT = "((pt_1 >= 25) & (pt_1 < 28)) * trg_wgt_single_mu24 + (pt_1 > 28) * trg_wgt_single_mu27"
-# the CROWN shifts of sm_tau_id_measurement_config (feat-new-sm-bbtautau-config 6f58e65, generated code) that move a
-# column of the mt channel, for every MC sample type; the recoil shifts exist for DY and W only
-PRODUCED_SHIFTS = (
-    {"CMS_HEM_2018", "CMS_eff_m_trigger_2018", "CMS_pileup_2018", "CMS_res_j_2018", "CMS_scale_e_2018", "CMS_res_e_2018", "CMS_scale_met_unclustered_energy_2018"}
-    | {f"CMS_scale_j_{s}" for s in ("Absolute", "Absolute_2018", "BBEC1", "BBEC1_2018", "EC2", "EC2_2018", "FlavorQCD", "HF", "HF_2018", "RelativeBal", "RelativeSample_2018")}
-    | {f"CMS_fake_t_DeepTau2018v2p5_VSe_DM{dm}_{region}_2018" for dm in (0, 1, 10, 11) for region in ("barrel", "endcap")}
-    | {f"CMS_fake_t_DeepTau2018v2p5_VSmu_wheel{w}_2018" for w in range(1, 6)}
-    | {f"CMS_scale_t_DeepTau2018v2p5_DM{dm}_{gen}_2018" for dm in (0, 1, 10, 11)
-       for gen in ("pt20to40_genTau", "pt40to60_genTau", "pt60toInf_genTau", "genElectron_barrel", "genElectron_endcap")}
-    | {f"CMS_scale_t_DeepTau2018v2p5_genMuon_wheel{w}_2018" for w in range(1, 6)}
-)
-RECOIL_SHIFTS = {"CMS_res_met_RecoilCalibration_2018", "CMS_scale_met_RecoilCalibration_2018"}
+# the CROWN shifts of sm_tau_id_measurement_config (feat-new-sm-bbtautau-config 6f58e65, generated code of 2018) that
+# move a column of the mt channel, for every MC sample type, with the CROWN era in the name; v7 drops the HEM shift (E29,
+# C20) and adds the prefiring shift of the year (E11, C11); the recoil shifts exist for DY and W only, and since the MET
+# fix of 2026-10-18 (smrun2_tau_id_v2) in 2018 only
+def produced_shifts(era):
+    year = era[:4]
+    return (
+        {f"CMS_eff_m_trigger_{era}", f"CMS_pileup_{era}", f"CMS_res_j_{era}", f"CMS_scale_e_{era}", f"CMS_res_e_{era}", f"CMS_scale_met_unclustered_energy_{era}", f"CMS_ecal_prefiring_{year}"}
+        | {f"CMS_scale_j_{s}" for s in ("Absolute", f"Absolute_{era}", "BBEC1", f"BBEC1_{era}", "EC2", f"EC2_{era}", "FlavorQCD", "HF", f"HF_{era}", "RelativeBal", f"RelativeSample_{era}")}
+        | {f"CMS_fake_t_DeepTau2018v2p5_VSe_DM{dm}_{region}_{era}" for dm in (0, 1, 10, 11) for region in ("barrel", "endcap")}
+        | {f"CMS_fake_t_DeepTau2018v2p5_VSmu_wheel{w}_{era}" for w in range(1, 6)}
+        | {f"CMS_scale_t_DeepTau2018v2p5_DM{dm}_{gen}_{era}" for dm in (0, 1, 10, 11)
+           for gen in ("pt20to40_genTau", "pt40to60_genTau", "pt60toInf_genTau", "genElectron_barrel", "genElectron_endcap")}
+        | {f"CMS_scale_t_DeepTau2018v2p5_genMuon_wheel{w}_{era}" for w in range(1, 6)}
+    )
+
+
+def recoil_shifts(era):
+    return {f"CMS_res_met_RecoilCalibration_{era}", f"CMS_scale_met_RecoilCalibration_{era}"}
 
 
 def analysis_for(**switches):
@@ -59,7 +67,9 @@ def test_mt_selection_is_the_predecessors():
         "tau_iso": "(id_tau_vsJet_Medium_2 > 0.5)",
         "muon_iso": "(iso_1 < 0.15)",
         "mt_cut": "(mt_1 < 65)",
+        "muon_eta": "(abs(eta_1) < 2.1)",  # v7: the embedding acceptance (E31)
         "trg_selection": "(pt_2 > 20) & (pt_1 >= 25) & ((trg_single_mu27 > 0.5) | (trg_single_mu24 > 0.5))",
+        "hem_veto": "(hem_veto < 0.5)",  # v7 (E29)
     }
 
 
@@ -69,7 +79,9 @@ def test_mm_control_region_is_the_predecessors():
         "os": "((q_1 * q_2) < 0)",
         "m_vis": "(m_vis > 70) & (m_vis < 110)",
         "muon_iso": "(iso_1 < 0.15) & (iso_2 < 0.15)",
+        "muon_eta": "(abs(eta_1) < 2.1)",
         "trg_selection": "(pt_2 > 15) & (pt_1 >= 25) & ((trg_single_mu27 > 0.5) | (trg_single_mu24 > 0.5))",
+        "hem_veto": "(hem_veto < 0.5)",
     }
     assert [(c.name, c.cut, c.variable.edges) for c in channel.categories] == [("control_region", "(m_vis > 70) & (m_vis < 110)", (70.0, 110.0))]
 
@@ -96,11 +108,11 @@ def test_processes_weights_and_estimates():
                            "emb_id": "id_wgt_mu_1", "emb_iso": "iso_wgt_mu_1", "emb_trigger": TRIGGER_WEIGHT}  # no tau ID, vsEle or vsMu SF
     assert channel.process("TTJ").selection.weights == {
         "puweight": "puweight", "id": "id_wgt_mu_1", "iso": "iso_wgt_mu_1", "tau_id": "((gen_match_2 == 5) * id_wgt_tau_vsJet_Tight_2 + (gen_match_2 != 5))",
-        "vs_mu": "id_wgt_tau_vsMu_Tight_2", "vs_ele": "id_wgt_tau_vsEle_VVLoose_2", "trigger": TRIGGER_WEIGHT, "top_pt": "topPtReweightWeight", "jet_fake": "1.0"}
+        "vs_mu": "id_wgt_tau_vsMu_Tight_2", "vs_ele": "id_wgt_tau_vsEle_VVLoose_2", "trigger": TRIGGER_WEIGHT, "prefiring": "prefiring_wgt", "top_pt": "topPtReweightWeight", "jet_fake": "1.0"}
     assert channel.process("ZL").selection.cuts == {"genmatch": "(~((gen_match_1 == 4) & (gen_match_2 == 5)) & ~(gen_match_2 == 6))"}
     qcd, *sums, contamination = channel.estimators
     assert qcd == DataMinus("QCD", "same_sign", ("EMB", "ZL", "ZJ", "TTL", "TTJ", "STL", "STJ", "VVL", "VVJ", "W"), clip_negative=True)
-    assert tuple(sums) == mc_variation_sums()
+    assert tuple(sums) == mc_variation_sums("2018")
     assert contamination == TemplateShift("CMS_emb_ttbar_contamination_Run2018", "EMB", "TTT", 0.1)
     mm = analysis_for().channel("mm")
     assert mm.process("MUEMB").selection.cuts == {"genmatch": "(gen_match_1 == 2) & (gen_match_2 == 2)"}
@@ -171,39 +183,67 @@ def test_es_grid_is_embedding_only_nominal_only():
 
 
 def test_mc_systematics_are_the_predecessor_families():
-    # the shape uncertainties the patched HttSystematics_TauIDRun2.cc declares for mt with embedding (the regrouped JES
-    # and HEM), plus CMS_PileUp of the synced shapes
-    expected = {f"CMS_scale_j_{s}_Run2018" for s in ("Absolute", "BBEC1", "EC2", "HF", "RelativeSample", "HEMIssue")}
+    # the shape uncertainties the patched HttSystematics_TauIDRun2.cc declares for mt with embedding (the regrouped JES;
+    # v7: no HEM, E29), plus CMS_PileUp of the synced shapes and CMS_prefiring (E11)
+    expected = {f"CMS_scale_j_{s}_Run2018" for s in ("Absolute", "BBEC1", "EC2", "HF", "RelativeSample")}
     expected |= {f"CMS_scale_j_{s}" for s in ("Absolute", "BBEC1", "EC2", "HF", "FlavorQCD", "RelativeBal")}
     expected |= {f"CMS_{name}_Run2018" for name in ("eff_m_trigger", "scale_met_unclustered_energy", "scale_met", "res_met", "scale_fake_m", "fake_j")}
     expected |= {f"CMS_{kind}_t_dm{dm}_Run2018" for kind in ("scale", "eff") for dm in (0, 1, 10, 11)} | {f"CMS_fake_m_WH{w}_Run2018" for w in range(1, 6)}
-    expected |= {"CMS_htt_ttbarShape", "CMS_PileUp"}
+    expected |= {"CMS_htt_ttbarShape", "CMS_PileUp", "CMS_prefiring"}
     summed = {f"CMS_scale_t_dm{dm}_Run2018" for dm in (0, 1, 10, 11)} | {"CMS_scale_fake_m_Run2018"}
     channel = analysis_for(vsjet_wp="Medium").channel("mt")
     sums = {e.name: e.parts for e in channel.estimators if isinstance(e, VariationSum)}
     assert set(sums) == summed
     assert sums["CMS_scale_t_dm1_Run2018"] == ("pt20to40", "pt40to60", "pt60toInf") and sums["CMS_scale_fake_m_Run2018"] == tuple(f"wheel{w}" for w in range(1, 6))
-    assert set(SUMMED_SHIFTS["CMS_scale_t_dm1_Run2018"].values()) == {f"CMS_scale_t_DeepTau2018v2p5_DM1_{pt}_genTau_2018" for pt in sums["CMS_scale_t_dm1_Run2018"]}  # the predecessor used the DM0 shift
+    assert set(summed_shifts("2018")["CMS_scale_t_dm1_Run2018"].values()) == {f"CMS_scale_t_DeepTau2018v2p5_DM1_{pt}_genTau_2018" for pt in sums["CMS_scale_t_dm1_Run2018"]}  # the predecessor used the DM0 shift
     direct = {v.name for v in channel.variations if not (isinstance(v, ColumnVariation) and v.derived) and not is_part(v.name)}
-    assert direct == {f"{name}{d}" for name in (expected - summed) | set(UNUSED_SHIFTS) for d in ("Up", "Down")}
+    assert direct == {f"{name}{d}" for name in (expected - summed) | {name for name, _ in unused_shifts("2018")} for d in ("Up", "Down")}
     parts = {v.name for v in channel.variations if is_part(v.name)}
     assert parts == {f"{name}{d}%{part}" for name, family in sums.items() for part in family for d in ("Up", "Down")}
     no_op = next(v for v in channel.variations if v.name == "CMS_eff_t_dm1_Run2018Up")  # as the predecessor's: equal to the nominal
     assert no_op.replace_weights == {"tau_id": channel.process("TTL").selection.weights["tau_id"]}
-    assert {name for name, *_ in WEIGHT_SHIFTS} == {"CMS_fake_j_Run2018", "CMS_htt_ttbarShape"}
+    assert {name for name, *_ in weight_shifts("2018")} == {"CMS_fake_j_Run2018", "CMS_htt_ttbarShape"}
     without = analysis_for(shape_systematics=False).channel("mt")
     assert not {v.name for v in without.variations} - {f"es{shift:+d}" for shift in ES_GRID}
     assert not [e for e in without.estimators if isinstance(e, VariationSum)]
 
 
-def test_every_produced_shift_is_declared():
-    # the skim fails on a shifted branch of a read column that no variation declares, and on a declared one without branch
-    channel = analysis_for().channel("mt")
+def era_analysis(era, **switches):
+    analysis = build(config(("mt", "mm"), "bbtautau_shapesmith.tau_id_measurement:build", era=era, sample_lists=[list_name("tau_id", era)], **switches))
+    validate(analysis)
+    return analysis
+
+
+@pytest.mark.parametrize("era", ERAS)
+def test_every_produced_shift_is_declared(era):
+    # the skim fails on a shifted branch of a read column that no variation declares, and on a declared one without
+    # branch; DY and W carry the recoil shifts in 2018 only (MET fix, smrun2_tau_id_v2)
+    channel = era_analysis(era).channel("mt")
     for group in ("DY", "W", "TT", "ST", "VV"):
         suffixes = {v.suffix for v in channel.variations if isinstance(v, ColumnVariation) and v.suffix and applies(v, "mc", group)}
-        shifts = PRODUCED_SHIFTS | (RECOIL_SHIFTS if group in ("DY", "W") else set())
+        shifts = produced_shifts(era) | (recoil_shifts(era) if group in ("DY", "W") and era == "2018" else set())
         assert suffixes == {f"__{shift}{d}" for shift in shifts for d in ("Up", "Down")}, group
     assert not [v for v in channel.variations if isinstance(v, ColumnVariation) and v.suffix and applies(v, "embedding", "EMB")]
+
+
+@pytest.mark.parametrize("era", ERAS)
+def test_the_recoil_shapes_follow_the_recoil_eras_of_the_production(era):
+    """The MET fix: CMS_scale_met and CMS_res_met (DY and W) in 2018 only; the switch recoil_eras books them where the
+    production has them, e.g. smrun2_tau_id_v1 in every era."""
+    tag = f"Run{era}"
+    recoil = {f"CMS_{kind}_met_{tag}{d}" for kind in ("scale", "res") for d in ("Up", "Down")}
+
+    def names(**switches):
+        return {v.name for v in era_analysis(era, **switches).channel("mt").variations}
+
+    booked = names()
+    assert (recoil <= booked) if era == "2018" else not recoil & booked
+    assert recoil <= names(recoil_eras=list(ERAS)) and not recoil & names(recoil_eras=[])
+    every_era = [v for v in era_analysis(era, recoil_eras=list(ERAS)).channel("mt").variations if v.name in recoil]
+    assert {v.groups for v in every_era} == {("DY", "W")}
+    assert {v.suffix for v in every_era} == {f"__CMS_{kind}_met_RecoilCalibration_{era}{d}" for kind in ("scale", "res") for d in ("Up", "Down")}
+    with pytest.raises(AnalysisError, match="recoil_eras"):
+        era_analysis(era, recoil_eras=["2022"])
 
 
 def test_summed_families_reach_the_shapes_file(tmp_path):
@@ -244,7 +284,7 @@ def test_m_vis_edges_follow_the_data_of_the_working_point(tmp_path):
     nominal = []
 
     def rows(sample, row):
-        row.update(q_1=1., q_2=-1., pt_1=30., eta_2=0., iso_1=.1, mt_1=30., extraelec_veto=0., extramuon_veto=0., dilepton_veto=0.)
+        row.update(q_1=1., q_2=-1., pt_1=30., eta_2=0., iso_1=.1, mt_1=30., extraelec_veto=0., extramuon_veto=0., dilepton_veto=0., hem_veto=0.)
         result = []
         for dm in (0., 1., 10., 11.):
             for pt, m_vis in ((30., np.linspace(35., 155., 25)), (50., np.linspace(40., 150., 17))):

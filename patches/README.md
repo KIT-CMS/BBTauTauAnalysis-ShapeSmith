@@ -2,22 +2,42 @@
 
 ## TauIDSFMeasurement-tauID_ES.patch
 
-The tau-ID/ES measurement (`configs/tau_id_es_2018.yaml`) runs `MorphingTauID2017` of
-[KIT-CMS/TauIDSFMeasurement](https://github.com/KIT-CMS/TauIDSFMeasurement), branch `tauID_ES` (84095dd), with jvoss's
-uncommitted local changes. Without them the options `--tes_precision`, `--es_min` and `--es_max`, the categories DM1011
-and DM*_PT20_40 / DM*_PT40_200, and the 2018 luminosity uncertainty 1.0084 do not exist. The patch is
-`git diff` of `bin/MorphingTauID2017.cpp` and `src/HttSystematics_TauIDRun2.cc` in
+The tau-ID/ES measurement (`configs/tau_id_es_2018.yaml`, `configs/smrun2_tau_id_v1_id_es.yaml`) runs
+`MorphingTauID2017` of [KIT-CMS/TauIDSFMeasurement](https://github.com/KIT-CMS/TauIDSFMeasurement), branch `tauID_ES`
+(84095dd), with jvoss's uncommitted local changes. Without them the options `--tes_precision`, `--es_min` and
+`--es_max` and the categories DM1011 and DM*_PT20_40 / DM*_PT40_200 do not exist. The patch starts from `git diff` of
+`bin/MorphingTauID2017.cpp` and `src/HttSystematics_TauIDRun2.cc` in
 `/work/jvoss/smhtt_ul_SFs_v15/CMSSW_14_1_0_pre4/src/CombineHarvester/TauIDSFMeasurement` (2026-09-30, unchanged since the
-build of 2026-07-05; sha256 of that diff `b5fad3bf76b4465d4d49c912ffa9801a50b98730e0fa988d32290fa39cda0ca5`) with one
-change: `HttSystematics_TauIDRun2.cc` declares the regrouped jet energy scale sources of the unpatched branch
-(`CMS_scale_j_{Absolute,BBEC1,EC2,HF,RelativeSample}_$ERA`, `CMS_scale_j_{Absolute,BBEC1,EC2,HF,FlavorQCD,RelativeBal}`)
-instead of jvoss's 28 individual sources, since the CROWN variations package produces the regrouped set; JER stays
-commented out and HEM declared, as in jvoss's. The patch has sha256
-`7f10cedf5e96e288d284f377cb2673f49692604255b3f5cbe2b46f888905a3d3`.
+build of 2026-07-05; sha256 of that diff `b5fad3bf76b4465d4d49c912ffa9801a50b98730e0fa988d32290fa39cda0ca5`), with these
+changes to `HttSystematics_TauIDRun2.cc`:
+
+- the regrouped jet energy scale sources of the unpatched branch
+  (`CMS_scale_j_{Absolute,BBEC1,EC2,HF,RelativeSample}_$ERA`, `CMS_scale_j_{Absolute,BBEC1,EC2,HF,FlavorQCD,RelativeBal}`)
+  instead of jvoss's 28 individual sources, since the CROWN variations package produces the regrouped set; JER stays
+  commented out (2026-10-03);
+- v7 (2026-10-17): no `CMS_scale_j_HEMIssue_$ERA` (2018 vetoes the HEM events, E29), `CMS_prefiring` in every era
+  instead of all but 2018 (E11: 2018 has the muon part), and `lumi_13TeV_$ERA` the total of the LUM POG Cholesky
+  scheme of the year (spec 6.6): 1.0123 (2016 halves), 1.0082 (2017), 1.0084 (2018). MorphingTauID2017 throws on a
+  declared shape that the synced shapes lack (`CombineTools/src/TFileIO.cc:24`, "TH1 ... not found"), so the v7
+  shapes (without HEM, with `CMS_prefiring` in 2018) need exactly this declaration;
+- v7b (2026-10-18, the MET fix): `CMS_scale_met_$ERA` and `CMS_res_met_$ERA` (recoil calibration of DY and W) only for
+  `Run2018`, as the productions from `smrun2_tau_id_v2` on recoil-correct DY and W in 2018 alone
+  (`constants.RECOIL_ERAS`); 2016 and 2017 have no recoil shapes. A refit of `smrun2_tau_id_v1` 2016/2017 shapes
+  ignores their recoil shapes (MorphingTauID2017 skips undeclared shapes).
+
+The patch is `git diff bin/MorphingTauID2017.cpp` followed by `git diff -U100000 src/HttSystematics_TauIDRun2.cc`: the
+second file with full context, so that `tests/test_tau_id_patch.py` reads the whole patched file and checks, per era,
+that every shape it declares for a process of the measurement is one the analysis produces (and the lumi value). It
+applies with `git apply` to a clean 84095dd. sha256 `dc29badd0a66192f2158037b866739c074bc33f92788452d1976eeb52937faa3`.
 
 jvoss's built area declares the 28 individual sources, which the shapes do not have, so the measurement needs an own
 area built with this patch; `combine.cmssw_dir` points to it (`/work/sdaigler/tau_id_es/CMSSW_14_1_0_pre4`, built
-2026-10-03). `MorphingTauID2017` writes its `cb.PrintAll()` log to the hard-coded path
+2026-10-03, rebuilt with the v7 changes on 2026-10-17: `scram b` in `CombineHarvester/TauIDSFMeasurement`; checked with
+MorphingTauID2017 on the v5 2018 synced shapes of Tight/VVLoose, DM0, which now stops at the missing
+`W_CMS_prefiringUp`, and on a copy without the HEM shapes and with `CMS_prefiring`, which gives the cards); rebuilt with
+the v7b recoil guard on 2026-10-18 and checked on the `smrun2_tau_id_v1` Tight/VVLoose DM0 shapes: 2017 gives the cards
+without a recoil nuisance, also from a copy without the 108 recoil histograms (as `smrun2_tau_id_v2` will have), 2018
+declares `CMS_scale_met_Run2018` and `CMS_res_met_Run2018` and stops on such a copy at `W_CMS_scale_met_Run2018Up`. `MorphingTauID2017` writes its `cb.PrintAll()` log to the hard-coded path
 `/work/jvoss/ntuples/smhtt_ul_SFs_v15/log/cb_PrintAll.log`; that directory does not exist, so the binary prints
 "Could not open log file" and carries on.
 

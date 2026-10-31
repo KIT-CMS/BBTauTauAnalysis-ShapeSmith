@@ -1,0 +1,42 @@
+# HH->bbtautau tau channels on smrun2_binned_v7 with fake factors, variant QCD + W+jets + ttbar (friend ff_v7_w), and em as
+# the ttbar control channel of the fits; the datacards of an era and the Run-2 combination (spec 6.9). One YAML for every era:
+#   shapesmith <command> -c configs/smrun2_binned_v7_ff_w.yaml -s era=<era>
+#   hist --control --skip-systematics, estimate --control, plot --control      # gallery column "emb ff with W"
+#   hist --skip-systematics, estimate, datacards, fit --background-only        # categories nominal (tau channels), em_tt
+#   shapesmith combine -c configs/smrun2_binned_v7_ff_w.yaml --era 2016preVFP --era 2016postVFP --era 2017 --era 2018 \
+#       -o /ceph/sdaigler/shapesmith/smrun2_binned_v7/combination/ff_w [--background-only] [--validate]
+# Switches (types and defaults in switches.py):
+#   sample_lists:      the inventories of the era (sm_<era>_borrowed: VH -> tautau of 2016postVFP from 2016preVFP)
+#   jet_fakes:         ff (jetFakes from the FF friend ff_v7_w: data minus genuine and lepton fakes in anti_iso)
+#   embedding:         [et, mt, tt], as the FF measurement of the payload (E33; [et, mt] if tt keeps MC)
+#   crown_shifts:      false (nominal only, E34); the FF friend shifts and the b-tag and prefiring weight variations stay
+# P5: the friend ff_v7_w must carry its FF shift keys (CROWN shifts of the friend, friend_common.py), so produce it
+#   with --shifts all as ff_v2 in v6, not with the --shifts None of spec E34 (P2-P5): the skim refuses a declared FF
+#   shift without its shifted branch. Without them: -s switches.shape_systematics=false (no FF shapes in the cards).
+#   fit_categories:    control (one category 'nominal' per tau channel and em_tt in em, without NN friends)
+#   dy_correction:     njets_btag (needs the DY table of the era)
+#   ff_processes:      [QCD, Wjets, ttbar], the payload of ff_v7_w: the W+jets keys of the friend shifted in et and mt
+#                      (constants.FF_SHIFTS_W; smrun2_binned_v7_ff.yaml: QCD + ttbar)
+analysis: bbtautau_shapesmith.analysis:build
+era: "2018"
+channels: [et, mt, tt, em]                                # em: the ttbar control channel (in every final state)
+switches: {sample_lists: ["sm_{era}_binned", "sm_{era}_borrowed", "sm_{era}_embedding"], jet_fakes: ff, embedding: [et, mt, tt], crown_shifts: false, nn_friend: false, fit_categories: control, control_regions: false, dy_correction: njets_btag, ff_processes: [QCD, Wjets, ttbar]}
+sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
+ntuples:
+  server: root://cmsdcache-kit-disk.gridka.de
+  base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7/CROWNRun
+  friends:                                                # the tau channels only: the em skim reads no friend
+    - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7/CROWNFriend/ff_v7_w, applies_to: [mc, data, embedding], channels: [et, mt, tt]}
+  # - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7/CROWNFriend/fastmtt, applies_to: [mc, data, embedding], channels: [et, mt, tt]}
+skim_dir: /ceph/sdaigler/shapesmith/smrun2_binned_v7/skims/tau_ff_w/{era}         # its own (friend ff_v7_w, em)
+output_dir: /ceph/sdaigler/shapesmith/smrun2_binned_v7/output/tau_ff_w/{era}
+ml_dir: /ceph/sdaigler/shapesmith/smrun2_binned_v7/ml/tau_ff_w/{era}
+workers: 16                                               # at most 24 on portal2
+log_level: DEBUG
+combine: {cmssw_dir: /work/sdaigler/smhtt_ul/CMSSW_14_1_9, scram_arch: el9_amd64_gcc12}   # with CombineHarvester (ValidateDatacards.py)
+# web gallery of the era: the column "emb ff with W" (et, mt, tt and em)
+web:
+  dir: "/web/sdaigler/public_html/smrun2_binned_v7/{era}"
+  variant: emb_ff_w
+  label: emb ff with W
+  description: "τ-embedding + jet→τh fakes from the fully corrected fake factor of QCD, W+jets (et, mt) and ttbar (friend ff_v7_w: three-process fractions, QCD and W+jets DR→SR, non-closure corrections); em is the ttbar control channel."

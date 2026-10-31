@@ -18,9 +18,9 @@ def column_variations(channel):
 def test_column_variations_come_with_their_switch(jet_fakes, embedding):
     analysis = analysis_for(jet_fakes, embedding)
     for name, channel in analysis.channels.items():
-        expected = (embedding_variations(name) if embedded(embedding, name) else ()) + (ff_variations(name) if jet_fakes == "ff" else ())
+        expected = (embedding_variations(name, "2018") if embedded(embedding, name) else ()) + (ff_variations(name, "2018") if jet_fakes == "ff" else ())
         assert tuple(column_variations(channel)) == expected
-        assert sum(isinstance(v, WeightVariation) for v in channel.variations) == 80  # the b-tag components
+        assert sum(isinstance(v, WeightVariation) for v in channel.variations) == 10  # the four b-tag components and prefiring
 
 
 @pytest.mark.parametrize("jet_fakes,embedding", COMBINATIONS)
@@ -31,7 +31,7 @@ def test_shape_systematics_off_declares_no_column_variation(jet_fakes, embedding
 
 @pytest.mark.parametrize("channel", ["et", "mt", "tt"])
 def test_embedding_variations(channel):
-    variations = embedding_variations(channel)
+    variations = embedding_variations(channel, "2018")
     assert len(variations) == 16 and all(v.applies_to == ("embedding",) and v.regions is None for v in variations)  # ES and vsJet: 4 DMs x Up/Down
     wp = "vsEleTight" if channel == "et" else "vsEleVVLoose"
     names = {v.name: v.suffix for v in variations}
@@ -48,14 +48,14 @@ def test_embedding_variations(channel):
 @pytest.mark.parametrize("channel", ["et", "mt", "tt"])
 def test_embedding_variation_sums_join_dm10_and_dm11(channel):
     wp = "vsEleTight" if channel == "et" else "vsEleVVLoose"
-    assert embedding_variation_sums(channel) == (
+    assert embedding_variation_sums(channel, "2018") == (
         VariationSum(f"CMS_scale_t_emb_dm1011_{wp}_2018", ("dm10", "dm11")), VariationSum(f"CMS_eff_t_emb_dm1011_{wp}_2018", ("dm10", "dm11")),
     )
 
 
 @pytest.mark.parametrize("channel,keys", [("et", FF_SHIFTS_LT), ("mt", FF_SHIFTS_LT), ("tt", FF_SHIFTS_TT)])
 def test_ff_variations(channel, keys):
-    variations = ff_variations(channel)
+    variations = ff_variations(channel, "2018")
     assert len(variations) == 2 * len(keys) and all(v.applies_to == ("data", "mc", "embedding") for v in variations)
     names = {v.name: v.suffix for v in variations}
     assert names[f"CMS_ff_process_fractionsfrac_QCD_{channel}_2018Up"] == "__process_fractionsfrac_QCDUp"

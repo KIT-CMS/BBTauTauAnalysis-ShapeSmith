@@ -1,0 +1,123 @@
+"""The DY table of an era (spec 6.10): derived from the control histograms of the era's dilepton run."""
+import dataclasses
+
+import numpy as np
+import pytest
+from shapesmith.histogram import INCLUSIVE, NOMINAL_VARIATION, HistKey, Histogram, HistogramSet
+from shapesmith.model import AnalysisError
+
+from bbtautau_shapesmith import dilepton, samples as samples_module
+from bbtautau_shapesmith.constants import DILEPTON_CHANNELS
+from bbtautau_shapesmith.dy_correction import BTAG_ROWS, derive, table_line
+from tests.helpers import config
+from tests.run2 import install, list_name
+
+EDGES = (1.5, 2.5, 3.5, 4.5, 10.5)  # n_jets 2, 3, 4, 5-10: the columns 2, 3 and >= 4
+
+
+@pytest.fixture(scope="module")
+def analysis_2017(tmp_path_factory):
+    directory = tmp_path_factory.mktemp("run2_dy")
+    database = install(directory)
+    patch = pytest.MonkeyPatch()
+    patch.setattr(samples_module, "INVENTORY_DIR", directory)
+    yield dilepton.build(config(DILEPTON_CHANNELS, "bbtautau_shapesmith.dilepton:build", era="2017", database=database, sample_lists=[list_name("binned", "2017")]))
+    patch.undo()
+
+
+def _fill(hset, channel, process, region, values):
+    hset[HistKey(channel, INCLUSIVE, process, region, NOMINAL_VARIATION, "n_jets")] = Histogram(EDGES, values, values)
+
+
+def histograms(analysis, dy_factor=(1.1, 1.3, 1.5), ttbar_factor=1.2):
+    """DY 100 per jet bin, TT 10, every other background 1; data = the DY times dy_factor per row (mm, ee) or TT times
+    ttbar_factor (em), plus the rest."""
+    hset = HistogramSet()
+    for name in DILEPTON_CHANNELS:
+        channel = analysis.channel(name)
+        for row, region in BTAG_ROWS.items():
+            yields = {process: np.full(4, 100.0 if process == "DY" else 10.0 if process == "TT" else 1.0) for process in channel.backgrounds()}
+            for process, values in yields.items():
+                _fill(hset, name, process, region, values)
+            data = sum(yields.values())
+            data = data + (yields["TT"] * (ttbar_factor - 1) if name == "em" else yields["DY"] * (dy_factor[row] - 1) + yields["TT"] * (ttbar_factor - 1))
+            _fill(hset, name, channel.data(), region, data)
+    return hset
+
+
+def test_the_table_of_an_era(analysis_2017):
+    table, scales, cells = derive(histograms(analysis_2017), analysis_2017, ["mm", "ee"], "em")
+    assert scales == pytest.approx({0: 1.2, 1: 1.2, 2: 1.2})  # the em ttbar data/MC of each b-tag region
+    assert table == {0: (1.1, 1.1, 1.1), 1: (1.3, 1.3, 1.3), 2: (1.5, 1.5, 1.5)}
+    assert [cell.column for cell in cells[:3]] == ["2", "3", ">=4"] and cells[2].dy == pytest.approx(2 * 2 * 100.0)  # >= 4: two jet bins, mm + ee
+    assert table_line("2017", table) == '"2017": {0: (1.1, 1.1, 1.1), 1: (1.3, 1.3, 1.3), 2: (1.5, 1.5, 1.5)},'
+    unscaled, _, _ = derive(histograms(analysis_2017), analysis_2017, ["mm", "ee"], 1.0)
+    assert unscaled[0][0] == pytest.approx(1.1 + 2 * 0.2 * 10 / (2 * 100), abs=1e-3)  # the ttbar excess of mm and ee counted as DY
+
+
+def test_the_table_is_per_era(analysis_2017):
+    with pytest.raises(ValueError, match="per era and 2016 half, not for 2016"):
+        derive(histograms(analysis_2017), dataclasses.replace(analysis_2017, era="2016"), ["mm"], 1.0)
+    with pytest.raises(KeyError, match="fill the b-tag regions first"):
+        derive(HistogramSet(), analysis_2017, ["mm"], 1.0)
+
+
+def test_the_combined_2016_takes_the_luminosity_weighted_mean_of_its_halves(monkeypatch):
+    """The 2016 fake-factor measurement weights the DY of both halves with one expression: the mean of the tables of
+    2016preVFP and 2016postVFP weighted with their luminosity; without both tables it fails."""
+    from bbtautau_shapesmith import constants, weights
+
+    others = {era: table for era, table in constants.DY_NJETS_BTAG.items() if not era.startswith("2016")}
+    monkeypatch.setattr(weights, "DY_NJETS_BTAG", others)
+    with pytest.raises(AnalysisError, match="no DY table for 2016preVFP, 2016postVFP"):
+        weights.dy_table("2016")
+    monkeypatch.setattr(weights, "DY_NJETS_BTAG", {**others, "2016postVFP": constants.DY_NJETS_BTAG["2018"]})
+    with pytest.raises(AnalysisError, match="no DY table for 2016preVFP "):
+        weights.dy_table("2016")
+    tables = {**others, "2016preVFP": {0: (1.0, 1.0, 1.0), 1: (1.2, 1.2, 1.2), 2: (2.0, 2.0, 2.0)},
+              "2016postVFP": {0: (2.0, 2.0, 2.0), 1: (1.2, 1.2, 1.2), 2: (1.0, 1.0, 1.0)}}
+    monkeypatch.setattr(weights, "DY_NJETS_BTAG", tables)
+    share = 19520.0 / 36330.0
+    table = weights.dy_table("2016")
+    assert table[0] == pytest.approx((share + 2 * (1 - share),) * 3, abs=1e-4) and table[1] == (1.2, 1.2, 1.2)
+    assert table[2] == pytest.approx((2 * share + (1 - share),) * 3, abs=1e-4) and weights.dy_table("2016preVFP") is tables["2016preVFP"]
+    assert "(n_bjets == 0) & (n_jets <= 2)) * 1.4627" in weights.dy_njets_btag_weight("2016")
+
+
+def test_every_era_and_2016_half_has_its_table():
+    """E19, spec 6.10: one table per era and 2016 half, rows n_bjets 0, 1, >= 2 with the n_jets columns <= 2, 3, >= 4;
+    the 2016 FF measurement weights its halves."""
+    from bbtautau_shapesmith import constants, weights
+
+    assert set(constants.DY_NJETS_BTAG) == set(constants.ERAS)
+    for era, table in constants.DY_NJETS_BTAG.items():
+        assert sorted(table) == [0, 1, 2], era
+        assert all(len(factors) == 3 and all(0.5 < f < 2.5 for f in factors) for factors in table.values()), era
+        assert weights.dy_njets_btag_weight(era).count("*") == 9
+    combined = weights.dy_table("2016")
+    for row, factors in combined.items():
+        for column, factor in enumerate(factors):
+            halves = [constants.DY_NJETS_BTAG[era][row][column] for era in ("2016preVFP", "2016postVFP")]
+            assert min(halves) <= factor <= max(halves)
+
+
+# the entries scripts/derive_dy_correction.py --ttbar-scale em printed on the smrun2_binned_v7b dilepton runs (2026-10-19)
+V7B_TABLES = {
+    "2016preVFP": {0: (0.875, 1.033, 1.355), 1: (1.052, 1.297, 1.824), 2: (0.968, 1.18, 1.631)},
+    "2016postVFP": {0: (0.919, 1.094, 1.463), 1: (1.099, 1.323, 1.878), 2: (1.008, 1.23, 1.812)},
+    "2017": {0: (0.884, 1.039, 1.344), 1: (1.067, 1.304, 1.726), 2: (0.938, 1.135, 1.628)},
+    "2018": {0: (0.882, 1.03, 1.328), 1: (1.115, 1.334, 1.805), 2: (0.981, 1.2, 1.717)},
+}
+
+
+def test_the_tables_are_those_of_the_v7b_dilepton_runs():
+    """Since 2026-10-19 the tables come from the v7b dilepton runs (MET fix, POG muon trigger SF on MC) and serve the
+    v7 run YAMLs too; every cell is the derived entry, and the 2016 FF measurement takes their luminosity-weighted mean."""
+    from bbtautau_shapesmith import constants, weights
+
+    assert constants.DY_NJETS_BTAG == V7B_TABLES
+    share = constants.LUMI_PB["2016preVFP"] / (constants.LUMI_PB["2016preVFP"] + constants.LUMI_PB["2016postVFP"])
+    combined = weights.dy_table("2016")
+    assert combined[0][0] == pytest.approx(share * 0.875 + (1 - share) * 0.919, abs=1e-4)
+    assert combined[2][2] == pytest.approx(share * 1.631 + (1 - share) * 1.812, abs=1e-4)
+    assert "(n_bjets == 1) & (n_jets == 3)) * 1.334" in weights.dy_njets_btag_weight("2018")

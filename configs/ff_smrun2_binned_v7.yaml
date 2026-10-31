@@ -1,0 +1,42 @@
+# SM fake-factor measurement (`shapesmith measure`, v7 spec 6.8, E18) on smrun2_binned_v7, variant QCD + ttbar: the
+# payload of the friend ff_v7. One YAML for every era:
+#   shapesmith skim    -c configs/ff_smrun2_binned_v7_w.yaml -s era=<era>   # once for both variants (its columns contain these)
+#   shapesmith measure -c configs/ff_smrun2_binned_v7.yaml -s era=<era> --suggest-binning   # edges for ff_tables.PER_ERA_EDGES
+#   shapesmith measure -c configs/ff_smrun2_binned_v7.yaml -s era=<era>                      # -> <output_dir>/fake_factors/<era>/
+# Eras: 2016 (both halves in one measurement, one payload for 2016preVFP and 2016postVFP; the lists sm_2016_binned and
+# sm_2016_embedding stand for those of both halves), 2017 and 2018; 2016preVFP and 2016postVFP alone are the cross-check
+# of the 2016 payload (scripts/compare_ff_payloads.py). Outside 2018 measure refuses until the era has its edges.
+# The cross-check without embedding: -s switches.embedding=false -s output_dir=/ceph/sdaigler/shapesmith/smrun2_binned_v7/output/ff_noemb
+# Switches (types and defaults in switches.py):
+#   sample_lists:       the inventories of the era (VH -> tautau is not subtracted: no borrowed list)
+#   embedding:          [et, mt, tt] subtracts the genuine taus as EMB, as the analysis runs (E33; [et, mt] if tt keeps MC)
+#   dy_correction:      njets_btag, as the analysis runs (needs the DY table of the era, spec 6.10)
+#   tt_fraction_region: application (each leg's fractions where its fake factor is applied, as v6)
+#   ff_processes:       [QCD, ttbar]; ff_smrun2_binned_v7_w.yaml is the variant with W+jets
+analysis: bbtautau_shapesmith.ff_measurement:build
+era: "2018"
+channels: [et, mt, tt]
+switches: {sample_lists: ["sm_{era}_binned", "sm_{era}_embedding"], embedding: [et, mt, tt], dy_correction: njets_btag, tt_fraction_region: application, ff_processes: [QCD, ttbar]}
+sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
+ntuples:
+  server: root://cmsdcache-kit-disk.gridka.de
+  base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7/CROWNRun
+  friends: []
+skim_dir: /ceph/sdaigler/shapesmith/smrun2_binned_v7/skims/ff_measurement/{era}   # shared by both variants: both charges, the lepton vetoes stored
+output_dir: /ceph/sdaigler/shapesmith/smrun2_binned_v7/output                     # -> fake_factors/<era>/ (the W variant: fake_factors_w/<era>/)
+workers: 12                                               # at most 24 on portal2
+log_level: DEBUG
+# web gallery of the era (shapesmith publish): the plots of the measurement, one column per variant
+web:
+  dir: "/web/sdaigler/public_html/ff_smrun2_binned_v7/{era}"
+  variant: ff_v7
+  label: ff_v7 (QCD, ttbar)
+  description: "FF measurement on smrun2_binned_v7 {era}, QCD and ttbar fake factors, genuine τh subtracted with the τ-embedding in et, mt and tt; the payload of the friend ff_v7."
+  title: "smrun2_binned_v7 {era} · fake factors"
+  about: |
+    Fake-factor measurement of the HH→bbττ analysis, era {era} (Run 2 UL, NanoAODv15, production smrun2_binned_v7) with
+    ShapeSmith, the TauFakeFactors method: QCD fake factors from data, ttbar fake factors from MC times a data/MC factor,
+    in the variant with W+jets also W+jets fake factors from data with a DR→SR correction from W MC; the process fractions,
+    the QCD DR→SR correction and the non-closure corrections in table order. 2016 is one measurement of both halves.
+
+    Each correction shows its p-value against 1; a correction with p > 0.05 is set to 1.
