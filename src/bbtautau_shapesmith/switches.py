@@ -135,12 +135,27 @@ class TauSwitches(_EmbeddedChannels, _FakeFactorProcesses, BaseModel):
     # jets and yield; the skims keep the inputs of FastMTT with the MET covariance (a refit, scripts/fastmtt_refit.py)
     nn_validation: bool = False
     # PRELIMINARY pseudo-shifts of the jet (3 %) and tau_h (1.5 %) energies with the MET propagated, as shape nuisances of
-    # the jet, MET and FastMTT inputs until P6 (NV1 with NV9 size, nn_validation.py), symmetrised in the datacards; needs
-    # nn_validation
+    # the jet, MET and FastMTT inputs until P6 (NV1 with NV9 size, nn_validation.py), symmetrised in the datacards; with
+    # the NN friend also of its outputs (S0+, NV9: the friend columns of each shift, scripts/pseudo_nn_friend.py
+    # --pseudo-shifts); needs nn_validation or nn_friend
     pseudo_shifts: bool = False
     # the anti-isolated region anti_iso with the fake-factor weight of the friend and its shifts in mc mode: the shapes
-    # of the MC jet fakes there against the nominal region (NV1); needs jet_fakes: mc and the fake-factor friend
+    # of the MC jet fakes there against the nominal region (NV1, NV4), with the decay-mode non-closure of the fake
+    # factors among the shifts; needs jet_fakes: mc and the fake-factor friend
     ff_transfer: bool = False
+    # the validation of the NN outputs (nn_outputs.py, nn_limit_spec.md 7.1, NV4 and NV4b): the outputs of the model as
+    # the control variables (the score per category and class, n_jets and mass_2 per category; with ff_transfer their
+    # MC-only copies; with nn_validation besides the inputs); nn_blinding: the blinding.json of the run's datacards ({era} filled) whose edges show the lo part
+    # of the HH categories in the nominal region (without it they hide every event there); nn_ff_payload: the
+    # fake-factor payload of the friend ({year} and {channel} filled, e.g. CROWN bbtautau
+    # payloads/fake_factors/sm/fake-factors-2026-10-19/{year}/fake_factors_{channel}.json.gz) for the regions of the
+    # fractions in the anti-isolated region (NV4b). All need nn_outputs, which needs nn_friend
+    nn_outputs: bool = False
+    nn_blinding: str | None = None
+    nn_ff_payload: str | None = None
+    # the jet fakes of the same-sign region from its anti-isolated part times the fake factor (region
+    # same_sign_anti_iso), so that the same-sign region has a prediction (NV4, a weak hint); needs jet_fakes: ff
+    ff_same_sign: bool = False
 
     @model_validator(mode="after")
     def _nn_categories_need_the_nn_friend(self) -> TauSwitches:
@@ -206,10 +221,21 @@ class TauSwitches(_EmbeddedChannels, _FakeFactorProcesses, BaseModel):
 
     @model_validator(mode="after")
     def _validation_switches(self) -> TauSwitches:
-        if self.pseudo_shifts and not self.nn_validation:
-            raise ValueError("pseudo_shifts requires nn_validation: true (preliminary nuisances of the input validation only)")
+        if self.pseudo_shifts and not (self.nn_validation or self.nn_friend):
+            raise ValueError("pseudo_shifts requires nn_validation or nn_friend (preliminary nuisances of the input validation or of the NN outputs)")
         if self.ff_transfer and self.jet_fakes != "mc":
             raise ValueError("ff_transfer requires jet_fakes: mc (the MC jet fakes in the anti-isolated region)")
+        return self
+
+    @model_validator(mode="after")
+    def _output_switches(self) -> TauSwitches:
+        if self.nn_outputs and not self.nn_friend:
+            raise ValueError("nn_outputs requires nn_friend: true (the outputs of the NN friend)")
+        for name in ("nn_blinding", "nn_ff_payload"):
+            if getattr(self, name) is not None and not self.nn_outputs:
+                raise ValueError(f"{name} requires nn_outputs: true")
+        if self.ff_same_sign and self.jet_fakes != "ff":
+            raise ValueError("ff_same_sign requires jet_fakes: ff (the fake-factor estimate of the same-sign region)")
         return self
 
     @model_validator(mode="after")

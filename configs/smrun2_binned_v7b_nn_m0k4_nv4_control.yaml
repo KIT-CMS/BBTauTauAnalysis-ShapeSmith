@@ -1,0 +1,49 @@
+# NN phase, validation of the NN outputs (nn_limit_spec.md 7.1, NV4 and NV4b; nn_outputs.py) in mc mode: the control
+# run of the input validation (smrun2_binned_v7b_nn_validation_control.yaml: MC jet fakes, the QCD of the control
+# regions, EMB in et/mt, the anti-isolated region anti_iso with the fake factor of ff_v7b, switch ff_transfer) with the
+# outputs of the baseline M0-k4 (columns nn_m0k4_, classes v7b5) as control variables instead of its inputs, for
+# - the FF closure per NN category (NV4): the MC jet fakes in anti_iso x FF against the nominal region, with the shifts
+#   of the fake-factor friend and the decay-mode non-closure (scripts/nn_outputs_transfer.py);
+# - the weak hints (NV4): data against the prediction in w_highmt_pass (b veto, mT > 80 GeV) and lepton_antiiso
+#   (shapesmith input-gof --region ...);
+# - the fractions per NN category (NV4b): the unweighted anti-isolated region abcd_anti_iso and the regions weighted by
+#   the ttbar fraction of the payload of ff_v7b (scripts/nn_outputs_fractions.py).
+# Its skims are copies of the input-validation skims with the columns of the pseudo NN friend (dCache is full; the NN
+# friend nn_m0_v1 of this file is the production the copies claim):
+#   python scripts/pseudo_nn_friend.py -c configs/smrun2_binned_v7b_nn_m0k4_nv4_control.yaml -s era=<era> -s nn_manifest=... \
+#       --channel <ch> --source /ceph/sdaigler/shapesmith_test/nn-validate/skims/tau_control_nn/<era> --crown ... \
+#       --payload-root <the R8_wp payload> --model nn_classifier/m0_k4_v7b5_wp=nn_m0k4_
+#   shapesmith hist -c configs/smrun2_binned_v7b_nn_m0k4_nv4_control.yaml -s era=<era> --control --regions ... --variables ...
+#   shapesmith estimate -c configs/smrun2_binned_v7b_nn_m0k4_nv4_control.yaml -s era=<era> --control
+# The fake-factor run of NV4 (nominal and same-sign region, the lo part of the HH category) needs no YAML of its own:
+# the run of the model (smrun2_binned_v7b_ff_nn_m0_v1.yaml) with -s switches.nn_outputs=true -s switches.ff_same_sign=true
+# -s switches.nn_blinding=<its datacards>/{era}/datacards/all/blinding.json (README, "NN output validation").
+analysis: bbtautau_shapesmith.analysis:build
+era: "2018"
+channels: [et, mt, tt]
+switches: {sample_lists: ["sm_{era}_binned", "sm_{era}_borrowed", "sm_{era}_embedding"], jet_fakes: mc, embedding: [et, mt], crown_shifts: false, nn_friend: true, fit_categories: none, fastmtt_friend: true, control_regions: true, diagnostics: true, dy_correction: njets_btag, ff_transfer: true,
+           nn_prefix: nn_m0k4_, nn_classes: [HH2B2Tau, tautau, Top, jetFakes, Other], nn_outputs: true,
+           nn_ff_payload: "/work/sdaigler/bbtautau/KingMaker/CROWN/analysis_configurations/bbtautau/payloads/fake_factors/sm/fake-factors-2026-10-19/{year}/fake_factors_{channel}.json.gz"}
+sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
+ntuples:
+  server: root://cmsdcache-kit-disk.gridka.de
+  base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7/CROWNRun      # the data
+  bases:                                                  # the MC and the embedding: the re-production
+    mc: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNRun
+    embedding: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNRun
+  friends:
+    - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7/CROWNFriend/ff_v7b, applies_to: [data], channels: [et, mt, tt]}
+    - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNFriend/ff_v7b, applies_to: [mc, embedding], channels: [et, mt, tt]}
+    - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7/CROWNFriend/fastmtt, applies_to: [data], channels: [et, mt, tt]}
+    - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNFriend/fastmtt, applies_to: [mc, embedding], channels: [et, mt, tt]}
+    - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7/CROWNFriend/nn_m0_v1, applies_to: [data], channels: [et, mt, tt]}
+    - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNFriend/nn_m0_v1, applies_to: [mc, embedding], channels: [et, mt, tt]}
+skim_dir: /ceph/sdaigler/nn/nv_m0k4/skims/tau_control_nn/{era}
+output_dir: /ceph/sdaigler/nn/nv_m0k4/output/tau_control_nn/{era}
+workers: 4                                                # the big control skims: <= 4 workers (memory rule of 2026-10-26)
+log_level: INFO
+combine:
+  cmssw_dir: /work/sdaigler/smhtt_ul/CMSSW_14_1_9
+  scram_arch: el9_amd64_gcc12
+  parallel: 16
+  minimizer: --cminFallbackAlgo Minuit2,Migrad,0:0.1

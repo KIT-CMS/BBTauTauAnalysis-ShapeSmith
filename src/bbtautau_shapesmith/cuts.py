@@ -113,6 +113,12 @@ def fake_factor_region(channel: str, ff_type: str = "corrected") -> Region:
     return Region("anti_iso", replace_cuts={"tau_iso": anti_iso_cut(channel)}, add_weights={"fake_factor": fake_factor_weight(channel, ff_type)})
 
 
+def same_sign_fake_factor_region(channel: str, ff_type: str = "corrected") -> Region:
+    """The anti-isolated part of the same-sign region with the fake-factor weight of the friend: the jet fakes of the
+    same-sign region in ff mode (switch ff_same_sign)."""
+    return Region("same_sign_anti_iso", replace_cuts={"os": SAME_SIGN, "tau_iso": anti_iso_cut(channel)}, add_weights={"fake_factor": fake_factor_weight(channel, ff_type)})
+
+
 def _pass_fail(name: str, cuts: dict[str, str], channel: str) -> tuple[Region, ...]:
     """The pass region and the tau-fail region, whose genuine taus lose the pass SF (MC only: EMB has its own weights)."""
     return (Region(f"{name}_pass", replace_cuts=cuts),

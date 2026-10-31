@@ -24,10 +24,15 @@ nn_friend_prefixes. Per event, as the friend:
 - `<prefix>predicted_class` (int32, the first largest of the class scores), `<prefix>predicted_max_value` and
   `<prefix>nn_score_<class>` (float32; `<prefix>binary_score` with a binary head).
 
+With --pseudo-shifts (a run with the switches pseudo_shifts and nn_friend, NV9 of NN spec 7.1): every column also under
+each pseudo-shift of the run that applies to the sample (nn_validation.pseudo_shift_variations: the jets and the tau_h
+legs scaled, the MET propagated, the derived inputs recomputed), as `<column>__<shift>`, the column the run reads under
+the shift; the model sees the shifted inputs and the gate the shifted columns, as the friend of a shift production would.
+
 The copy holds the samples of the channel of the run, every Parquet file of the source with the columns appended
-(the others unchanged) and the source manifest with its contract extended by the friend bases of the run and the new
-columns, plus a "pseudo_friend" record (payloads, sha256 of manifests and ONNX files, gate counts, residues,
-onnxruntime version). The copy is then checked with ShapeSmith's own skim reuse check (shapesmith.skim.reuse_problems
+(the others unchanged) and the source manifest with its contract extended by the friend bases of the run, the new
+columns and the pseudo-shifts, plus a "pseudo_friend" record (payloads, sha256 of manifests and ONNX files, gate
+counts, residues, onnxruntime version). The copy is then checked with ShapeSmith's own skim reuse check (shapesmith.skim.reuse_problems
 against the contract of the run): `shapesmith skim` would reuse it, could it list the friend files of the production.
 """
 from __future__ import annotations
@@ -48,7 +53,8 @@ import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 from shapesmith.config import load_analysis, load_config
-from shapesmith.expressions import columns_of, mask
+from shapesmith.expressions import columns_of, evaluate, mask
+from shapesmith.model import ColumnVariation
 from shapesmith.skim import contract, exported_by, needed_columns, reuse_problems
 from shapesmith.store import SKIM_COLUMNS, manifest_path, read_manifest, schema, write_manifest
 
@@ -103,19 +109,40 @@ def friend_columns(model: dict, frame, gate: np.ndarray) -> dict[str, np.ndarray
     return columns
 
 
+def shifted_frame(frame, derived: dict[str, str]):
+    """The frame with the derived columns of a pseudo-shift (expressions of the nominal columns) in place."""
+    shifted = frame.copy()
+    for column, expr in derived.items():
+        shifted[column] = evaluate(frame, expr)
+    return shifted
+
+
 def score_file(job: dict) -> dict:
-    """Score one Parquet file of the source with every model and write it with the friend columns to the target."""
+    """Score one Parquet file of the source with every model, nominal and under the pseudo-shifts of the job, and write
+    it with the friend columns to the target."""
     table = pq.read_table(job["source"])
     frame = table.select([c for c in table.column_names if c in job["read"]]).to_pandas()
     gate = mask(frame, job["gate"])
     for model in job["models"]:
         for name, values in friend_columns(model, frame, gate).items():
             table = table.append_column(name, pa.array(values))
+    for shift in job.get("shifts", []):
+        shifted = shifted_frame(frame, shift["derived"])
+        shifted_gate = mask(shifted, job["gate"])
+        for model in job["models"]:
+            for name, values in friend_columns(model, shifted, shifted_gate).items():
+                table = table.append_column(f"{name}{shift['suffix']}", pa.array(values))
     Path(job["target"]).parent.mkdir(parents=True, exist_ok=True)
     pq.write_table(table, job["target"], compression="snappy")
     folds = len(job["models"][0]["files"])
     residues = (frame["event"].to_numpy().astype(np.uint64) % np.uint64(folds)).astype(np.int64)
     return {"events": len(frame), "gate": int(gate.sum()), "residues": np.bincount(residues, minlength=folds).tolist()}
+
+
+def pseudo_shifts(channel, columns: list[str]) -> list[ColumnVariation]:
+    """The pseudo-shifts of a channel whose outputs the friend writes: those of the run that read the friend `columns`
+    under the shift (switches pseudo_shifts and nn_friend, nn_validation.pseudo_shift_variations)."""
+    return [v for v in channel.variations if isinstance(v, ColumnVariation) and v.name.startswith("CMS_pseudo_") and set(columns) & set(v.derived)]
 
 
 def sha256(path: Path) -> str:
@@ -152,6 +179,7 @@ def main() -> int:
     parser.add_argument("--payload-root", type=Path, help="the directory the payloads are relative to (default: --crown)")
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--force", action="store_true", help="replace an existing copy")
+    parser.add_argument("--pseudo-shifts", action="store_true", help="also the outputs under the pseudo-shifts of the run (switches pseudo_shifts, nn_friend)")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     import onnxruntime
@@ -167,6 +195,10 @@ def main() -> int:
               "models": [{key: model[key] for key in ("payload", "model", "prefix", "columns", "manifest_sha256", "onnx_sha256")} for model in models],
               "gate": gate_cuts, "onnxruntime": onnxruntime.__version__}
     read = {"event"} | columns_of(gate_cuts) | {name for model in models for name in model["inputs"] if name not in model["constants"]}
+    shifts = pseudo_shifts(channel, columns) if args.pseudo_shifts else []
+    if args.pseudo_shifts and not shifts:
+        raise SystemExit(f"--pseudo-shifts: no pseudo-shift of the run in {args.channel} reads the columns {', '.join(columns)} (switches pseudo_shifts, nn_friend, nn_prefix)")
+    read |= columns_of(expr for shift in shifts for column, expr in shift.derived.items() if column not in columns)
     jobs, manifests = [], {}
     for sample in channel.samples:
         source_dir, target_dir = args.source / args.channel / sample.nick, Path(config.skim_dir) / args.channel / sample.nick
@@ -177,7 +209,9 @@ def main() -> int:
         manifests[sample.nick] = read_manifest(source_dir / "manifest.json")
         for name in manifests[sample.nick]["completed"]:
             stem = Path(name).stem
-            jobs.append({"nick": sample.nick, "source": str(source_dir / f"{stem}.parquet"), "target": str(target_dir / f"{stem}.parquet"), "read": read, "gate": gate_cuts, "models": models})
+            applied = [{"name": v.name, "suffix": f"__{v.name}", "derived": {c: e for c, e in v.derived.items() if c not in columns}} for v in shifts if sample.kind in v.applies_to]
+            jobs.append({"nick": sample.nick, "source": str(source_dir / f"{stem}.parquet"), "target": str(target_dir / f"{stem}.parquet"), "read": read, "gate": gate_cuts,
+                         "models": models, "shifts": applied})
     logger.info(f"{args.channel}: {len(manifests)} samples, {len(jobs)} files of {args.source / args.channel} -> {Path(config.skim_dir) / args.channel}, columns {', '.join(columns)}")
     counts: dict[str, list[dict]] = {}
     with ProcessPoolExecutor(max_workers=args.workers, mp_context=multiprocessing.get_context("spawn")) as pool:  # as ShapeSmith: no fork
@@ -190,8 +224,12 @@ def main() -> int:
         extended = copy.deepcopy(stored)
         friends = stored["contract"].get("friends", [])
         extended["contract"]["friends"] = friends + [base for base in expected.get("friends", []) if base not in friends]
+        shifted = [v for v in shifts if sample.kind in v.applies_to]
+        written = set(columns) | {f"{name}__{v.name}" for v in shifted for name in columns}
         extended["contract"]["required_columns"] = sorted(set(stored["contract"]["required_columns"]) | set(columns))
-        extended["columns"] = sorted(set(stored["columns"]) | set(columns))
+        extended["columns"] = sorted(set(stored["columns"]) | written)
+        if shifted:  # the pseudo-shifts of the run, now with the shifted outputs of the friend
+            extended["contract"]["column_variations"] = {**stored["contract"].get("column_variations", {}), **{v.name: expected["column_variations"][v.name] for v in shifted}}
         extended["pseudo_friend"] = {**record, "events": sum(r["events"] for r in results), "gate_passed": sum(r["gate"] for r in results),
                                      "residues": np.sum([r["residues"] for r in results], axis=0).tolist() if results else []}
         write_manifest(manifest_path(config.skim_dir, args.channel, sample.nick), extended)

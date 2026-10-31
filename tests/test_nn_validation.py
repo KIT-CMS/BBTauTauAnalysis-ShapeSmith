@@ -228,7 +228,7 @@ def test_the_validation_switches_of_the_tau_run(pseudo_shifts):
 def test_ff_transfer_adds_the_fake_factor_region_and_its_shifts_in_mc_mode():
     on = analysis(jet_fakes="mc", fastmtt_friend=True, control_regions=True, nn_validation=True, ff_transfer=True)
     off = analysis(jet_fakes="mc", fastmtt_friend=True, control_regions=True, nn_validation=True)
-    ff = analysis(fastmtt_friend=True)
+    ff = analysis(fastmtt_friend=True, crown_shifts=False, study_uncertainties=True)
     for name in TAU_CHANNELS:
         region = on.channel(name).region("anti_iso")
         assert region == ff.channel(name).region("anti_iso")  # the jetFakes region of the ff mode

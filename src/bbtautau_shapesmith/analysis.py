@@ -12,9 +12,10 @@ from shapesmith.model import ABCD, Analysis, AnalysisError, Category, Channel, C
 
 from bbtautau_shapesmith import cuts, dilepton
 from bbtautau_shapesmith.constants import (
-    BTAG_BINS, CONTROL_CHANNELS, EVENT_KEY, LT_CHANNELS, LUMI_PB, NN_CLASS_COLUMN, NN_SCORE_COLUMN, PREFIRING_NUISANCE, TAU_CHANNELS, check_era,
+    BTAG_BINS, CONTROL_CHANNELS, EVENT_KEY, LT_CHANNELS, LUMI_PB, NN_CLASS_COLUMN, NN_SCORE_COLUMN, PREFIRING_NUISANCE, TAU_CHANNELS, YEAR, check_era,
 )
 from bbtautau_shapesmith.ml import ML_CLASSES, ml_config, raw_count_groups
+from bbtautau_shapesmith.nn_outputs import blinding_edges, fraction_regions, output_variables
 from bbtautau_shapesmith.nn_validation import FASTMTT_INPUTS, pseudo_shift_names, pseudo_shift_variations, validation_variables
 from bbtautau_shapesmith.processes import (
     EMBEDDED, GENUINE, JET_FAKE, LEPTON_FAKE, NODE_SM, SIGNAL, SIGNAL_XS_FB, SIGNAL_XS_NUISANCES, SPLITS, available, backgrounds_in, tau_processes,
@@ -54,15 +55,18 @@ def diagnostic_estimators(name: str, every_mc: tuple[str, ...]) -> tuple:
 
 
 def estimators(name: str, era: str, processes: tuple[Process, ...], switches: TauSwitches) -> tuple:
-    """jetFakes = data - (genuine + lepton fakes) in the fake-factor region, or QCD from ABCD with every MC subtracted
-    (with diagnostics also in the control regions); in an embedded channel the sums of the embedding shifts of DM10 and
-    DM11 (after the estimates, which carry them too; only with the CROWN shifts) and the ttbar contamination of the
-    embedded sample (+-10 % of genuine ttbar)."""
+    """jetFakes = data - (genuine + lepton fakes) in the fake-factor region (with ff_same_sign also those of the
+    same-sign region from its anti-isolated part), or QCD from ABCD with every MC subtracted (with diagnostics also in
+    the control regions); in an embedded channel the sums of the embedding shifts of DM10 and DM11 (after the
+    estimates, which carry them too; only with the CROWN shifts) and the ttbar contamination of the embedded sample
+    (+-10 % of genuine ttbar)."""
     genuine_and_lepton_fakes = backgrounds_in(processes, GENUINE) + backgrounds_in(processes, LEPTON_FAKE)
     every_mc = genuine_and_lepton_fakes + backgrounds_in(processes, JET_FAKE)
     output = jet_fakes_output(switches.jet_fakes)
     if switches.jet_fakes == "ff":
         result = (DataMinus(output, "anti_iso", genuine_and_lepton_fakes),)
+        if switches.ff_same_sign:
+            result += (DataMinus(output, "same_sign_anti_iso", genuine_and_lepton_fakes, target="same_sign"),)
     else:
         result = (ABCD(output, "abcd_anti_iso", "abcd_same_sign", "abcd_same_sign_anti_iso", every_mc),)
     if switches.diagnostics:
@@ -77,16 +81,16 @@ def estimators(name: str, era: str, processes: tuple[Process, ...], switches: Ta
 def column_variations(name: str, era: str, switches: TauSwitches) -> tuple:
     """The embedding tau shifts (CROWN shifts, not in a nominal-only production) and the fake-factor friend shifts; with
     study_uncertainties the embedding tau ID as weight factors in a nominal-only production and the decay-mode
-    non-closure of the fake factors."""
+    non-closure of the fake factors, which ff_transfer (the MC jet fakes in AR x FF) carries too."""
     if not switches.shape_systematics:
         return ()
     embedding = embedding_variations(name, era) if switches.embedded(name) and switches.crown_shifts else ()
     if switches.study_uncertainties and switches.embedded(name) and not switches.crown_shifts and name in LT_CHANNELS:
         embedding += embedding_id_variations(name, era)
     fakes = ff_variations(name, era, switches.wjets) if switches.jet_fakes == "ff" or switches.ff_transfer else ()
-    if switches.study_uncertainties and switches.jet_fakes == "ff":
+    if (switches.study_uncertainties and switches.jet_fakes == "ff") or switches.ff_transfer:
         fakes += ff_dm_nonclosure_variations(name, era, ff_variant(switches.wjets))
-    pseudo = pseudo_shift_variations(name, era, switches.embedded(name)) if switches.pseudo_shifts else ()
+    pseudo = pseudo_shift_variations(name, era, switches.embedded(name), nn_output_columns(switches)) if switches.pseudo_shifts else ()
     return embedding + fakes + pseudo
 
 
@@ -117,6 +121,14 @@ def check_manifest(manifest: str, channels: Iterable[str], classes: tuple[str, .
             raise AnalysisError(f"nn_manifest: {path} lists the classes {listed}, the run has {list(classes)} (nn_classes or the label profile, in the order of predicted_class)")
 
 
+def nn_output_columns(switches: TauSwitches) -> tuple[str, ...]:
+    """The friend columns of the run's model (nn_prefix): its class, its largest score and the score of every class;
+    none without the NN friend."""
+    if not switches.nn_friend:
+        return ()
+    return tuple(f"{switches.nn_prefix}{column}" for column in (NN_CLASS_COLUMN, NN_SCORE_COLUMN, *(f"nn_score_{name}" for name in nn_classes(switches))))
+
+
 def nn_friend_columns(switches: TauSwitches) -> tuple[str, ...]:
     """The NN friend columns a tau skim keeps besides those the run reads: the class and score of every model of the
     friend production (nn_friend_prefixes), so that the runs of all its models share one skim."""
@@ -134,24 +146,38 @@ def fit_categories(switches: TauSwitches, processes: tuple[Process, ...]) -> tup
     return categories(nn_classes(switches), switches.nn_categories, switches.nn_binning, switches.nn_prefix, groups, clip=(jet_fakes_output(switches.jet_fakes),))
 
 
+def output_controls(name: str, era: str, switches: TauSwitches, blinded: str) -> dict:
+    """The control variables of the switch nn_outputs (nn_outputs.py), the HH categories with the blinding edges of
+    nn_blinding."""
+    edges = blinding_edges(switches.nn_blinding.replace("{era}", era), name, era) if switches.nn_blinding is not None else None
+    return output_variables(nn_classes(switches), switches.nn_categories, switches.nn_prefix, blinded, edges, name, switches.ff_transfer)
+
+
 def channel(name: str, era: str, switches: TauSwitches, channel_samples: tuple[Sample, ...]) -> Channel:
     """A tau channel; with the NN friend the control variable NN_score leaves out the events of the signal category
-    (variables.nn_score_blinding)."""
+    (variables.nn_score_blinding); with nn_outputs the control variables are the outputs of the model and yield (with
+    nn_validation also its inputs)."""
     table = available(tau_processes(name, era, switches.jet_fakes, switches.embedded(name), switches.dy_correction), channel_samples)
     groups = {p.group for p in table}
     baseline = cuts.baseline_cuts(name, era)
+    payload = switches.nn_ff_payload.replace("{year}", YEAR[era]).replace("{channel}", name) if switches.nn_ff_payload is not None else None
     regions = (
         cuts.regions(name, switches.jet_fakes, switches.ff_type)
         + (cuts.diagnostic_regions(name) if switches.control_regions else ())
         + ((cuts.fake_factor_region(name, switches.ff_type),) if switches.ff_transfer else ())
+        + ((cuts.same_sign_fake_factor_region(name, switches.ff_type),) if switches.ff_same_sign else ())
+        + (fraction_regions(payload, name) if payload is not None else ())
     )
     estimates = estimators(name, era, table, switches)
     blinded = nn_score_blinding(nn_classes(switches), switches.nn_prefix, baseline, regions, estimates) if switches.nn_friend else None
-    variables = (
-        validation_variables(name, switches.fastmtt_friend)
-        if switches.nn_validation
-        else control_variables(switches.nn_friend, switches.diagnostics, switches.fastmtt_friend, switches.nn_prefix, blinded)
-    )
+    if switches.nn_validation:
+        variables = validation_variables(name, switches.fastmtt_friend)
+    elif switches.nn_outputs:  # the outputs replace the control variables, as the inputs do in nn_validation
+        variables = {"yield": control_variables()["yield"]}
+    else:
+        variables = control_variables(switches.nn_friend, switches.diagnostics, switches.fastmtt_friend, switches.nn_prefix, blinded)
+    if switches.nn_outputs:
+        variables = {**variables, **output_controls(name, era, switches, blinded)}
     return Channel(
         name=name,
         samples=tuple(s for s in channel_samples if s.group in groups),

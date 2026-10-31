@@ -35,6 +35,9 @@ symmetrise the pairs, Analysis.symmetrised_variations); FastMTT is not refitted:
 response of a refit (FASTMTT_*, measured with the standalone FastMTT of CROWN on 2018 events; per event a refit moves by
 1-6 % more, the jitter of its likelihood minimum, which a scale cannot reproduce), eta_fastmtt stays; the tau_h shift
 applies to every tau_h candidate (also jet and lepton fakes).
+In a run with the NN friend (S0+, NV9 as a preliminary shape of the NN outputs) each pseudo-shift also reads the outputs
+of the model under it, the friend column `<column>__<shift>` in place of every friend column of the model
+(scripts/pseudo_nn_friend.py --pseudo-shifts): the model evaluated on the shifted inputs.
 """
 from __future__ import annotations
 
@@ -288,17 +291,21 @@ def tau_legs(channel: str) -> tuple[int, ...]:
     return (1, 2) if channel == "tt" else (2,)
 
 
-def pseudo_shift_variations(channel: str, era: str, embedded: bool) -> tuple[ColumnVariation, ...]:
+def pseudo_shift_variations(channel: str, era: str, embedded: bool, nn_columns: tuple[str, ...] = ()) -> tuple[ColumnVariation, ...]:
     """The preliminary pseudo-shifts of a tau channel (module docstring): the jets on MC, the tau_h legs on MC and, in an
-    embedded channel, on the embedding (its own nuisance)."""
+    embedded channel, on the embedding (its own nuisance); `nn_columns`, the friend columns of the NN model of the run,
+    each read as `<column>__<shift>` under the shift (the outputs of the model on the shifted inputs)."""
+
+    def variation(name: str, derived: dict[str, str], kinds: tuple[str, ...]) -> ColumnVariation:
+        return ColumnVariation(name, derived={**derived, **{column: f"{column}__{name}" for column in nn_columns}}, applies_to=kinds)
+
     result = ()
     for direction, sign in (("Up", 1.0), ("Down", -1.0)):
         jets = pseudo_shift({}, 1.0 + sign * PSEUDO_JES)
         taus = pseudo_shift({leg: 1.0 + sign * PSEUDO_TES for leg in tau_legs(channel)})
-        result += (ColumnVariation(f"{PSEUDO_JES_NAME}_{era}{direction}", derived=jets, applies_to=("mc",)),
-                   ColumnVariation(f"{PSEUDO_TES_NAME}_{era}{direction}", derived=taus, applies_to=("mc",)))
+        result += (variation(f"{PSEUDO_JES_NAME}_{era}{direction}", jets, ("mc",)), variation(f"{PSEUDO_TES_NAME}_{era}{direction}", taus, ("mc",)))
         if embedded:
-            result += (ColumnVariation(f"{PSEUDO_EMB_TES_NAME}_{era}{direction}", derived=taus, applies_to=("embedding",)),)
+            result += (variation(f"{PSEUDO_EMB_TES_NAME}_{era}{direction}", taus, ("embedding",)),)
     return result
 
 
