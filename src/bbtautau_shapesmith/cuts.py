@@ -98,13 +98,25 @@ def regions(channel: str, jet_fakes: str, ff_type: str = "corrected") -> tuple[R
     anti = anti_iso_cut(channel)
     same_sign = Region("same_sign", replace_cuts={"os": SAME_SIGN})
     if jet_fakes == "ff":
-        return (same_sign, Region("anti_iso", replace_cuts={"tau_iso": anti}, add_weights={"fake_factor": fake_factor_weight(channel, ff_type)}))
+        return (same_sign, fake_factor_region(channel, ff_type))
     return (
         same_sign,
         Region("abcd_same_sign", replace_cuts={"os": SAME_SIGN}),
         Region("abcd_anti_iso", replace_cuts={"tau_iso": anti}),
         Region("abcd_same_sign_anti_iso", replace_cuts={"os": SAME_SIGN, "tau_iso": anti}),
     )
+
+
+def fake_factor_region(channel: str, ff_type: str = "corrected") -> Region:
+    """The anti-isolated region with the fake-factor weight of the friend: the jetFakes estimate in ff mode, the MC jet
+    fakes times the fake factor in mc mode (switch ff_transfer)."""
+    return Region("anti_iso", replace_cuts={"tau_iso": anti_iso_cut(channel)}, add_weights={"fake_factor": fake_factor_weight(channel, ff_type)})
+
+
+def same_sign_fake_factor_region(channel: str, ff_type: str = "corrected") -> Region:
+    """The anti-isolated part of the same-sign region with the fake-factor weight of the friend: the jet fakes of the
+    same-sign region in ff mode (switch ff_same_sign)."""
+    return Region("same_sign_anti_iso", replace_cuts={"os": SAME_SIGN, "tau_iso": anti_iso_cut(channel)}, add_weights={"fake_factor": fake_factor_weight(channel, ff_type)})
 
 
 def _pass_fail(name: str, cuts: dict[str, str], channel: str) -> tuple[Region, ...]:

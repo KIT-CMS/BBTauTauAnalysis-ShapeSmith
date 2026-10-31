@@ -1,0 +1,34 @@
+# NN phase (nn_limit_spec.md 3.1, X8; 2026-10-25): smrun2_binned_v7b_ff.yaml with the ML export of the label profile
+# v7b5 (N3, spec 6.1: HH, tautau = EMB in et/mt and every genuine MC di-tau in tt, Top = TTL + STL, jetFakes = the data
+# of the anti-isolated region times the fake factor with its subtraction rows, Other) and its own skims: the re-skim of
+# X8 adds the n-tuple columns bpair_mass_{1,2}, jtag_value_{1,2} and, for MC, bpair_hadronFlavour_{1,2} and
+# jet_hadronFlavour_{1,2} (ml_variables: every set of ml.py). No CROWN production: the v7b n-tuples have them. The other
+# switches are those of smrun2_binned_v7b_ff.yaml, so the same skims later serve the NN categories (with the NN friend
+# under ntuples.friends, nn_friend: true, fit_categories: nn; a new friend needs skim --force).
+#   shapesmith skim      -c configs/smrun2_binned_v7b_ff_nn.yaml -s era=<era>    # the re-skim, every era
+#   shapesmith ml-export -c configs/smrun2_binned_v7b_ff_nn.yaml -s era=<era>    # -> ml_dir: <channel>/events.feather, classes.json
+#   shapesmith ml-merge  -c configs/smrun2_binned_v7b_ff_nn.yaml --era 2016preVFP --era 2016postVFP --era 2017 --era 2018 \
+#       -o /ceph/sdaigler/shapesmith/smrun2_binned_v7b/ml/v7b5/run2                # the four eras in one file per channel
+# em: the ttbar control channel of the fits, skimmed without the export columns and not exported.
+analysis: bbtautau_shapesmith.analysis:build
+era: "2018"
+channels: [et, mt, tt, em]                                # em: the ttbar control channel (in every final state)
+switches: {sample_lists: ["sm_{era}_binned", "sm_{era}_borrowed", "sm_{era}_embedding"], jet_fakes: ff, embedding: [et, mt], crown_shifts: false, nn_friend: false, fastmtt_friend: true, fit_categories: control, control_regions: false, dy_correction: njets_btag, study_uncertainties: true, symmetrise_ff_shifts: true, ff_processes: [QCD, ttbar], ml_labels: v7b5}
+sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
+ntuples:
+  server: root://cmsdcache-kit-disk.gridka.de
+  base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7/CROWNRun      # the data
+  bases:                                                  # the MC and the embedding: the re-production
+    mc: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNRun
+    embedding: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNRun
+  friends:                                                # the tau channels only: the em skim reads no friend
+    - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7/CROWNFriend/ff_v7b, applies_to: [data], channels: [et, mt, tt]}
+    - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNFriend/ff_v7b, applies_to: [mc, embedding], channels: [et, mt, tt]}
+    - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7/CROWNFriend/fastmtt, applies_to: [data], channels: [et, mt, tt]}
+    - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNFriend/fastmtt, applies_to: [mc, embedding], channels: [et, mt, tt]}
+skim_dir: /ceph/sdaigler/shapesmith/smrun2_binned_v7b/skims/tau_ff_nn/{era}        # its own: the re-skim of X8
+output_dir: /ceph/sdaigler/shapesmith/smrun2_binned_v7b/output/tau_ff_nn/{era}
+ml_dir: /ceph/sdaigler/shapesmith/smrun2_binned_v7b/ml/v7b5/{era}                 # <channel>/events.feather, classes.json
+workers: 16                                               # at most 16 cores on deepthought2 (taskset -c 16-31)
+log_level: DEBUG
+combine: {cmssw_dir: /work/sdaigler/smhtt_ul/CMSSW_14_1_9, scram_arch: el9_amd64_gcc12}

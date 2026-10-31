@@ -4,13 +4,17 @@ correlation scheme of correlations.py (v7 spec 6.7); in v7 (nominal only, E34) t
 variations of the nominal trees (b tag, fake factors, prefiring). The switch study_uncertainties adds the uncertainties
 sized in the v7b studies (study_uncertainties.py): the embedding tau ID as exact weight factors and its ES as lnN, the
 POG MC tau ES, vsJet components and di-tau trigger SF as lnN, the residual decay-mode non-closure of the fake factors as
-a shape, the MET residual, the HIPM lepton efficiency, the 2016 halves of the fake factors and K4 as lnN."""
+a shape, the MET residual, the HIPM lepton efficiency, the 2016 halves of the fake factors and K4 as lnN. The stages of
+the NN phase (nn_limit_spec.md 8) add weight variations by switch: S0+ the top-pT shape of ttbar (ttbar_shape, SH7) and the
+heavy-flavour normalisation at >= 3 b tags (heavy_flavour, SH8), S1 the signal theory shapes normalised to the inclusive
+rate (signal_theory, SH14; with the shift production P6)."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Collection, Iterable
+from dataclasses import dataclass, replace
 
 from shapesmith.histogram import part_of
-from shapesmith.model import AnalysisError, ColumnVariation, LnN, Process, VariationSum, WeightVariation
+from shapesmith.model import NOMINAL, AnalysisError, ColumnVariation, LnN, Process, Selection, VariationSum, WeightVariation
 
 from bbtautau_shapesmith import study_uncertainties as study_sizes
 from bbtautau_shapesmith.constants import (
@@ -19,6 +23,7 @@ from bbtautau_shapesmith.constants import (
 )
 from bbtautau_shapesmith.correlations import nuisance
 from bbtautau_shapesmith.processes import EMBEDDED, SIGNAL, VH_TAUTAU
+from bbtautau_shapesmith.weights import TOP_PT
 
 DIRECTIONS = ("Up", "Down")
 # LUM POG Cholesky scheme for 2016+2017+2018 (LumiRecommendationsRun2 r13, 2026-01-14; spec 6.6, E20): nuisance -> the
@@ -33,6 +38,53 @@ LEPTON_ID = 1.02  # e/mu ID and isolation on MC (the correlated part, K4)
 EMBEDDING_SHARED, EMBEDDING_OWN = 0.5, 0.866
 TRIGGER_LNN = 1.02  # the single-lepton trigger SFs of the nominal production have no variations: +-2 % (TauAnalysis convention, spec C6)
 BORROWED_LNN = 1.05  # a process of samples borrowed from another era (3.3): the detector differences
+# NN spec 8, S0+ (SH7; v7_analyse 4.1, 11.2 no. 2): the top-pT shape of ttbar as in the tau-ID measurement (K9, TOP
+# recommendation), the difference with (the nominal) against without the reweighting, symmetrised: Down without the
+# weight, Up its mirror 2 w - 1 around the nominal; on every process that carries the top-pT weight (weights.TOP_PT: the
+# TT parts of the tau channels, TT of em), correlated over the channels and eras
+TTBAR_SHAPE = "CMS_htt_ttbarShape"
+# S0+ (SH8, N12; v7_analyse 4.5, 11.2 no. 1): the heavy flavour the simulation lacks at >= 3 b tags (data/prediction of
+# btag3p in every era 1.24-1.37 in em, 1.26-1.35 in mm + ee with the DY table, 0.99-1.29 in et and mt; the b-tag SF
+# +1 sigma reaches only 1.25-1.35, v5): ttbb, Z/V + bb and g -> bb. A 30 % normalisation (lnN 1.30, Down 1 / 1.30) of the
+# heavy-flavour component of the simulated backgrounds, the events with >= 3 b tags whose b pair is two heavy-flavour jets
+# (hadron flavour b or c, columns of the re-skim X8). Written as a weight variation, so that the share of the component
+# sets its size in each bin. The b pair of ttbar is that of the top decays below 3 b tags, and the DY table corrects DY in
+# btag1 and btag2 (measured with exactly 2 b tags, CMS_htt_dy_table): the component starts at 3 b tags.
+HEAVY_FLAVOUR = "CMS_htt_heavy_flavour"
+HEAVY_FLAVOUR_LNN = 1.30
+HEAVY_FLAVOUR_COMPONENT = "((n_bjets >= 3) & (bpair_hadronFlavour_1 >= 4) & (bpair_hadronFlavour_2 >= 4))"
+HEAVY_FLAVOUR_WEIGHT = {"heavy_flavour": "1.0"}  # the weight it replaces, on the simulated backgrounds of a run with it
+# S1 (SH14): the signal theory shapes, each normalised to the inclusive rate of the sample, so that only acceptance and
+# shape remain (the inclusive cross section is QCDscale_HH and PDF_alphas_HH): datacard name -> the varied weight column
+# (a format of the direction) per kind of the switch signal_theory. The QCD scales are the CROWN shifts of
+# lhe_scale_weight (bbtautau variations/theory.add_qcd_scale_shifts: LHEScaleWeight [7] muR 2, [1] muR 0.5, [5] muF 2,
+# [3] muF 0.5); the parton shower (ISR and FSR scale 2 Up, 0.5 Down as add_parton_shower_shifts, PSWeight [0]-[3]) and
+# the PDF (1 +- the Hessian sum of LHEPdfWeight, CROWN event::reweighting::LHEpdf) are columns the shift production P6 is
+# to add (N19), under names to be aligned with its producers.
+SIGNAL_THEORY = {
+    "qcd_scale": {"QCDscale_ren_HH_acc": "lhe_scale_weight__QCDscale_ren{direction}", "QCDscale_fac_HH_acc": "lhe_scale_weight__QCDscale_fac{direction}"},
+    "parton_shower": {"ps_isr_HH": "ps_weight__ps_isr{direction}", "ps_fsr_HH": "ps_weight__ps_fsr{direction}"},
+    "pdf": {"pdf_HH_acc": "lhe_pdf_weight__pdf{direction}"},
+}
+SIGNAL_THEORY_WEIGHT = {"theory": "1.0"}  # the weight they replace, on the signal of a run with them
+# the NanoAOD source of each normalisation (scripts/signal_theory_sums.py): the Runs sum and its index, or "pdf" for the
+# mean of the per-event PDF weight over the Events
+SIGNAL_THEORY_INDICES = {
+    "QCDscale_renUp": ("LHEScaleSumw", 7), "QCDscale_renDown": ("LHEScaleSumw", 1),
+    "QCDscale_facUp": ("LHEScaleSumw", 5), "QCDscale_facDown": ("LHEScaleSumw", 3),
+    "ps_isrUp": ("PSSumw", 0), "ps_fsrUp": ("PSSumw", 1), "ps_isrDown": ("PSSumw", 2), "ps_fsrDown": ("PSSumw", 3),
+    "pdfUp": ("pdf", None), "pdfDown": ("pdf", None),
+}
+# the inclusive means of the varied weights of the powheg kappa_lambda = 1 sample per era (scripts/signal_theory_sums.py
+# on its NanoAODv15, 2026-10-25; PDF from the Events of one file, 0.5-0.8 M events): the normalisation of the signal
+# theory shapes. The scales move the inclusive cross section by -10.6/+12.0 % (muR) and -1.8/+2.3 % (muF), the parton
+# shower by <= 0.1 %, the per-event PDF sum by +-1.8 %.
+SIGNAL_THEORY_NORM = {
+    "2016preVFP": {"QCDscale_renUp": 0.8935, "QCDscale_renDown": 1.11968, "QCDscale_facUp": 0.98163, "QCDscale_facDown": 1.02337, "ps_isrUp": 0.99996, "ps_fsrUp": 0.99993, "ps_isrDown": 1.00005, "ps_fsrDown": 1.00034, "pdfUp": 1.01838, "pdfDown": 0.98162},
+    "2016postVFP": {"QCDscale_renUp": 0.89346, "QCDscale_renDown": 1.11975, "QCDscale_facUp": 0.98175, "QCDscale_facDown": 1.02324, "ps_isrUp": 0.99995, "ps_fsrUp": 0.99981, "ps_isrDown": 1.00003, "ps_fsrDown": 1.00081, "pdfUp": 1.01827, "pdfDown": 0.98173},
+    "2017": {"QCDscale_renUp": 0.89346, "QCDscale_renDown": 1.11976, "QCDscale_facUp": 0.98167, "QCDscale_facDown": 1.02333, "ps_isrUp": 0.99999, "ps_fsrUp": 1.00016, "ps_isrDown": 0.99999, "ps_fsrDown": 0.99971, "pdfUp": 1.01836, "pdfDown": 0.98164},
+    "2018": {"QCDscale_renUp": 0.89355, "QCDscale_renDown": 1.11961, "QCDscale_facUp": 0.98169, "QCDscale_facDown": 1.0233, "ps_isrUp": 1.00001, "ps_fsrUp": 1.00042, "ps_isrDown": 0.99997, "ps_fsrDown": 0.99887, "pdfUp": 1.01833, "pdfDown": 0.98167},
+}
 
 
 def btag_variations(era: str) -> tuple[WeightVariation, ...]:
@@ -101,6 +153,46 @@ def ff_variations(channel: str, era: str, wjets: bool = False) -> tuple[ColumnVa
     the fake factor of its leg. With W+jets fake factors (ff_processes) et and mt add the W+jets keys."""
     keys = FF_SHIFTS_TT if channel == "tt" else FF_SHIFTS_LT + (FF_SHIFTS_W if wjets else ())
     return tuple(variation for key in keys for variation in _shifts(nuisance(f"CMS_ff_{key}_{channel}", "fake_factors", era), f"__{key}", ("data", "mc", "embedding")))
+
+
+def with_weights(processes: Iterable[Process], names: Collection[str], weights: dict[str, str]) -> tuple[Process, ...]:
+    """The processes, those in `names` with `weights` added after their own (the nominal factor that a weight
+    variation replaces, e.g. HEAVY_FLAVOUR_WEIGHT)."""
+    return tuple(replace(p, selection=Selection(p.selection.cuts, {**p.selection.weights, **weights})) if p.name in names else p for p in processes)
+
+
+def ttbar_shape_variations(era: str) -> tuple[WeightVariation, ...]:
+    """CMS_htt_ttbarShape (TTBAR_SHAPE): Down without the top-pT weight, Up its mirror 2 w - 1 around the nominal; in the
+    nominal region, since the estimates take no weight variation."""
+    name = nuisance(TTBAR_SHAPE, "theory", era)
+    ((weight, column),) = TOP_PT.items()
+    return (WeightVariation(f"{name}Up", {weight: f"(2.0 * {column} - 1.0)"}, regions=(NOMINAL,)), WeightVariation(f"{name}Down", {weight: "1.0"}, regions=(NOMINAL,)))
+
+
+def heavy_flavour_variations(era: str) -> tuple[WeightVariation, ...]:
+    """CMS_htt_heavy_flavour (HEAVY_FLAVOUR): the heavy-flavour component times 1.30 (Up) and 1 / 1.30 (Down) on the
+    processes that carry HEAVY_FLAVOUR_WEIGHT; in the nominal region."""
+    name = nuisance(HEAVY_FLAVOUR, "theory", era)
+    ((weight, _),) = HEAVY_FLAVOUR_WEIGHT.items()
+    shifts = (("Up", round(HEAVY_FLAVOUR_LNN - 1, 4)), ("Down", round(1 / HEAVY_FLAVOUR_LNN - 1, 4)))
+    return tuple(WeightVariation(f"{name}{d}", {weight: f"(1 + {HEAVY_FLAVOUR_COMPONENT} * {shift!r})"}, regions=(NOMINAL,)) for d, shift in shifts)
+
+
+def signal_theory_variations(era: str, kinds: Iterable[str]) -> tuple[WeightVariation, ...]:
+    """The signal theory shapes of the kinds (SIGNAL_THEORY) on the process that carries SIGNAL_THEORY_WEIGHT: each
+    direction the varied weight over its inclusive mean SIGNAL_THEORY_NORM of the era (the inclusive rate stays); in the
+    nominal region."""
+    if era not in SIGNAL_THEORY_NORM:
+        raise AnalysisError(f"signal_theory: no inclusive normalisation for {era} (SIGNAL_THEORY_NORM has {', '.join(SIGNAL_THEORY_NORM)}; scripts/signal_theory_sums.py)")
+    ((weight, _),) = SIGNAL_THEORY_WEIGHT.items()
+    result = ()
+    for kind in kinds:
+        for name, column in SIGNAL_THEORY[kind].items():
+            for direction in DIRECTIONS:
+                varied = column.format(direction=direction)
+                norm = SIGNAL_THEORY_NORM[era][varied.split("__", 1)[1]]
+                result += (WeightVariation(f"{nuisance(name, 'theory', era)}{direction}", {weight: f"({varied} / {norm!r})"}, regions=(NOMINAL,)),)
+    return result
 
 
 def lumi_lnn(processes: tuple[str, ...], era: str) -> tuple[LnN, ...]:

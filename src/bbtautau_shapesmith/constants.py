@@ -6,6 +6,10 @@ ERAS = ("2016preVFP", "2016postVFP", "2017", "2018")
 # 2018 with the new normtag; Run 2 = 137.96 fb-1, labelled 138 fb-1
 LUMI_PB = {"2016preVFP": 19520.0, "2016postVFP": 16810.0, "2017": 42070.0, "2018": 59560.0}
 YEAR = {"2016preVFP": "2016", "2016postVFP": "2016", "2017": "2017", "2018": "2018"}  # the calendar year of an era
+# an event of the n-tuples (Analysis.event_key, decided 2026-10-26): every data and embedding sample is read without
+# the skim rows that repeat the event of an earlier row of the sample (2018D mutau embedding: the input files nano_35 and
+# nano_53 share 44 497 events); the skims keep every row
+EVENT_KEY = ("run", "lumi", "event")
 # eras measured together (v7 spec E18, 6.8): one fake-factor measurement and payload of 2016 on both halves, every
 # sample normalised to the luminosity of its own half
 COMBINED_ERAS = {"2016": ("2016preVFP", "2016postVFP")}
@@ -63,8 +67,8 @@ PREFIRING_WEIGHT = "prefiring_wgt"  # E11: L1PreFiringWeight_Nom on MC, 2016-201
 PREFIRING_VARIATIONS = {"Up": "L1PreFiringWeight_Up", "Down": "L1PreFiringWeight_Dn"}  # columns of the nominal tree (C11)
 PREFIRING_NUISANCE = "CMS_prefiring"  # one lnN for 2016-2018 (E11, E34)
 
-# NN output classes in training order: index = friend column predicted_class, datacard bin id = index + 1
-NN_CLASS_NAMES = ("HH2B2Tau", "DY", "ST", "TT", "VV", "jetFakes", "Other")
+# NN friend columns: the index of the predicted class (the class order of the ML export, ml.ML_CLASSES; datacard bin id
+# = index + 1) and its score
 NN_CLASS_COLUMN = "predicted_class"
 NN_SCORE_COLUMN = "predicted_max_value"
 NN_COLUMNS = frozenset((NN_CLASS_COLUMN, NN_SCORE_COLUMN))

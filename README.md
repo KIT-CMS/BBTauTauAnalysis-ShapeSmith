@@ -48,7 +48,7 @@ shapesmith measure   -c configs/ff_sm2018_binned_v6.yaml && shapesmith measure -
 # fake-factor run (friend ff_v2) with em as the ttbar control channel: control plots, then the background-only fit
 shapesmith skim      -c configs/sm2018_binned_v6_ff.yaml
 shapesmith hist      -c configs/sm2018_binned_v6_ff.yaml --control --skip-systematics && shapesmith estimate -c configs/sm2018_binned_v6_ff.yaml --control
-shapesmith hist      -c configs/sm2018_binned_v6_ff.yaml --skip-systematics && shapesmith estimate -c configs/sm2018_binned_v6_ff.yaml   # categories nominal, em_tt
+shapesmith hist      -c configs/sm2018_binned_v6_ff.yaml && shapesmith estimate -c configs/sm2018_binned_v6_ff.yaml   # with systematics (the card shapes); categories nominal, em_tt
 shapesmith datacards -c configs/sm2018_binned_v6_ff.yaml && shapesmith fit -c configs/sm2018_binned_v6_ff.yaml --background-only   # -> datacards/background_fit.md
 # web galleries (after plot or measure; target, column and texts from the web: block of each run YAML), in this
 # order: the first publication fixes the order of the columns and channels
@@ -61,10 +61,7 @@ shapesmith publish   -c configs/sm2018_binned_v6_ff.yaml --channels tt --variant
                      --description "MC genuine ττ + jet→τh fakes from the fully corrected fake factor (friend ff_v2); tt only, it has no embedding."   # column ff: tt
 shapesmith publish   -c configs/ff_sm2018_binned_v6.yaml                 # ~sdaigler/ff_sm2018_binned_v6: the FF measurement
 shapesmith publish   -c configs/ff_sm2018_binned_v6_noemb.yaml           # its cross-check column
-# with NN friends (nn_friend: true, fit_categories: nn, friend under ntuples.friends, re-skim):
-shapesmith hist      -c configs/sm2018_binned_v6_ff.yaml && shapesmith estimate -c configs/sm2018_binned_v6_ff.yaml
-shapesmith sync      -c configs/sm2018_binned_v6_ff.yaml && shapesmith datacards -c configs/sm2018_binned_v6_ff.yaml && shapesmith fit -c configs/sm2018_binned_v6_ff.yaml
-shapesmith ml-export -c configs/sm2018_binned_v6_ff.yaml
+# the NN training data: see "NN training data (ML export)"; the NN categories and limits: "NN categories, limits and blinding"
 shapesmith inspect   output/sm2018_binned_v6_ff/shapes.root --unchanged   # variations equal to their nominal
 ```
 
@@ -122,7 +119,7 @@ shapesmith measure -c configs/ff_smrun2_binned_v7.yaml $S && shapesmith measure 
 for F in configs/smrun2_binned_v7_ff.yaml configs/smrun2_binned_v7_ff_w.yaml; do
   shapesmith skim -c $F $S
   shapesmith hist -c $F $S --control --skip-systematics && shapesmith estimate -c $F $S --control && shapesmith plot -c $F $S --control
-  shapesmith hist -c $F $S --skip-systematics && shapesmith estimate -c $F $S && shapesmith datacards -c $F $S && shapesmith fit -c $F $S --background-only
+  shapesmith hist -c $F $S && shapesmith estimate -c $F $S && shapesmith datacards -c $F $S && shapesmith fit -c $F $S --background-only   # hist with systematics: the card shapes
 done
 shapesmith combine -c configs/smrun2_binned_v7_ff.yaml --era 2016preVFP --era 2016postVFP --era 2017 --era 2018 \
                    -o /ceph/sdaigler/shapesmith/smrun2_binned_v7/combination/ff --background-only --validate
@@ -194,19 +191,38 @@ Switches of the tau run YAML (typed in `switches.py`; an unknown or mistyped swi
 | `ff_type` | `corrected` (default), `raw` | the FF friend weight of `jetFakes`: corrected, or raw (no DR->SR and non-closure corrections; needs `jet_fakes: ff` and `shape_systematics: false`) |
 | `embedding` | `false` (default), `true`, a list of channels (`[et, mt]`) | genuine ττ from the embedded samples (`EMB`) instead of the T parts of the MC, in every tau channel or in the listed ones (each a channel of the run); needs the embedding inventory in `sample_lists` |
 | `nn_friend` | `false` (default), `true` | NN categories from the NN friend |
+| `nn_prefix` | `""` (default), a column prefix | the model of the run among the models of the NN friend: it reads `<prefix>predicted_class` and `<prefix>predicted_max_value` (categories, control variable `NN_score` without the signal category, see the blinding rules) |
+| `nn_friend_prefixes` | `[]` (default), the prefixes of the friend | every model of the friend production; the skims keep the class and score columns of each, so the runs of all its models share one skim (must contain `nn_prefix`; empty: `nn_prefix` only) |
+| `nn_classes` | none (default), a list | the classes of the model in the order of `predicted_class`, with `HH2B2Tau` once (none: those of `ml_labels`, else `thesis6` with `jet_fakes: mc` and `v7b5` with `ff`); K = their number |
+| `nn_manifest` | none (default), a path | the `manifest.json` of the model's CROWN payload (`{channel}` and `{era}` filled), whose `classes` must equal the run's classes in order, else the build fails |
+| `nn_categories` | `k1` (default), `k2`, `thesis` | the NN categories (`variables.py`, spec 6.2): the argmax without `n_bjets >= 3` (K1), K1 with the HH category split into `HH2B2Tau_btag1` and `HH2B2Tau_btag2` (K2), or the argmax of the thesis (R3-R5) |
+| `nn_binning` | `data_blind` (default), `thesis` | their binning, resolved by `datacards` from 1000 fine bins: the data-blind rules of spec 6.3, or the custom edges and AutoRebin of the thesis |
 | `fastmtt_friend` | `false` (default), `true` | the control variables `m_fastmtt`, `pt_fastmtt`, `eta_fastmtt` and `phi_fastmtt` of et, mt and tt from the FastMTT friend (CROWN `sm_fastmtt`, tag `fastmtt`; em has none), which `ntuples.friends` must list for the tau channels |
-| `fit_categories` | `nn` (default), `control` | the categories of `hist`, `datacards` and `fit`: the NN classes (with `nn_friend`), or one category `nominal` per tau channel with the nominal region in one bin (`yield`), e.g. for `fit --background-only` without NN friends |
+| `fit_categories` | `nn` (default), `control`, `none` | the categories of `hist`, `datacards` and `fit`: the NN classes (needs `nn_friend: true`, else the run fails: without the friend there would be no tau category and cards with em only), one category `nominal` per tau channel with the nominal region in one bin (`yield`), e.g. for `fit --background-only` without NN friends, or none (a run of control plots) |
+| `ml_labels` | none (default), `thesis6`, `v7b5` | the ML export and its label profile (`ml.py`, see "NN training data"): `thesis6` needs `jet_fakes: mc`, `v7b5` `jet_fakes: ff`; the class order of the profile is also that of the NN categories (`predicted_class`) unless `nn_classes` names them |
+| `ml_variables` | none (default: every set), a list | the export variables: column names or the sets `thesis`, `objects`, `kinematics`, `reskim`, `truth` of `ml.py`; the skims of the run hold them (`reskim` and `truth` need the re-skim of NN spec X8); needs `ml_labels` |
+| `signal_sample` | `powheg` (default), `node_sm` | the signal `HH2B2Tau` from the powheg κλ = 1 sample, or from the madgraph node_SM sample of the master's thesis (R3, N9), the powheg sample then left out |
 | `control_regions` | `false` (default), `true` | wider skim plus the named pass/fail control regions; needs `jet_fakes: mc` |
 | `diagnostics` | `false` (default), `true` | QCD in the control regions (et/mt: same-sign data minus MC, tt: ABCD with the fail regions) and the variables `met_uncorrected`, `metphi_uncorrected`, `npv_good`, `rho` (the last two from production v6 on); needs `control_regions: true` |
 | `shape_systematics` | `true` (default), `false` | the CROWN shifts of the embedded samples and of the fake-factor friend as shape variations |
 | `crown_shifts` | `true` (default), `false` | `false` for a production without CROWN shifts (v7 is nominal only, E34): no embedding tau shifts; the fake-factor friend shifts and the weight variations of the nominal tree (b tag, prefiring) stay |
 | `dy_correction` | `none` (default), `njets_btag` | every DY process (ZTT, ZL, ZJ) times the DY data/MC table `DY_NJETS_BTAG` (`constants.py`) of its n_bjets (0, 1, ≥ 2) and n_jets (≤ 2, 3, ≥ 4) |
+| `ttbar_shape` | `false` (default), `true` | stage S0+ of the NN phase (SH7): the top-pT shape `CMS_htt_ttbarShape` of ttbar, see "Systematics stages" |
+| `heavy_flavour` | `false` (default), `true` | stage S0+ (SH8): `CMS_htt_heavy_flavour`, 30 % on the heavy-flavour component at ≥ 3 b tags; reads `bpair_hadronFlavour_{1,2}` (skims of the re-skim X8 or later) |
+| `signal_theory` | `[]` (default), a list of `qcd_scale`, `parton_shower`, `pdf` | stage S1 (SH14): the signal theory shapes normalised to the inclusive rate; needs `crown_shifts: true` (the shift production P6) and `signal_sample: powheg` |
+| `nn_validation` | `false` (default), `true` | the input validation of the NN phase (see "NN input validation"): the control variables are the NN inputs of the channel in fine bins, their eta-phi occupancy cells and `yield`; the skims keep the inputs of FastMTT |
+| `pseudo_shifts` | `false` (default), `true` | PRELIMINARY shape nuisances of the input validation: jets ±3 %, tau_h ±1.5 % with the MET propagated and the derived quantities recomputed (`CMS_pseudo_jes_<era>`, `CMS_pseudo_tes_<era>`, `CMS_pseudo_emb_tes_<era>`), symmetrised in the cards; with the NN friend also of its outputs (NV9 in S0+: the friend columns `<column>__<shift>` of `scripts/pseudo_nn_friend.py --pseudo-shifts`); needs `nn_validation` or `nn_friend` |
+| `ff_transfer` | `false` (default), `true` | the region `anti_iso` with the fake factor of the friend and its shifts (with the decay-mode non-closure of the fake factors) in `mc` mode (MC jet fakes in AR x FF against the nominal region); needs `jet_fakes: mc` and the fake-factor friend |
+| `nn_outputs` | `false` (default), `true` | the validation of the NN outputs (see "NN output validation"): the control variables are the outputs of the model (`NN_cat_<category>`, `NN_P_<class>`, `n_jets` and `mass_2` per category, `NN_ar_<HH category>`; with `ff_transfer` the MC-only copies `NNmc_*`) and `yield`; needs `nn_friend` |
+| `nn_blinding` | path with `{era}` | the `blinding.json` of the run's datacards: its edges show the `lo` part of the HH categories in the nominal region (without it they hide every event there); needs `nn_outputs` |
+| `nn_ff_payload` | path with `{year}`, `{channel}` | the fake-factor payload of the friend: the regions `anti_iso_ttbar_fraction(_up)`, the anti-isolated region weighted by its ttbar fraction (NV4b); needs `nn_outputs` |
+| `ff_same_sign` | `false` (default), `true` | the jet fakes of the same-sign region from its anti-isolated part times the fake factor (region `same_sign_anti_iso`); needs `jet_fakes: ff` |
 
 **em as the ttbar control channel.** A tau run YAML can list `em` in `channels` (e.g. `[et, mt, tt, em]`). It is a
 control channel (`Analysis.control_channels`): `datacards` and `fit` put it into every final state, never into one of
 its own. It is the dilepton em selection (OS, isolated e and μ, ≥ 2 jets) with the unsplit MC of the dilepton
-analysis (ttbar with the top-pT weight), one category `em_tt` with the b tag of the tau baseline counted in one bin,
-no further regions, the b-tag and prefiring variations of the tau channels and the lnN `eff_e`, `eff_m` and
+analysis (ttbar with the top-pT weight), one category `em_tt` with the b tag of the tau baseline counted in one bin
+(with NN categories two, `em_tt_btag1` and `em_tt_btag2`, without `n_bjets >= 3`, SH4), no further regions, the b-tag and prefiring variations of the tau channels and the lnN `eff_e`, `eff_m` and
 `CMS_eff_m_trigger_<era>` (2 %, the muon trigger of mt); `htt_tjXsec` correlates its ttbar with that of the tau channels. The friends of the
 tau channels name them (`channels: [et, mt, tt]`), so the em skim looks for none; a tau run with em has its own
 `skim_dir` (the em skim of the dilepton run has other columns). The ML labels come from the tau channels only, and
@@ -286,6 +302,14 @@ holds only the samples of its processes. The skim contract records `nevents` for
 `94bd5a0f` has a wrong mutau 2018D event count (21,362,177; its 57 files hold 25,419,943): use a database with the
 corrected count, and re-skim a skim made with the old one once with
 `shapesmith skim --force --samples EmbeddingRun2018D_cwinter-embedding_2018UL_mutau`.
+
+Repeated events (decided 2026-10-26): the tau, dilepton, tau-ID and trigger analyses set `event_key` = (run, lumi,
+event) (`constants.EVENT_KEY`), so every data and embedding sample is read without the skim rows that repeat an event of
+an earlier row of the sample, in file order (core README, "Steps"); the skims keep every row, and `hist`, `measure` and
+`ml-export` list the dropped rows in `repeated_events.json`. The only case in v7b is the mutau 2018D embedding: its
+input files `nano_35` and `nano_53` share 44 497 events, which leaves 59 repeated rows in the `tau_ff`/`tau_ff_nn`
+skims (2018 mt) and 243 in `tau_control`; every other data and embedding sample of the `tau_ff_nn`, `tau_control` and
+`dilepton` skims has none. The fake-factor measurement keeps them: its skims hold no run and lumi.
 
 `tests/fixtures/datasets.json` holds the database entries of exactly the nicks in `inventory/`, taken from the sibling
 checkout `KingMaker_sample_database` at `feat-run2-nanoaodv15-samples` `0de63ebe` (the v7 registration and the HH-WG
@@ -529,7 +553,9 @@ must follow its keys.
 | MC, embedding, fake-factor and dilepton weights, trigger chains, the DY correction weight | `weights.py` |
 | process tables (tau: gen-match split, dilepton: unsplit) | `processes.py` |
 | NN categories, control variables and binning | `variables.py` |
-| b-tag weight variations, embedding and fake-factor shifts, lnN table | `systematics.py` |
+| the scores of an installed NN payload in a copy of stored skims, as the NN friend writes them (dress rehearsal without a friend production) | `scripts/pseudo_nn_friend.py` |
+| the NN input validation: the inputs and the models that read them, their binning, the b-tag WPs of NV2, the occupancy cells, the pseudo-shifts | `nn_validation.py`, `scripts/nn_validation_*.py`, `scripts/fastmtt_refit.py` |
+| b-tag weight variations, embedding and fake-factor shifts, lnN table; the stages S0+ and S1 of the NN phase (ttbar shape, heavy flavour, signal theory and its inclusive normalisation) | `systematics.py`, `scripts/signal_theory_sums.py` |
 | colours, labels, axis titles of all six channels | `style.py` |
 | tau analysis assembly (with the control channel em), estimators, ML export | `analysis.py` |
 | fake-factor measurement: regions, processes, legs (QCD, W+jets, ttbar); its tables per era | `ff_measurement.py`, `ff_tables.py` |
@@ -554,10 +580,353 @@ written again and the `V7_*` sets shrink to nothing; with the first v7 files `du
 channel of v4 (from the golden references of 2026-09-30); `tests/test_contracts_v4.py` checks that the v4 run YAMLs
 differ from them by exactly the changes since (so a v4 skim needs `skim --force`).
 
+## NN training data (ML export)
+
+The NN phase (`docs/nn_limit_spec.md` of the workspace, 3.1, X1-X11) trains on the events the analysis selects, exported
+by `shapesmith ml-export` per era (format: core README, "ML export"): one row per event of the nominal (signal) region,
+with its identifiers, class, signed weight and variables. Switch `ml_labels` turns the export on (`ml.py`):
+
+| Profile | Run YAML | Classes (in this order = class index = `predicted_class`) |
+|---|---|---|
+| `thesis6` (`jet_fakes: mc`, R3-R5) | `smrun2_binned_v7b_noemb.yaml` (the `tau_control` skims), `ml/thesis6/<era>` | `HH2B2Tau`; `DY` = ZTT, ZL, ZJ; `ST`; `TT`; `VV` (each with its J part); `Other` = W, TTV, EWK, single Higgs |
+| `v7b5` (`jet_fakes: ff`, R6 on, N3) | `smrun2_binned_v7b_ff_nn.yaml` (re-skim `tau_ff_nn`), `ml/v7b5/<era>` | `HH2B2Tau`; `tautau` = EMB in et and mt, ZTT, TTT, STT, VVT, TTVT, EWKT in tt; `Top` = TTL, STL; `jetFakes`; `Other` = ZL, VVL, TTVL, EWKL, single Higgs |
+
+- **jetFakes** (`v7b5`): the data of the anti-isolated region times the fake factor, as the class of the training
+  (N6), and the processes the estimate subtracts (EMB or the genuine MC and the lepton fakes) in that region as
+  subtraction rows (`is_subtraction`, negated weights, class `jetFakes`): with them the class is the datacard
+  template (10-14 % smaller), for the proxy limit and the check of N6.
+- **No QCD in `thesis6`**: the ABCD QCD of the `mc` mode is an estimate of data histograms, not of events, and is not
+  exported (as in the thesis); a proxy limit of R3-R5 lacks it.
+- **Signal**: the powheg κλ = 1 sample; for R3 the node_SM sample of the thesis, `-s switches.signal_sample=node_sm`
+  with its own `ml_dir` (the run YAML header has the command), the powheg sample is then left out of the run.
+- **Variables** (`ml_variables`, sets of `ml.py`): `thesis` (the 20 inputs of the thesis with the v15 names `n_bjets`,
+  `n_jets`; `mtt_coll_approx` does not exist in v15 and is computed in the model from the legs and the MET),
+  `objects` (pt, eta, phi, mass of both legs, `iso_1`, `tau_decaymode_1/2`, the b pair with `bpair_btag_value_*`, the
+  two leading jets, `met`, `metphi`, `metSumEt`, FastMTT), `kinematics` (`mt_1`, `mt_2`, `mt_tot`, `pzetamissvis`,
+  `mass_tautaubb`, `pt_tautaubb`, `deltaR_ditaupair`, `bpair_deltaR`), `reskim` (`bpair_mass_1/2`, `jtag_value_1/2`)
+  and `truth` (`bpair_hadronFlavour_1/2`, `jet_hadronFlavour_1/2`, MC only: NaN in data and embedding rows). The
+  skims of the run hold every export column; `reskim` and `truth` are in the v7b n-tuples but not in the skims before
+  the re-skim of X8, so the `v7b5` run has its own skim directory and `thesis6` uses the three other sets. Values are
+  those of the n-tuple, with the CROWN default -10 for an absent object (the second jet, the b pair). `iso_1` is the
+  light-lepton isolation in et and mt but the raw DeepTau vsJet score of the leading tau in tt, which defines the
+  anti-isolated region: never an NN input in tt; `tau_decaymode_1` is that of a tau only in tt.
+- **Repeated events**: none in data and embedding rows (`event_key`, "Sample lists"; `<ml_dir>/repeated_events.json`).
+  The export `ml/v7b5` of 2026-10-25 predates it: its mt 2018 file repeats 52 rows of the mutau 2018D embedding (36 of
+  the class tautau, 16 subtraction rows of jetFakes). `ml/v7b5_dedupe` (2026-10-26, the same skims) is that export
+  without them, otherwise equal but for `row` and the `thesis_training` split of the later mt 2018 EMB rows (241 rows);
+  the M0 trainings read `ml/v7b5`, the proxy of the bbtautau-nn ladder `ml/v7b5_dedupe`.
+- **Folds**: none in the files. The trainer takes `event % n` on uint64 (n = 2 or 4, N28; the model of residue r
+  scores the events with `event % n == r`); `thesis_training` is the split of the thesis within a parity fold.
+- **Run 2**: `shapesmith ml-merge` puts the four eras into one file per channel (column `era`); the weights keep the
+  luminosity of their era, the class weights are the trainer's.
+
+```bash
+F=configs/smrun2_binned_v7b_ff_nn.yaml        # v7b5; the re-skim of X8 (new skim_dir), then the export of every era
+for E in 2016preVFP 2016postVFP 2017 2018; do
+  shapesmith skim -c $F -s era=$E && shapesmith ml-export -c $F -s era=$E; done
+shapesmith ml-merge -c $F --era 2016preVFP --era 2016postVFP --era 2017 --era 2018 -o /ceph/sdaigler/shapesmith/smrun2_binned_v7b/ml/v7b5/run2
+N=configs/smrun2_binned_v7b_noemb.yaml        # thesis6 on the stored tau_control skims (2018 for R3-R5)
+shapesmith ml-export -c $N -s era=2018
+shapesmith ml-export -c $N -s era=2018 -s switches.signal_sample=node_sm -s "ml_dir=/ceph/sdaigler/shapesmith/smrun2_binned_v7b/ml/thesis6_node_sm/{era}"   # R3
+```
+
+The runs with the NN categories, their cards and limits: "NN categories, limits and blinding" below.
+
+## NN input validation (NV1-NV3)
+
+The validation of the NN inputs before the first v7b training (`docs/nn_limit_spec.md` of the workspace, 7.1, E15, N13;
+`nn_validation.py`, the core command `shapesmith input-gof`). Inputs: the union of the columns the planned models read
+(`nn_validation.NN_INPUTS` with the models: the thesis recipe R3-R5 and M0 the 19 thesis columns and the legs and MET of
+`mtt_coll_approx`, 28 columns; M1 the same; M2/M3 the token fields of the eight slots and the HL features), plus
+`mtt_coll_approx` as the expression of the old CROWN formula. Not tested: the generator truth, the raw vsJet scores
+(`iso_1` in tt) and constants (`mass_1` in mt, `tau_decaymode_1` in et and mt).
+
+| Run YAML | Selection | Used for |
+|---|---|---|
+| `smrun2_binned_v7b_ff_nn_validation.yaml` | the signal region of the FF run (EMB in et/mt, jetFakes of `ff_v7b`, S0 systematics) | NV1 and NV3 in the SR, NV2 in the SR, D6 |
+| `smrun2_binned_v7b_nn_validation_control.yaml` | the emb control run with the control regions, `ff_transfer` (anti_iso x FF of `ff_v7b`) | NV1 in btag0_os_pass, w_highmt_pass and lepton_antiiso, the MC jet fakes AR/SR, D6; with `-s switches.embedding=false` the EMB width of NV3 |
+| `smrun2_binned_v7b_dilepton_nn_validation.yaml` | em, mm, ee with >= 2 jets | NV2 (em_tt btag1/btag2, mm/ee), NV3 in em and mm, D6 |
+
+Each has its own re-skim under `/ceph/sdaigler/shapesmith_test/nn-validate/` (the pseudo-shifts move events across the
+cuts; the control run reads the columns of the re-skim X8 and the FF friend). The pseudo-shifts (`nn_validation.py`
+docstring) recompute m_vis, pt_vis, mt_1, mt_2, mt_tot, pzetamissvis, mass_tautaubb, pt_tautaubb, the dijet masses and
+pT and `mtt_coll_approx` from the scaled four momenta and the propagated MET (checked against four-vectors in
+`tests/test_nn_validation.py`); FastMTT is not refitted but follows the mean response of a refit (`FASTMTT_*`). The three
+YAMLs set `combine.minimizer` to a fallback (`--cminFallbackAlgo Minuit2,Migrad,0:0.1`): with combine's default a failed
+observed fit gives a saturated statistic of 10^2-10^3 on an unremarkable card. btag0_os_pass and w_highmt_pass veto b
+tags, so the b pair and what is built from it are tested in the signal region and lepton_antiiso (`input-gof` writes no
+one-bin cards; lepton_antiiso has too few et events for one).
+
+```bash
+F=configs/smrun2_binned_v7b_ff_nn_validation.yaml; C=configs/smrun2_binned_v7b_nn_validation_control.yaml; D=configs/smrun2_binned_v7b_dilepton_nn_validation.yaml
+ERAS="--era 2016preVFP --era 2016postVFP --era 2017 --era 2018"; OUT=/ceph/sdaigler/nn/validation/<date>
+for E in 2016preVFP 2016postVFP 2017 2018; do S="-s era=$E"
+  shapesmith skim -c $F $S && shapesmith hist -c $F $S --control && shapesmith estimate -c $F $S --control
+  shapesmith skim -c $C $S
+  shapesmith hist -c $C $S --control --channels et,mt --regions nominal,anti_iso,btag0_os_pass,btag0_ss_pass,btag0_os_fail,btag0_ss_fail,w_highmt_pass,lepton_antiiso,lepton_antiiso_ss
+  shapesmith hist -c $C $S --control --channels tt --regions nominal,anti_iso,btag0_os_pass,btag0_ss_pass,btag0_os_fail,btag0_ss_fail
+  shapesmith estimate -c $C $S --control
+  shapesmith skim -c $D $S && shapesmith hist -c $D $S --control --regions nominal,btag0,btag1,btag2
+done
+# NV1 and NV3 in the SR and the control regions: with the pseudo-shifts, and without (--exclude CMS_pseudo, own output);
+# the better of the two minimizations of the autoMCStats parameters per card, 20 000 toys for every card below p = 1e-3
+GOF="--toys 300 --alt-minimizer '--X-rtd MINIMIZER_no_analytic' --tail-toys 20000"
+eval shapesmith input-gof -c $F $ERAS $GOF -o $OUT/gof/with_pseudo_shifts
+eval shapesmith input-gof -c $C $ERAS $GOF --channels et,mt --region w_highmt_pass -o $OUT/gof/with_pseudo_shifts   # also btag0_os_pass (et,mt,tt), lepton_antiiso
+python scripts/nn_validation_btag.py --dilepton $D --sr $F $ERAS -o $OUT/nv2                       # NV2
+python scripts/nn_validation_fastmtt_dilepton.py -c $D $ERAS --crown <CROWN> --build <dir> -o $OUT/nv3_dilepton   # NV3 em, mm
+python scripts/nn_validation_emb_width.py --emb $C --noemb-output-dir '<noemb output_dir>' $ERAS -o $OUT/nv3_emb   # NV3 EMB width
+python scripts/nn_validation_transfer.py -c $C $ERAS -o $OUT/transfer                               # MC jet fakes AR/SR
+python scripts/nn_validation_occupancy.py --sample sr:$F:et,mt,tt:nominal --sample btag0:$C:et,mt,tt:btag0_os_pass --sample dilepton:$D:em,mm:nominal $ERAS -o $OUT/occupancy   # D6
+```
+
+`scripts/fastmtt_refit.py` builds the FastMTT of a CROWN checkout (src/SVFit) with ROOT and runs it on numpy arrays; it
+reproduces the FastMTT friend bitwise and gives FastMTT where no friend exists (em, mm) and under the pseudo-shifts.
+
+## NN output validation (NV4, NV4b)
+
+The validation of the outputs of a trained model (`docs/nn_limit_spec.md` of the workspace, 7.1; `nn_outputs.py`, switch
+`nn_outputs`): data against the prediction for every score and category with the GoF rule of NV1 (`shapesmith
+input-gof`), the fake-factor closure per NN category on the MC jet fakes and the fake-factor fractions per category.
+Control variables (the scores in the 1000 fine bins of the categories): `NN_cat_<category>` (the score in each NN
+category of `nn_categories`, the HH categories in the nominal region and the region of its jet fakes only below the
+blinding edge of `nn_blinding`), `NN_P_<class>` (each class score over every event, without the events `NN_score` leaves
+out), `NN_n_jets_<category>` and `NN_mass_2_<category>` (the NV1 decisions of 2026-10-27), `NN_ar_<HH category>` (the
+HH score of anti-isolated taus only: never an event of the signal region), with `ff_transfer` the MC-only copies
+`NNmc_cat_<HH category>`, `NNmc_P_<class>`, `NNmc_<input>_<HH category>` (data and embedding below the axis).
+
+| Run | Regions | Used for |
+|---|---|---|
+| the fake-factor run of the model (`smrun2_binned_v7b_ff_nn_m0_v1.yaml` with the overrides of its ladder step) and `-s switches.nn_outputs=true -s switches.ff_same_sign=true -s switches.nn_blinding=<its cards>/{era}/datacards/all/blinding.json` | nominal (data, EMB, jetFakes), same_sign (jetFakes from `same_sign_anti_iso`) | NV4: the background categories, the `lo` parts, every class score (nominal); a weak hint (same sign); with `switches.ttbar_shape=true` S0 and S0+ from one `hist` (`input-gof --exclude CMS_htt_ttbarShape` for S0) |
+| `smrun2_binned_v7b_nn_m0k4_nv4_control.yaml` (M0-k4; copies of the input-validation control skims with the pseudo friend) | nominal and `anti_iso` (MC jet fakes, AR x FF), `w_highmt_pass`, `lepton_antiiso`, `abcd_anti_iso` and `anti_iso_ttbar_fraction(_up)` | NV4: the FF closure per category (`scripts/nn_outputs_transfer.py`), the weak hints high mT (b veto) and lepton anti-isolation; NV4b (`scripts/nn_outputs_fractions.py`) |
+
+NV4b compares, per category and card bin, the ttbar fraction of the anti-isolated region in the definition of the
+payload (QCD = data minus every simulated process, f = TTJ / (QCD + TTJ)) with the fraction the payload applies there
+(its (mt_1, n_jets) or (m_vis, n_jets) bins averaged over the jet fakes of the bin) and turns the difference into the
+change of the jetFakes template through the payload's own fraction shift (the fake factor is linear in the fractions),
+against the fake-factor band of the bin. The pseudo-friend copies of the control skims pass the skim reuse check of the
+run except for the decay-mode non-closure that `ff_transfer` adds (a weight of the fake factor: the rows do not depend
+on it).
+
+```bash
+F=configs/smrun2_binned_v7b_ff_nn_m0_v1.yaml; C=configs/smrun2_binned_v7b_nn_m0k4_nv4_control.yaml
+ERAS="--era 2016preVFP --era 2016postVFP --era 2017 --era 2018"; OUT=/ceph/sdaigler/nn/nv_m0k4
+STEP="<the -s overrides of the ladder step: skim_dir, nn_prefix, nn_friend_prefixes, nn_manifest; switches.ttbar_shape=true>"
+NV4="-s switches.nn_outputs=true -s switches.ff_same_sign=true -s switches.nn_blinding=<cards>/{era}/datacards/all/blinding.json -s output_dir=$OUT/output/tau_ff_nn/{era}"
+for E in 2016preVFP 2016postVFP 2017 2018; do
+  shapesmith hist -c $F -s era=$E $STEP $NV4 --channels et,mt,tt --control --regions nominal,anti_iso,same_sign,same_sign_anti_iso
+  shapesmith estimate -c $F -s era=$E $STEP $NV4 --channels et,mt,tt --control
+  python scripts/pseudo_nn_friend.py -c $C -s era=$E --channel <ch> --source /ceph/sdaigler/shapesmith_test/nn-validate/skims/tau_control_nn/$E --crown <CROWN> --payload-root <payload> --model nn_classifier/<model>=nn_m0k4_
+  shapesmith hist -c $C -s era=$E --control --channels et,mt --regions nominal,anti_iso,abcd_anti_iso,w_highmt_pass,lepton_antiiso,lepton_antiiso_ss,anti_iso_ttbar_fraction,anti_iso_ttbar_fraction_up
+  shapesmith hist -c $C -s era=$E --control --channels tt --regions nominal,anti_iso,abcd_anti_iso,anti_iso_ttbar_fraction,anti_iso_ttbar_fraction_up
+  shapesmith estimate -c $C -s era=$E --control
+done
+GOF="--toys 300 --alt-minimizer '--X-rtd MINIMIZER_no_analytic' --tail-toys 20000"
+eval shapesmith input-gof -c $F $ERAS $STEP $NV4 --channels et,mt,tt $GOF --variables <NN_cat_*,NN_P_*> -o $OUT/nv4/gof_s0plus
+eval shapesmith input-gof -c $F $ERAS $STEP $NV4 --channels et,mt,tt $GOF --variables <NN_cat_*,NN_P_*> --exclude CMS_htt_ttbarShape -o $OUT/nv4/gof_s0
+eval shapesmith input-gof -c $F $ERAS $STEP $NV4 --channels et,mt,tt $GOF --region same_sign -o $OUT/nv4/weak_s0
+eval shapesmith input-gof -c $C $ERAS --channels et,mt $GOF --region w_highmt_pass -o $OUT/nv4/weak_s0   # also lepton_antiiso
+python scripts/nn_outputs_transfer.py -c $C $ERAS -o $OUT/nv4/transfer                        # FF closure per NN category
+python scripts/nn_outputs_fractions.py -c $C $ERAS --limit-run '<the ladder step>/shapesmith/<variant>/{era}' -o $OUT/nv4b   # NV4b
+```
+
+NV4b is work in progress: the template-response estimate uses only the ttbar-fraction Up displacement.
+In saturated payload cells this displacement can be zero, so the corresponding bins have no verdict
+(`within_ff: null`, shown as `-`) and are excluded from the assessed-bin count. A report with such bins
+does not establish NV4b closure; an informative fraction response still has to be evaluated.
+
+## NN categories, limits and blinding
+
+The chain of the NN phase from the training data to the limit (`docs/nn_limit_spec.md` of the workspace, 3-8; the
+decisions N1-N28 of 2026-10-25): the categories, their binning and blinding (SH1-SH6), the statistics commands
+(SH9-SH12), the systematics stages and run YAMLs (SH7, SH8, SH13-SH15). The core README describes the mechanics
+("Score categories", "Limits and statistical checks"); this section names the analysis's choices.
+
+1. **Training data**: `ml-export` (above). The trainer (repository `bbtautau-nn`, N2) writes per model and channel one
+   ONNX file per outer-fold residue and a manifest with the inputs and classes in order and the fold count (`event % n`,
+   n = 2 or 4, N28: the model of residue r scores the events with `event % n == r` and never saw them); its `install`
+   puts them into the CROWN payload `payloads/nn_classifier/<model>/<era>/<scope>/manifest.json`.
+2. **NN friend**: CROWN bbtautau `sm_nn_classifier` evaluates every model of a production (its `MODELS`: payload
+   directory and column prefix) and writes `<prefix>predicted_class` (the class index in the order of the manifest),
+   `<prefix>predicted_max_value` and `<prefix>nn_score_<class>`, -1 outside its gate (the tau skim selection with
+   control regions, without the charge requirement, N21). It runs on the full list of every tau run, chained on the
+   FastMTT friend (KingMaker `sm_nn_classifier: {friend_tag: <tag>, requires: [sm_fastmtt]}`), the data under
+   `smrun2_binned_v7` and the MC and embedding under `smrun2_binned_v7b`, `--shifts None` until P6. Productions
+   (spec 9): FR1 `nn_thesis2018_v1` (2018, the thesis recipe trained on node_SM and on powheg, 6 classes), FR2 `nn_m0_v1`
+   (Run 2, M0 and M0-k4, 5 classes), FR3 `nn_step2_v1` (step 2); each a fresh tag.
+3. **NN runs** (SH13): each is the run it copies with the friend entries after `fastmtt`, `nn_friend: true`,
+   `fit_categories: nn`, the NN switches below and its own `skim_dir` (a new friend needs new skims; the production
+   skims stay), without export and gallery (`tests/test_nn_runs.py`). The model of a run is one column prefix of its
+   friend (`nn_prefix`); `nn_friend_prefixes` lists every model of the friend, whose columns the skims keep, so the run of
+   the other model reuses the skims with `-s switches.nn_prefix=...` and its own `output_dir` (the YAML headers have the
+   commands). The prefixes are those of the friend's `MODELS` (CROWN `sm_nn_classifier.py`, empty until FR1/FR2 exist).
+
+   | Run YAML | Friend | Runs | NN switches | Background model |
+   |---|---|---|---|---|
+   | `smrun2_binned_v7b_nn_thesis2018_v1.yaml` | FR1, 2018 | R4 (powheg); R3 with `-s switches.signal_sample=node_sm -s switches.nn_prefix=nn_thesis_nodesm_` and its own `output_dir` (skim once more with `signal_sample=node_sm` for the node_SM sample) | `nn_prefix: nn_thesis_powheg_`, `nn_friend_prefixes: [nn_thesis_nodesm_, nn_thesis_powheg_]`, `nn_categories: thesis`, `nn_binning: thesis` (classes thesis6 of the `mc` mode) | `noemb`: MC jet fakes, ABCD QCD, no embedding; et, mt, tt (the final state `all` without em, as the thesis) |
+   | `smrun2_binned_v7b_ff_nn_thesis2018_v1.yaml` | FR1, 2018 | R5 (the R4 model) | as R4 and `nn_classes: [HH2B2Tau, DY, ST, TT, VV, Other]` (thesis6: the `ff` mode would give v7b5) | the final one: EMB in et/mt, `jetFakes` from `ff_v7b`, em; `datacards --channels et,mt,tt` for `all` without em |
+   | `smrun2_binned_v7b_ff_nn_m0_v1.yaml` | FR2, every era | R6, R7 (M0), the baseline; R8 (M0-k4) with `-s switches.nn_prefix=nn_m0k4_` and its own `output_dir` | `nn_prefix: nn_m0_`, `nn_friend_prefixes: [nn_m0_, nn_m0k4_]`, `nn_categories: k1` (`k2` if R7 chooses it, N10), `nn_binning: data_blind` (classes v7b5) | the final one with `ff_v7b` |
+   | `smrun2_binned_v7b_ff_w_nn_m0_v1.yaml` | FR2, every era | the same with W+jets fake factors (N7: trained with `ff`, limits for `ff` and `ff_w`) | as above | the final one with `ff_v7b_w` |
+
+   `nn_manifest` (unset in the YAMLs until the payloads exist) checks the classes against the installed manifest.
+
+   ```bash
+   F=configs/smrun2_binned_v7b_ff_nn_m0_v1.yaml
+   for E in 2016preVFP 2016postVFP 2017 2018; do S="-s era=$E"
+     shapesmith skim -c $F $S -s switches.heavy_flavour=true   # once; with the S0+ columns, so the skims serve S0 and S0+
+     shapesmith hist -c $F $S && shapesmith estimate -c $F $S && shapesmith datacards -c $F $S && shapesmith fit -c $F $S
+     shapesmith datacards -c $F $S --variant stat_only --no-systematics && shapesmith fit -c $F $S --variant stat_only; done
+   shapesmith combine -c $F --era 2016preVFP --era 2016postVFP --era 2017 --era 2018 -o /ceph/sdaigler/shapesmith/smrun2_binned_v7b/combination/ff_nn_m0_v1
+   ```
+   `hist` runs **without** `--skip-systematics` (which books no variation at all, so the cards would have no shapes)
+   and fills every NN category in 1000 fine bins plus the unweighted counts `NN_score%raw` the binning needs: shapes of
+   an earlier ShapeSmith version must be filled again.
+4. **Categories** (`nn_categories`, spec 6.2, N10-N12): K1 (`k1`) is the argmax over the classes per channel and era,
+   one category per class named after it (`HH2B2Tau`, `tautau`, `Top`, `jetFakes`, `Other` for v7b5) with the cut
+   `(<prefix>predicted_class == i) & (n_bjets < 3)`; the discriminant is the score of the predicted class
+   (`<prefix>predicted_max_value`, in the HH category P(HH)), finely binned; the background categories have at most 5
+   bins and act as normalisation controls. K2 (`k2`) splits the HH category into `HH2B2Tau_btag1` (`n_bjets == 1`) and
+   `HH2B2Tau_btag2` (`== 2`; about 40 % of the signal has one b jet); K2 replaces K1 if it gains ≥ 3 % and > 2σ_paired
+   in R7, then scheme and binning algorithm are fixed. `thesis` is the plain argmax of the thesis (R3-R5). Events with
+   `n_bjets ≥ 3` are cut from K1 and K2 (N12, -2.3 % signal), and with NN categories em_tt is split into
+   `em_tt_btag1` and `em_tt_btag2` without btag3p (SH4). Card bins of a K1 tau channel: `htt_<ch>_1lo_<era>`,
+   `htt_<ch>_1hi_<era>`, then `htt_<ch>_2_<era>` to `htt_<ch>_5_<era>`; the background-only fit summaries name them
+   `HH2B2Tau lo`, `HH2B2Tau hi`, `tautau`, ...
+5. **Binning** (`nn_binning`, spec 6.3, the same data-blind algorithm for every model from R6 on): `datacards` resolves
+   the edges after `estimate` from the nominal templates (the rules need the jetFakes template; data are never read).
+   `data_blind` (rule set C', decided 2026-10-26): the HH category starts from 50 bins of equal signal on P(HH) in
+   [1/K, 1] and merges from the top until every bin has a total background ≥ 1.0 weighted events with a relative
+   statistical uncertainty ≤ 50 %, ≥ 1 unweighted event of each raw-count group whose share of the category's
+   background (nominal templates, P ≥ 1/K) is ≥ 10 % (in tt Top, 3-4 %, is exempt), and no template (signal, every
+   background, jetFakes) below -1 % of the bin's total background; the remaining low bins join the lowest accepted
+   bin, at most 15 bins. The background categories start from 5 bins of equal background, with the same raw-count and
+   negative rules, ≤ 10 % and ≤ 5 bins. The rules before C' (≤ 30 %, every raw-count group, every template ≥ 0) cost
+   ×1.27 on the limit of R6_wp, almost all in tt. The raw-count groups follow the background model
+   (`ml.raw_count_groups`): Top (TTL, STL), tautau (EMB or the genuine MC di-tau) and jetFakes (its anti-isolated
+   data) with fake factors; TT, DY and the ABCD QCD in `mc` mode.
+   jetFakes (QCD in `mc` mode) is clipped at 0 after the rebinning (SH6, listed under `clipped` in
+   `template_changes.json`). `thesis`: the custom edges of the thesis (HH) and 20 equal bins (others), merged by the
+   AutoRebin(1.0, 0.9) of the thesis, for R3-R5 and as the cross-check of R6 and R7. The edges per channel and category
+   go to `<card dir>/nn_binning.json` (with the rules, the share of every raw-count group and the exempt groups);
+   datacards warns when a blinded category has fewer than 3 bins (N11: the 2016
+   halves stay separate cards).
+6. **Blinding** (spec 6.4, N14), see the rules below.
+7. **Statistics** (spec 7.2, commands of the core README, all with `--variant KEY`): `fit` gives the prefit Asimov
+   limits (`-t -1 --expectSignal 0`, converged with `combine.precise`) on μ and σ(ggF HH) for the model comparisons;
+   `fit --background-only` the masked background-only fit with pulls and the prefit/postfit stacks of every card bin;
+   `limit-aposteriori` the expected limit of the result (the masked background-only fit to the data, its snapshot, then
+   `AsymptoticLimits -t -1 --toysFrequentist --bypassFrequentistFit`); `injection` toys at μ = 0, 1 and the expected
+   limit (linearity, unbiased pulls); `limit-hybridnew` the HybridNew cross-check of the final expected limit; `gof` the
+   saturated GoF with toys per channel, era and combined; `impacts` (data or `--asimov`) with pull plots; `limit-overview`
+   the table and Brazil plot per channel, era and combined. `datacards --variant stat_only --no-systematics` puts the
+   "statistics only" cards beside S0; the r range, minimizer, timeout and parallel jobs are `combine:` options of the run
+   YAML. The NN run YAMLs set the fallback of the validation runs, `--cminFallbackAlgo Minuit2,Migrad,0:0.1`: combine's
+   default reports a failed fit to the data as it is; a fit that converges (the Asimov limits) stays the same. `fit
+   --limits-only` (and `combine --limits-only`) leaves out the significance and the best fit.
+8. **Units** (N23): μ = σ/σ_SM of ggF HH → bbττ first; σ(ggF HH) = r × 30.40 fb (`Analysis.signal_cross_section`), from
+   a second limit with the cross-section theory nuisances of the signal (`QCDscale_HH`, `PDF_alphas_HH`) frozen and its
+   acceptance, shape and BR uncertainties kept; ggF only, named so. Every result is reported with "statistics only"
+   (data statistics and autoMCStats) next to its stage.
+
+**Dress rehearsal without a friend production** (`scripts/pseudo_nn_friend.py`): it scores the events of stored skims
+with installed payloads exactly as the friend does (CROWN's `nn_payloads.read_payload` and gate, the model of residue
+`event % n` on uint64, one event per call, -1 outside the gate) and writes a copy of the skims with the friend columns
+of every `--model PAYLOAD=PREFIX` and the manifests extended by the friend of the run YAML, then checks the copy with
+ShapeSmith's skim reuse check. A copy of a run YAML with `skim_dir` on the copy then runs `hist` and the rest unchanged.
+
+**Blinding rules** (spec 6.4, 8):
+- Every HH category is two card channels, `htt_<ch>_<k>lo_<era>` and `htt_<ch>_<k>hi_<era>` (combine can mask whole
+  channels only), split at S/B(μ = 1) = 0.5 % from the nominal templates of the model, before data are looked at: the hi
+  part starts at the lowest bin with S/B > 0.5 % and takes every bin above it (even one that falls back below); no lo
+  channel if the lowest bin passes, one unsplit unmasked channel if none does.
+- The hi channels have the Asimov background prediction as `data_obs`; the lo channels, the background categories and
+  the control regions have the real data. `datacards` writes `<output_dir>/datacards[/<variant>]/<final
+  state>/blinding.json` next to `combined.txt` (format: core README, "Score categories"); `masked` lists exactly the
+  card bins whose `data_obs` is the Asimov prediction; a card without NN categories has no file, and a missing file
+  masks nothing. `combine` merges the `masked` lists of the cards of the eras.
+- Every fit to real data (`fit --background-only`, `combine --background-only`, `gof`, `impacts` on data, the fit of
+  `limit-aposteriori`, the toys of `injection --a-posteriori`) builds the workspace with `--channel-masks` and adds
+  `mask_<bin>=1` for every bin in `masked` to its `--setParameters`; a prefit Asimov fit (`-t -1`) needs no mask. The
+  summaries list the masked channels and show no data for them.
+- Plots and gallery yields of the NN categories show the prediction in the hi bins (`plot --blind` hides the data of the
+  whole histogram). These plots and the prefit and postfit stacks of `fit --background-only` draw the bins of the card
+  with equal widths and the bin edges as tick labels, in events per bin (`plot --normalize-by-bin-width`: dN/dx on the
+  score axis instead).
+- Only the signal category is blinded (multiclass argmax categories, decided 2026-10-25): the control variable
+  `NN_score` (the score of the predicted class over every event; `hist --control`, `plot --control`, the gallery)
+  leaves out the events predicted as `HH2B2Tau` in the nominal region and in the anti-isolated region whose events are
+  its jet-fake estimate (`anti_iso`, `abcd_anti_iso` in `mc` mode), so that its prediction holds the same events as its
+  data (`variables.nn_score_blinding`: their score minus 2, below the axis). Every other region keeps every event (same
+  sign, lepton anti-isolation, btag0, high mT); the os pass and fail regions of btag1, btag2 and btag3p
+  (`control_regions`) lie inside the nominal or the anti-isolated region and lose those events too, while their
+  same-sign QCD estimate keeps them.
+- Not blinded, and never read by combine: `shapes.root` and its index `shapes.json` (the sum of every histogram, the
+  data of a whole NN category included) and `sync` (the fit categories in their 1000 fine bins with the full data).
+  Their nominal-region data of the NN categories stay unread until unblinding.
+- Unblinding (S2: real data in hi, no masks; `--unblind` of the fit commands, logged loudly) only after NV4, NV5 and
+  the checks of spec 7.2 have passed with S1, the impacts are reviewed, and with the release of the analysis owner; no
+  run YAML or default unblinds.
+
+**Systematics stages** (spec 8; `systematics.py`, switches of the tau run, all off by default so that every run YAML
+stays at S0; `tests/test_nn_systematics.py`):
+
+| Stage | Nuisances | Switches |
+|---|---|---|
+| S0 (now, nominal only, E34) | data statistics and autoMCStats; the lnN (Cholesky lumi, cross sections, HH theory, BR, lepton and τ ID, EMB ES, syst_TES as acceptance lnN); the weight shapes of the nominal trees (b tag, prefiring as lnN, FF friend shifts with the FF DM non-closure, EMB ID weight factors) | the v7b FF runs as they are (`study_uncertainties`, `symmetrise_ff_shifts`) |
+| S0+ (ShapeSmith only, before P6) | + the ttbar top-pT shape (SH7), + the heavy-flavour normalisation (SH8; a no-op in K1 and K2, see below), + the pseudo-shifts of NV9 as preliminary shapes of the NN outputs (see below); em_tt btag1/btag2 (SH4) and the merge and clip of negative jetFakes bins (SH6) come with the NN categories at every stage | `ttbar_shape: true`, `heavy_flavour: true`, `pseudo_shifts: true` |
+| S1 (after P6) | + every kinematic CROWN shift (needs the NN friend with `--shifts all` and the `fastmtt` friend with shifts), PS, PU, the signal theory shapes (SH14) | `crown_shifts: true`, `signal_theory: [qcd_scale, parton_shower, pdf]` |
+| S2 | unblinding, see the blinding rules | - |
+
+- **SH7 `CMS_htt_ttbarShape`** (v7_analyse 4.1, 11.2 no. 2): the ttbar n_jets slope (≥ 4 against 2 jets -3 to -7 %
+  in em, to -14 % in em btag1) has no shape uncertainty in the cards. As in the tau-ID measurement (K9, TOP: with
+  against without the weight): Down without `topPtReweightWeight`, Up its mirror 2 w - 1 around the nominal, on every
+  process carrying the top-pT weight (`weights.TOP_PT`: TTT, TTL, TTJ of the tau channels, TT of em), one nuisance for
+  every channel and era (theory, K), in the nominal region. The weight lies in [0.83, 1.06] in the v7b skims; in 2018 it
+  moves ttbar by ±0.5-0.8 % at 2 jets and ±2.2-2.5 % at ≥ 4 jets (TTL of mt and et), ±3.4-4.7 % for TTT in tt, and the
+  simulated backgrounds by ±1.2 / 0.9 / 1.7 % (et / mt / tt), so it covers about a third to a half of the slope; the
+  ISR/FSR PS weights of ttbar follow with P6.
+- **SH8 `CMS_htt_heavy_flavour`** (v7_analyse 4.5, 11.2 no. 1; N12): the simulation lacks heavy flavour at ≥ 3 b tags
+  (data/prediction of btag3p 1.24-1.37 in em, 1.26-1.35 in mm + ee with the DY table, 0.99-1.29 in et and mt, in every
+  era; the b-tag SF +1σ reaches only 1.25-1.35): ttbb, Z/V + bb and g → bb. Its component is the events with
+  `n_bjets ≥ 3` whose b pair is two heavy-flavour jets (`bpair_hadronFlavour_{1,2}` 4 or 5), on every simulated
+  background (not the signal, EMB or the data-driven jetFakes/QCD, whose data contain the heavy flavour), in the tau
+  channels and em; Up × 1.30, Down × 1/1.30 (lnN 1.30, the size of the deficit), written as a weight variation so that
+  its share sets its size per bin, one nuisance (theory, K). Below 3 b tags the b pair of ttbar is that of the top decays
+  and the DY table corrects DY in btag1 and btag2 (`CMS_htt_dy_table`), so the component starts at 3 b tags. In 2018 it
+  is 79-85 % of the btag3p backgrounds and 0.9-1.6 % of all simulated backgrounds (et, mt, tt): +30 % on it gives
+  +24-26 % on btag3p and +0.5 / 0.5 / 0.3 % on the simulated backgrounds (et / mt / tt). With NN categories no category has `n_bjets ≥ 3` (K1/K2 cut btag3p, em_tt
+  is split into btag1 and btag2), so the nuisance is a no-op there and `datacards` leaves it out (logged); it acts on the
+  control categories and is the prerequisite for btag3p in the NN categories. The ttbb fraction of ttbar itself
+  needs the ttbb identifier of P6 (N19). It reads columns of the re-skim X8 (`skims/tau_ff_nn` and the NN runs): skim
+  with the switch on, or the skim reports the missing columns.
+- **NV9 pseudo-shifts of the NN outputs** (S0+; `pseudo_shifts` with the NN friend): the pseudo-shifts of the input
+  validation (`nn_validation.py`: jets ±3 %, τh ±1.5 %, the MET propagated, the derived inputs and the cuts recomputed)
+  also read the outputs of the model under the shift, the friend columns `<column>__<shift>` (the model evaluated on the
+  shifted inputs behind the shifted gate). Until the shift production P6 the pseudo friend writes them
+  (`scripts/pseudo_nn_friend.py --pseudo-shifts`) into copies of skims that keep the events passing under a shift, the
+  skims of the input validation (`/ceph/sdaigler/shapesmith_test/nn-validate/skims/tau_ff_nn`); em from the skims of the
+  run. The pairs are symmetrised in the cards like those of NV1. Objects below the CROWN thresholds are not in the
+  n-tuples, so an Up shift misses the events that would enter there; n_jets and n_bjets stay.
+- **SH14 signal theory** (S1, N19, N23): the QCD scales `QCDscale_ren_HH_acc` and `QCDscale_fac_HH_acc` from the CROWN
+  shifts `lhe_scale_weight__QCDscale_{ren,fac}{Up,Down}` (bbtautau `variations/theory.py`, muR or muF 2 and 0.5), the
+  parton shower `ps_isr_HH`, `ps_fsr_HH` (ISR/FSR scale 2 Up, 0.5 Down, NanoAOD `PSWeight`) and `pdf_HH_acc` (1 ± the
+  Hessian sum of `LHEPdfWeight`, CROWN `event::reweighting::LHEpdf`), each the varied weight over its inclusive mean
+  (`systematics.SIGNAL_THEORY_NORM`, measured per era by `scripts/signal_theory_sums.py` on the NanoAOD of the powheg
+  sample: the Runs sums `LHEScaleSumw`, `PSSumw`, and the PDF from the Events of one file), so only acceptance and shape
+  remain and nothing is counted twice with `QCDscale_HH` and `PDF_alphas_HH`. Inclusively the scales move the signal by
+  -10.6/+12.0 % (muR) and -1.8/+2.3 % (muF), the PS by ≤ 0.1 %, the per-event PDF sum by ±1.8 %. The v7b n-tuples have
+  only the nominal `lhe_scale_weight` (no `LHEScaleWeight`, `PSWeight` or `LHEPdfWeight`, checked on the HH files of
+  2018): the QCD scales need the CROWN shift production (P6); the PS and PDF columns need producers in `sm_config` (their
+  names `ps_weight__ps_{isr,fsr}*` and `lhe_pdf_weight__pdf*` are aligned with them at P6). Without the columns the skim
+  reports them missing.
+
 ## Prerequisites outside this repository
 
-- NN friend trees (`predicted_class`, `predicted_max_value`) from a trained model + CROWN `sm_ml.py`. With embedding
-  shifts the NN friend must be produced with `--shifts all`, or the NN category and score stay nominal under them.
+- NN friend trees from a trained model and the CROWN friend `sm_nn_classifier` (NN spec 3.4; CROWN bbtautau
+  `feat-new-sm-bbtautau-config`, see "NN categories, limits and blinding"). `<prefix>predicted_class` indexes the classes
+  of the model (`nn_classes`, else the label profile: `ml.ML_CLASSES`, the `classes` of the export's `classes.json` and
+  of the payload's `manifest.json`). With CROWN shifts the NN friend must be produced with `--shifts all`, or the NN
+  category and score stay nominal under them.
 - Fake-factor friends (`fake_factor`, `fake_factor_1/2`, the raw `fake_factor_raw`, `fake_factor_1/2_raw` and their
   shifts) from CROWN `fake_factors_friend_config.py`, on data, MC and embedding. A new FF payload gets a new friend tag
   (a new `ntuples.friends` base); the skim contract records the friend bases, so the stored skims then need `skim --force`.

@@ -19,6 +19,11 @@ from bbtautau_shapesmith.cuts import genmatch_cuts
 from bbtautau_shapesmith.weights import dilepton_mc_weights, embedding_weights, group_weights, mc_weights
 
 SIGNAL = "HH2B2Tau"  # the powheg NLO ggF HH -> bbtautau, kappa_lambda = 1 (E23)
+# sigma(ggF HH) at kappa_lambda = 1 in fb, the unit of the limits on the cross section (spec N23): r x SIGNAL_XS_FB; the
+# sample cross section 0.002221 pb is this times 2 BR(H->bb) BR(H->tautau). Its theory nuisances (scale + THnum + m_t,
+# PDF + alpha_s; systematics.lnn) are frozen in that limit, the BR and the acceptance and shape uncertainties stay.
+SIGNAL_XS_FB = 30.40
+SIGNAL_XS_NUISANCES = ("QCDscale_HH", "PDF_alphas_HH")
 NODE_SM = "HH2B2Tau_nodeSM"  # the madgraph node_SM sample: the cross-check of the signal (an auxiliary process)
 VH_TAUTAU = "VH_htt"  # ZH and W+-H with H -> tautau (E23)
 OPTIONAL_GROUPS = frozenset({VH_TAUTAU, NODE_SM})

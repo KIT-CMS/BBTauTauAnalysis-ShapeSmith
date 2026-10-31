@@ -141,8 +141,14 @@ def nicks(sample_list: str = "sm2018_binned_v2") -> tuple[str, ...]:
     return read_sample_list(INVENTORY / f"{sample_list}.txt")
 
 
-def config(channels=("et", "mt", "tt"), analysis="bbtautau_shapesmith.analysis:build", era="2018", database=DATABASE, **switches) -> RunConfig:
-    """A run configuration on the fixture database; the sample lists default to the v2 production."""
+TAU_ANALYSIS = "bbtautau_shapesmith.analysis:build"
+
+
+def config(channels=("et", "mt", "tt"), analysis=TAU_ANALYSIS, era="2018", database=DATABASE, **switches) -> RunConfig:
+    """A run configuration on the fixture database; the sample lists default to the v2 production. A tau run without
+    the NN friend has no fit categories unless it names them (fit_categories nn needs the friend, NN spec X9)."""
     switches.setdefault("sample_lists", ["sm2018_binned_v2"])
+    if analysis == TAU_ANALYSIS:
+        switches.setdefault("fit_categories", "nn" if switches.get("nn_friend") else "none")
     return RunConfig(analysis=analysis, era=era, channels=list(channels), switches=switches, ntuples={"base": "/unused"},
                      skim_dir="/unused/skim", output_dir="/unused/output", sample_database=database)

@@ -8,6 +8,7 @@ from pydantic import AfterValidator, BaseModel, ConfigDict, Field, ValidationErr
 from shapesmith.model import AnalysisError
 
 from bbtautau_shapesmith.constants import RECOIL_ERAS
+from bbtautau_shapesmith.ml import ML_PROFILES
 
 STRICT = ConfigDict(extra="forbid", strict=True, frozen=True)
 SampleLists = list[str]  # inventory/<name>.txt: the KingMaker sample lists of the production
@@ -69,10 +70,38 @@ class TauSwitches(_EmbeddedChannels, _FakeFactorProcesses, BaseModel):
     ff_type: Literal["corrected", "raw"] = "corrected"  # FF friend weight; raw: no DR->SR and non-closure corrections (needs jet_fakes: ff, shape_systematics: false)
     embedding: Embedding = False  # genuine tautau from the embedded samples instead of MC, in every tau channel or the listed ones
     nn_friend: bool = False  # NN categories from the NN friend
+    # the model of the NN friend (SH1): the column prefix of the model (one friend can hold several models; columns
+    # <prefix>predicted_class, <prefix>predicted_max_value, <prefix>nn_score_<class>, -1 outside its gate) and its
+    # classes in the order of predicted_class (none: those of the label profile, ml_labels or else thesis6 with
+    # jet_fakes mc and v7b5 with ff); nn_manifest: the manifest.json of the model's CROWN payload ({channel} replaced by
+    # every tau channel of the run), whose "classes" must be exactly these classes
+    nn_prefix: Annotated[str, Field(pattern=r"^[A-Za-z0-9_]*$")] = ""
+    nn_classes: list[str] | None = None
+    nn_manifest: str | None = None
+    # the column prefixes of every model of the NN friend production (the MODELS of its CROWN configuration): the skims
+    # keep <prefix>predicted_class and <prefix>predicted_max_value of each, so that one skim serves the run of every
+    # model (nn_prefix picks it, -s switches.nn_prefix=...); empty: the columns of nn_prefix only
+    nn_friend_prefixes: list[Annotated[str, Field(pattern=r"^[A-Za-z0-9_]*$")]] = Field(default_factory=list)
+    # the NN categories (variables.py): thesis (argmax, R3-R5), k1 (argmax without n_bjets >= 3, N12) or k2 (k1 with the
+    # HH category split by n_bjets == 1 / == 2, N10); their binning, resolved by datacards: data_blind (NN spec 6.3) or
+    # thesis (the custom edges and AutoRebin(1.0, 0.9) of the thesis)
+    nn_categories: Literal["thesis", "k1", "k2"] = "k1"
+    nn_binning: Literal["data_blind", "thesis"] = "data_blind"
+    # the ML export (ml.py, NN spec 3.1): the label profile thesis6 (needs jet_fakes: mc) or v7b5 (needs jet_fakes: ff),
+    # none without an export; the class order of the profile is also that of the NN categories
+    ml_labels: Literal["thesis6", "v7b5"] | None = None
+    # the export variables: column names or the variable sets of ml.py (thesis, objects, kinematics, reskim, truth);
+    # none: every set (reskim and truth need the re-skim of X8)
+    ml_variables: list[str] | None = None
+    # the signal process HH2B2Tau from the powheg kappa_lambda = 1 sample (E23), or from the madgraph node_SM sample of
+    # the master's thesis (R3, N9; the powheg sample is then left out)
+    signal_sample: Literal["powheg", "node_sm"] = "powheg"
     # the control variables m, pt, eta and phi_fastmtt of the di-tau system from the FastMTT friend (CROWN sm_fastmtt,
     # tag fastmtt; et, mt and tt, em has none)
     fastmtt_friend: bool = False
-    fit_categories: Literal["nn", "control"] = "nn"  # nn: the NN categories (with nn_friend); control: one category 'nominal' per channel
+    # nn: the NN categories (needs nn_friend); control: one category 'nominal' per channel; none: no fit categories
+    # (a run of control plots)
+    fit_categories: Literal["nn", "control", "none"] = "nn"
     control_regions: bool = False  # wider skim plus the named pass/fail control regions (needs jet_fakes: mc)
     diagnostics: bool = False  # QCD in the control regions and the diagnostic variables (needs control_regions; npv_good, rho from v6)
     shape_systematics: bool = True  # the embedding and fake-factor shifts (column variations)
@@ -92,6 +121,69 @@ class TauSwitches(_EmbeddedChannels, _FakeFactorProcesses, BaseModel):
     # v7b fake-factor runs since 2026-10-19: the mt QCD non-closure shifts of 2017/2018 at -8/+28 % made robustHesse drop
     # them from the covariance); needs jet_fakes: ff
     symmetrise_ff_shifts: bool = False
+    # the systematics stages of the NN phase (nn_limit_spec.md 8, systematics.py): S0+ the top-pT shape of ttbar
+    # CMS_htt_ttbarShape (SH7) and the 30 % normalisation of the heavy-flavour component at >= 3 b tags
+    # CMS_htt_heavy_flavour (SH8; needs skims with bpair_hadronFlavour_{1,2}, as the re-skim of NN spec X8), on the
+    # tau channels and em; S1 the signal theory shapes normalised to the inclusive rate (SH14): qcd_scale (the CROWN
+    # shifts QCDscale_ren and QCDscale_fac of lhe_scale_weight), parton_shower and pdf (columns the shift production P6 is
+    # to add); they need crown_shifts: true and the powheg signal
+    ttbar_shape: bool = False
+    heavy_flavour: bool = False
+    signal_theory: list[Literal["qcd_scale", "parton_shower", "pdf"]] = Field(default_factory=list)
+    # the input validation of the NN phase (nn_validation.py, nn_limit_spec.md 7.1, NV1-NV3): the control variables are
+    # the NN inputs of each channel in fine bins (shapesmith input-gof merges them), the eta-phi occupancy of the legs and
+    # jets and yield; the skims keep the inputs of FastMTT with the MET covariance (a refit, scripts/fastmtt_refit.py)
+    nn_validation: bool = False
+    # PRELIMINARY pseudo-shifts of the jet (3 %) and tau_h (1.5 %) energies with the MET propagated, as shape nuisances of
+    # the jet, MET and FastMTT inputs until P6 (NV1 with NV9 size, nn_validation.py), symmetrised in the datacards; with
+    # the NN friend also of its outputs (S0+, NV9: the friend columns of each shift, scripts/pseudo_nn_friend.py
+    # --pseudo-shifts); needs nn_validation or nn_friend
+    pseudo_shifts: bool = False
+    # the anti-isolated region anti_iso with the fake-factor weight of the friend and its shifts in mc mode: the shapes
+    # of the MC jet fakes there against the nominal region (NV1, NV4), with the decay-mode non-closure of the fake
+    # factors among the shifts; needs jet_fakes: mc and the fake-factor friend
+    ff_transfer: bool = False
+    # the validation of the NN outputs (nn_outputs.py, nn_limit_spec.md 7.1, NV4 and NV4b): the outputs of the model as
+    # the control variables (the score per category and class, n_jets and mass_2 per category; with ff_transfer their
+    # MC-only copies; with nn_validation besides the inputs); nn_blinding: the blinding.json of the run's datacards ({era} filled) whose edges show the lo part
+    # of the HH categories in the nominal region (without it they hide every event there); nn_ff_payload: the
+    # fake-factor payload of the friend ({year} and {channel} filled, e.g. CROWN bbtautau
+    # payloads/fake_factors/sm/fake-factors-2026-10-19/{year}/fake_factors_{channel}.json.gz) for the regions of the
+    # fractions in the anti-isolated region (NV4b). All need nn_outputs, which needs nn_friend
+    nn_outputs: bool = False
+    nn_blinding: str | None = None
+    nn_ff_payload: str | None = None
+    # the jet fakes of the same-sign region from its anti-isolated part times the fake factor (region
+    # same_sign_anti_iso), so that the same-sign region has a prediction (NV4, a weak hint); needs jet_fakes: ff
+    ff_same_sign: bool = False
+
+    @model_validator(mode="after")
+    def _nn_categories_need_the_nn_friend(self) -> TauSwitches:
+        # without the friend there would be no tau category at all, and datacards with em only (NN spec X9)
+        if self.fit_categories == "nn" and not self.nn_friend:
+            raise ValueError("fit_categories nn requires nn_friend: true (without the NN friend: control or none)")
+        return self
+
+    @model_validator(mode="after")
+    def _nn_classes_hold_the_signal_once(self) -> TauSwitches:
+        if self.nn_classes is not None and (self.nn_classes.count("HH2B2Tau") != 1 or len(set(self.nn_classes)) != len(self.nn_classes)):
+            raise ValueError(f"nn_classes must be distinct and contain HH2B2Tau (the signal category), got {self.nn_classes}")
+        return self
+
+    @model_validator(mode="after")
+    def _nn_prefix_is_a_model_of_the_friend(self) -> TauSwitches:
+        prefixes = self.nn_friend_prefixes
+        if prefixes and (self.nn_prefix not in prefixes or len(set(prefixes)) < len(prefixes)):
+            raise ValueError(f"nn_friend_prefixes must be distinct and contain nn_prefix '{self.nn_prefix}', got {prefixes}")
+        return self
+
+    @model_validator(mode="after")
+    def _ml_labels_match_the_jet_fakes(self) -> TauSwitches:
+        if self.ml_labels is not None and ML_PROFILES[self.ml_labels] != self.jet_fakes:
+            raise ValueError(f"ml_labels {self.ml_labels} requires jet_fakes: {ML_PROFILES[self.ml_labels]}")
+        if self.ml_variables is not None and self.ml_labels is None:
+            raise ValueError("ml_variables requires ml_labels")
+        return self
 
     @model_validator(mode="after")
     def _controls_need_mc_fakes(self) -> TauSwitches:
@@ -115,6 +207,35 @@ class TauSwitches(_EmbeddedChannels, _FakeFactorProcesses, BaseModel):
     def _symmetrised_shifts_need_fake_factors(self) -> TauSwitches:
         if self.symmetrise_ff_shifts and self.jet_fakes != "ff":
             raise ValueError("symmetrise_ff_shifts requires jet_fakes: ff")
+        return self
+
+    @model_validator(mode="after")
+    def _signal_theory_needs_the_shift_production(self) -> TauSwitches:
+        if len(set(self.signal_theory)) < len(self.signal_theory):
+            raise ValueError(f"signal_theory lists a kind twice: {self.signal_theory}")
+        if self.signal_theory and not self.crown_shifts:
+            raise ValueError("signal_theory requires crown_shifts: true (the theory weights come with the shift production P6)")
+        if self.signal_theory and self.signal_sample != "powheg":
+            raise ValueError("signal_theory requires signal_sample: powheg (the normalisation is that of the powheg sample)")
+        return self
+
+    @model_validator(mode="after")
+    def _validation_switches(self) -> TauSwitches:
+        if self.pseudo_shifts and not (self.nn_validation or self.nn_friend):
+            raise ValueError("pseudo_shifts requires nn_validation or nn_friend (preliminary nuisances of the input validation or of the NN outputs)")
+        if self.ff_transfer and self.jet_fakes != "mc":
+            raise ValueError("ff_transfer requires jet_fakes: mc (the MC jet fakes in the anti-isolated region)")
+        return self
+
+    @model_validator(mode="after")
+    def _output_switches(self) -> TauSwitches:
+        if self.nn_outputs and not self.nn_friend:
+            raise ValueError("nn_outputs requires nn_friend: true (the outputs of the NN friend)")
+        for name in ("nn_blinding", "nn_ff_payload"):
+            if getattr(self, name) is not None and not self.nn_outputs:
+                raise ValueError(f"{name} requires nn_outputs: true")
+        if self.ff_same_sign and self.jet_fakes != "ff":
+            raise ValueError("ff_same_sign requires jet_fakes: ff (the fake-factor estimate of the same-sign region)")
         return self
 
     @model_validator(mode="after")
@@ -145,6 +266,9 @@ class DileptonSwitches(BaseModel):
     sample_lists: SampleLists = Field(min_length=1)
     dy_correction: DyCorrection = "none"  # none to derive the table, njets_btag for its closure
     diagnostics: bool = False  # n_jets regions, flavour templates of DY (mm, ee) and ttbar (em), the diagnostic variables
+    # the input validation of the NN phase (NV2, NV3): >= 2 jets in every channel, the b-tag scores and jet variables of
+    # nn_validation.py as control variables, the inputs of FastMTT with the MET covariance kept (a refit)
+    nn_validation: bool = False
 
 
 class TauIdSwitches(BaseModel):

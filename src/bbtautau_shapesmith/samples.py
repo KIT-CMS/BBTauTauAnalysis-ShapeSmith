@@ -173,9 +173,22 @@ def _stand_in(chosen: list[Sample]) -> list[Sample]:
     return [dataclasses.replace(s, group=replaced[s.group]) if s.group in replaced else s for s in chosen]
 
 
-def samples(database: Path, sample_lists: list[str], channels: list[str], era: str) -> dict[str, tuple[Sample, ...]]:
+def _signal_from(chosen: list[Sample], group: str) -> list[Sample]:
+    """The samples of `group` as the signal samples, those of SIGNAL left out (the node_SM sample as the signal of the
+    thesis comparison, R3); SIGNAL: unchanged."""
+    if group == SIGNAL:
+        return chosen
+    if not any(s.group == group for s in chosen):
+        raise AnalysisError(f"the signal from {group}: the sample lists have no {group} sample")
+    logger.info(f"the signal {SIGNAL} from the {group} samples, without the {SIGNAL} samples")
+    return [dataclasses.replace(s, group=SIGNAL) if s.group == group else s for s in chosen if s.group != SIGNAL]
+
+
+def samples(
+    database: Path, sample_lists: list[str], channels: list[str], era: str, signal: str = SIGNAL
+) -> dict[str, tuple[Sample, ...]]:
     """The samples of every channel of a run in `era`, in sample-list order; a nick listed twice, a nick of another era
-    and a borrowing BORROWED does not allow raise."""
+    and a borrowing BORROWED does not allow raise. `signal`: the group whose samples are the signal (_signal_from)."""
     names = [member for name in sample_lists for member in inventory_names(name, era)]
     if names != list(sample_lists):
         logger.info(f"sample lists of the combined era {era}: {', '.join(names)}")
@@ -203,10 +216,10 @@ def samples(database: Path, sample_lists: list[str], channels: list[str], era: s
         chosen.append((sample, routed))
     if problems:
         raise AnalysisError(f"sample lists {', '.join(names)} of the {era} run:\n" + "\n".join(problems))
-    standing_in = _stand_in([sample for sample, _ in chosen])
+    kept = {s.nick: s for s in _stand_in(_signal_from([sample for sample, _ in chosen], signal))}
     result = {channel: [] for channel in channels}
-    for sample, (_, routed) in zip(standing_in, chosen):
-        for channel in channels:
+    for sample, routed in chosen:
+        for channel in channels if sample.nick in kept else ():
             if routed is None or channel in routed:
-                result[channel].append(sample)
+                result[channel].append(kept[sample.nick])
     return {channel: tuple(listed) for channel, listed in result.items()}

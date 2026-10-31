@@ -48,7 +48,7 @@ from shapesmith.config import RunConfig
 from shapesmith.measurements.tau_trigger import Bin, Reference, TauTriggerMeasurement
 from shapesmith.model import Analysis, AnalysisError, Category, Channel, ColumnVariation, DataMinus, EqualData, Process, Region, Selection, TemplateShift, Variable
 
-from bbtautau_shapesmith.constants import LUMI_PB, YEAR, check_era
+from bbtautau_shapesmith.constants import EVENT_KEY, LUMI_PB, YEAR, check_era
 from bbtautau_shapesmith.cuts import SAME_SIGN, era_cuts
 from bbtautau_shapesmith.samples import sample_database, samples
 from bbtautau_shapesmith.switches import TauTriggerSwitches, parse
@@ -362,5 +362,6 @@ def build(config: RunConfig) -> Analysis:
         signal=None,
         channels={"mt": channel(era, switches, by_channel["mt"], bins)},
         measurement=measurement(era, switches, bins),
+        event_key=EVENT_KEY,
     )
 

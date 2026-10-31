@@ -1,38 +1,34 @@
 """Assemble the HH->bbtautau Analysis of the tau channels (and the ttbar control channel em) of one era from the run
-configuration switches; ML export configuration."""
+configuration switches, with its ML export (ml.py)."""
 from __future__ import annotations
 
+import dataclasses
+import json
 from collections.abc import Iterable
+from pathlib import Path
 
 from shapesmith.config import RunConfig
-from shapesmith.model import ABCD, Analysis, AnalysisError, Category, Channel, DataMinus, MLExportConfig, Process, Sample, TemplateShift
+from shapesmith.model import ABCD, Analysis, AnalysisError, Category, Channel, CrossSection, DataMinus, Process, Sample, TemplateShift
 
 from bbtautau_shapesmith import cuts, dilepton
-from bbtautau_shapesmith.constants import BTAG_BINS, CONTROL_CHANNELS, LT_CHANNELS, LUMI_PB, PREFIRING_NUISANCE, TAU_CHANNELS, check_era
-from bbtautau_shapesmith.processes import EMBEDDED, GENUINE, JET_FAKE, LEPTON_FAKE, SIGNAL, SPLITS, available, backgrounds_in, tau_processes
+from bbtautau_shapesmith.constants import (
+    BTAG_BINS, CONTROL_CHANNELS, EVENT_KEY, LT_CHANNELS, LUMI_PB, NN_CLASS_COLUMN, NN_SCORE_COLUMN, PREFIRING_NUISANCE, TAU_CHANNELS, YEAR, check_era,
+)
+from bbtautau_shapesmith.ml import ML_CLASSES, ml_config, raw_count_groups
+from bbtautau_shapesmith.nn_outputs import blinding_edges, fraction_regions, output_variables
+from bbtautau_shapesmith.nn_validation import FASTMTT_INPUTS, pseudo_shift_names, pseudo_shift_variations, validation_variables
+from bbtautau_shapesmith.processes import (
+    EMBEDDED, GENUINE, JET_FAKE, LEPTON_FAKE, NODE_SM, SIGNAL, SIGNAL_XS_FB, SIGNAL_XS_NUISANCES, SPLITS, available, backgrounds_in, tau_processes,
+)
 from bbtautau_shapesmith.samples import sample_database, samples
 from bbtautau_shapesmith.style import style
 from bbtautau_shapesmith.switches import TauSwitches, parse
 from bbtautau_shapesmith.systematics import (
-    Study, btag_variations, embedding_id_variations, embedding_ttbar_nuisance, embedding_variation_sums, embedding_variations, ff_dm_nonclosure_variations,
-    ff_variant, ff_variations, lnn, prefiring_variations,
+    HEAVY_FLAVOUR_WEIGHT, SIGNAL_THEORY_WEIGHT, Study, btag_variations, embedding_id_variations, embedding_ttbar_nuisance, embedding_variation_sums,
+    embedding_variations, ff_dm_nonclosure_variations, ff_variant, ff_variations, heavy_flavour_variations, lnn, prefiring_variations,
+    signal_theory_variations, ttbar_shape_variations, with_weights,
 )
-from bbtautau_shapesmith.variables import categories, control_variables, nominal_category
-
-ML_VARIABLES = (
-    "pt_1", "pt_2", "m_vis", "pt_vis", "mt_tot", "pt_tautau", "deltaR_ditaupair", "met", "n_jets", "n_bjets",
-    "jpt_1", "jpt_2", "mjj", "pt_dijet", "bpair_pt_1", "bpair_pt_2", "bpair_btag_value_1", "bpair_btag_value_2",
-    "bpair_m_inv", "bpair_pt_dijet", "bpair_deltaR", "pt_tautaubb", "mass_tautaubb",
-)
-# NN training labels; the embedded genuine di-tau events take the place of ZTT in the DY class
-LABEL_OF_GROUP = {"HH2B2Tau": "is_HH2B2Tau", "DY": "is_DY", EMBEDDED: "is_DY", "TT": "is_TT", "ST": "is_ST", "VV": "is_VV"}
-
-
-def label_of(process: Process) -> str:
-    if process.name in JET_FAKE:
-        return "is_jetFakes"
-    return LABEL_OF_GROUP.get(process.group, "is_Other")
-
+from bbtautau_shapesmith.variables import categories, control_variables, nn_score_blinding, nominal_category
 
 def process_union(channels: Iterable[Channel]) -> tuple[Process, ...]:
     """The processes of all channels, each name once in channel order; a process that is auxiliary in one channel and
@@ -43,15 +39,6 @@ def process_union(channels: Iterable[Channel]) -> tuple[Process, ...]:
             if process.name not in union or union[process.name].role == "auxiliary":
                 union[process.name] = process
     return tuple(union.values())
-
-
-def ml_config(processes: tuple[Process, ...], jet_fakes: str) -> MLExportConfig:
-    labels = {p.name: label_of(p) for p in processes if p.role in ("signal", "background")}
-    region_of = {}
-    if jet_fakes == "ff":
-        labels["jetFakes"] = "is_jetFakes"
-        region_of["jetFakes"] = "anti_iso"
-    return MLExportConfig(variables=ML_VARIABLES, processes=tuple(labels), label_of=labels, region_of=region_of)
 
 
 def jet_fakes_output(jet_fakes: str) -> str:
@@ -68,15 +55,18 @@ def diagnostic_estimators(name: str, every_mc: tuple[str, ...]) -> tuple:
 
 
 def estimators(name: str, era: str, processes: tuple[Process, ...], switches: TauSwitches) -> tuple:
-    """jetFakes = data - (genuine + lepton fakes) in the fake-factor region, or QCD from ABCD with every MC subtracted
-    (with diagnostics also in the control regions); in an embedded channel the sums of the embedding shifts of DM10 and
-    DM11 (after the estimates, which carry them too; only with the CROWN shifts) and the ttbar contamination of the
-    embedded sample (+-10 % of genuine ttbar)."""
+    """jetFakes = data - (genuine + lepton fakes) in the fake-factor region (with ff_same_sign also those of the
+    same-sign region from its anti-isolated part), or QCD from ABCD with every MC subtracted (with diagnostics also in
+    the control regions); in an embedded channel the sums of the embedding shifts of DM10 and DM11 (after the
+    estimates, which carry them too; only with the CROWN shifts) and the ttbar contamination of the embedded sample
+    (+-10 % of genuine ttbar)."""
     genuine_and_lepton_fakes = backgrounds_in(processes, GENUINE) + backgrounds_in(processes, LEPTON_FAKE)
     every_mc = genuine_and_lepton_fakes + backgrounds_in(processes, JET_FAKE)
     output = jet_fakes_output(switches.jet_fakes)
     if switches.jet_fakes == "ff":
         result = (DataMinus(output, "anti_iso", genuine_and_lepton_fakes),)
+        if switches.ff_same_sign:
+            result += (DataMinus(output, "same_sign_anti_iso", genuine_and_lepton_fakes, target="same_sign"),)
     else:
         result = (ABCD(output, "abcd_anti_iso", "abcd_same_sign", "abcd_same_sign_anti_iso", every_mc),)
     if switches.diagnostics:
@@ -91,16 +81,17 @@ def estimators(name: str, era: str, processes: tuple[Process, ...], switches: Ta
 def column_variations(name: str, era: str, switches: TauSwitches) -> tuple:
     """The embedding tau shifts (CROWN shifts, not in a nominal-only production) and the fake-factor friend shifts; with
     study_uncertainties the embedding tau ID as weight factors in a nominal-only production and the decay-mode
-    non-closure of the fake factors."""
+    non-closure of the fake factors, which ff_transfer (the MC jet fakes in AR x FF) carries too."""
     if not switches.shape_systematics:
         return ()
     embedding = embedding_variations(name, era) if switches.embedded(name) and switches.crown_shifts else ()
     if switches.study_uncertainties and switches.embedded(name) and not switches.crown_shifts and name in LT_CHANNELS:
         embedding += embedding_id_variations(name, era)
-    fakes = ff_variations(name, era, switches.wjets) if switches.jet_fakes == "ff" else ()
-    if switches.study_uncertainties and switches.jet_fakes == "ff":
+    fakes = ff_variations(name, era, switches.wjets) if switches.jet_fakes == "ff" or switches.ff_transfer else ()
+    if (switches.study_uncertainties and switches.jet_fakes == "ff") or switches.ff_transfer:
         fakes += ff_dm_nonclosure_variations(name, era, ff_variant(switches.wjets))
-    return embedding + fakes
+    pseudo = pseudo_shift_variations(name, era, switches.embedded(name), nn_output_columns(switches)) if switches.pseudo_shifts else ()
+    return embedding + fakes + pseudo
 
 
 def study(switches: TauSwitches, channels: Iterable[str]) -> Study | None:
@@ -111,28 +102,111 @@ def study(switches: TauSwitches, channels: Iterable[str]) -> Study | None:
     return Study(embedded, ff_variant(switches.wjets) if switches.jet_fakes == "ff" else None, switches.crown_shifts)
 
 
-def fit_categories(switches: TauSwitches) -> tuple[Category, ...]:
+def nn_classes(switches: TauSwitches) -> tuple[str, ...]:
+    """The NN classes in the order of the friend's predicted_class: nn_classes, else those of the label profile of the
+    export, by default the profile of the jet-fake mode (thesis6 with mc, v7b5 with ff)."""
+    if switches.nn_classes is not None:
+        return tuple(switches.nn_classes)
+    return ML_CLASSES[switches.ml_labels or {"mc": "thesis6", "ff": "v7b5"}[switches.jet_fakes]]
+
+
+def check_manifest(manifest: str, channels: Iterable[str], classes: tuple[str, ...]) -> None:
+    """The model manifest (nn_manifest, {channel} filled per tau channel) lists exactly the NN classes of the run."""
+    for name in channels:
+        path = Path(manifest.replace("{channel}", name))
+        if not path.is_file():
+            raise AnalysisError(f"nn_manifest: {path} does not exist")
+        listed = json.loads(path.read_text()).get("classes")
+        if listed is None or tuple(listed) != classes:
+            raise AnalysisError(f"nn_manifest: {path} lists the classes {listed}, the run has {list(classes)} (nn_classes or the label profile, in the order of predicted_class)")
+
+
+def nn_output_columns(switches: TauSwitches) -> tuple[str, ...]:
+    """The friend columns of the run's model (nn_prefix): its class, its largest score and the score of every class;
+    none without the NN friend."""
+    if not switches.nn_friend:
+        return ()
+    return tuple(f"{switches.nn_prefix}{column}" for column in (NN_CLASS_COLUMN, NN_SCORE_COLUMN, *(f"nn_score_{name}" for name in nn_classes(switches))))
+
+
+def nn_friend_columns(switches: TauSwitches) -> tuple[str, ...]:
+    """The NN friend columns a tau skim keeps besides those the run reads: the class and score of every model of the
+    friend production (nn_friend_prefixes), so that the runs of all its models share one skim."""
+    if not switches.nn_friend:
+        return ()
+    return tuple(f"{prefix}{column}" for prefix in switches.nn_friend_prefixes for column in (NN_CLASS_COLUMN, NN_SCORE_COLUMN))
+
+
+def fit_categories(switches: TauSwitches, processes: tuple[Process, ...]) -> tuple[Category, ...]:
     if switches.fit_categories == "control":
         return nominal_category()
-    return categories() if switches.nn_friend else ()
+    if switches.fit_categories != "nn":
+        return ()
+    groups = raw_count_groups(processes, switches.jet_fakes)
+    return categories(nn_classes(switches), switches.nn_categories, switches.nn_binning, switches.nn_prefix, groups, clip=(jet_fakes_output(switches.jet_fakes),))
+
+
+def output_controls(name: str, era: str, switches: TauSwitches, blinded: str) -> dict:
+    """The control variables of the switch nn_outputs (nn_outputs.py), the HH categories with the blinding edges of
+    nn_blinding."""
+    edges = blinding_edges(switches.nn_blinding.replace("{era}", era), name, era) if switches.nn_blinding is not None else None
+    return output_variables(nn_classes(switches), switches.nn_categories, switches.nn_prefix, blinded, edges, name, switches.ff_transfer)
 
 
 def channel(name: str, era: str, switches: TauSwitches, channel_samples: tuple[Sample, ...]) -> Channel:
+    """A tau channel; with the NN friend the control variable NN_score leaves out the events of the signal category
+    (variables.nn_score_blinding); with nn_outputs the control variables are the outputs of the model and yield (with
+    nn_validation also its inputs)."""
     table = available(tau_processes(name, era, switches.jet_fakes, switches.embedded(name), switches.dy_correction), channel_samples)
     groups = {p.group for p in table}
+    baseline = cuts.baseline_cuts(name, era)
+    payload = switches.nn_ff_payload.replace("{year}", YEAR[era]).replace("{channel}", name) if switches.nn_ff_payload is not None else None
+    regions = (
+        cuts.regions(name, switches.jet_fakes, switches.ff_type)
+        + (cuts.diagnostic_regions(name) if switches.control_regions else ())
+        + ((cuts.fake_factor_region(name, switches.ff_type),) if switches.ff_transfer else ())
+        + ((cuts.same_sign_fake_factor_region(name, switches.ff_type),) if switches.ff_same_sign else ())
+        + (fraction_regions(payload, name) if payload is not None else ())
+    )
+    estimates = estimators(name, era, table, switches)
+    blinded = nn_score_blinding(nn_classes(switches), switches.nn_prefix, baseline, regions, estimates) if switches.nn_friend else None
+    if switches.nn_validation:
+        variables = validation_variables(name, switches.fastmtt_friend)
+    elif switches.nn_outputs:  # the outputs replace the control variables, as the inputs do in nn_validation
+        variables = {"yield": control_variables()["yield"]}
+    else:
+        variables = control_variables(switches.nn_friend, switches.diagnostics, switches.fastmtt_friend, switches.nn_prefix, blinded)
+    if switches.nn_outputs:
+        variables = {**variables, **output_controls(name, era, switches, blinded)}
     return Channel(
         name=name,
         samples=tuple(s for s in channel_samples if s.group in groups),
         skim=cuts.skim_cuts(name, era, switches.control_regions),
-        cuts=cuts.baseline_cuts(name, era),
+        cuts=baseline,
         processes=table,
-        regions=cuts.regions(name, switches.jet_fakes, switches.ff_type) + (cuts.diagnostic_regions(name) if switches.control_regions else ()),
-        categories=fit_categories(switches),
-        variables=control_variables(switches.nn_friend, switches.diagnostics, switches.fastmtt_friend),
+        regions=regions,
+        categories=fit_categories(switches, table),
+        variables=variables,
         variations=btag_variations(era) + prefiring_variations() + column_variations(name, era, switches),
-        estimators=estimators(name, era, table, switches),
-        keep_columns=("event", "run", "lumi"),
+        estimators=estimates,
+        keep_columns=("event", "run", "lumi", *nn_friend_columns(switches)) + (FASTMTT_INPUTS if switches.nn_validation else ()),
     )
+
+
+def with_stage_variations(channel: Channel, era: str, switches: TauSwitches) -> Channel:
+    """A tau or control channel with the weight variations of the NN systematics stages (nn_limit_spec.md 8):
+    ttbar_shape on the processes with the top-pT weight, heavy_flavour on the simulated backgrounds and signal_theory on
+    the signal, each of the last two with the nominal factor 1.0 it replaces (systematics.with_weights)."""
+    processes, variations = channel.processes, ()
+    if switches.ttbar_shape:
+        variations += ttbar_shape_variations(era)
+    if switches.heavy_flavour:
+        processes = with_weights(processes, {p.name for p in processes if p.role == "background" and p.group != EMBEDDED}, HEAVY_FLAVOUR_WEIGHT)
+        variations += heavy_flavour_variations(era)
+    if switches.signal_theory:
+        processes = with_weights(processes, {p.name for p in processes if p.role == "signal"}, SIGNAL_THEORY_WEIGHT)
+        variations += signal_theory_variations(era, switches.signal_theory)
+    return dataclasses.replace(channel, processes=processes, variations=channel.variations + variations) if variations else channel
 
 
 def symmetrised_ff_shifts(channels: Iterable[Channel], era: str, switches: TauSwitches) -> tuple[str, ...]:
@@ -161,9 +235,14 @@ def build(config: RunConfig) -> Analysis:
     if not config.channels or set(config.channels) - set(TAU_CHANNELS + CONTROL_CHANNELS):
         raise AnalysisError(f"the tau analysis supports the channels {', '.join(TAU_CHANNELS)} and the control channels {', '.join(CONTROL_CHANNELS)}")
     switches.check_embedding(config.channels)
-    by_channel = samples(sample_database(config), switches.sample_lists, config.channels, era)
+    if switches.nn_manifest is not None:
+        check_manifest(switches.nn_manifest, [name for name in config.channels if name in TAU_CHANNELS], nn_classes(switches))
+    signal = NODE_SM if switches.signal_sample == "node_sm" else SIGNAL
+    by_channel = samples(sample_database(config), switches.sample_lists, config.channels, era, signal)
     channels = {
-        name: dilepton.top_control_channel(by_channel[name], era, switches.dy_correction) if name in CONTROL_CHANNELS else channel(name, era, switches, by_channel[name])
+        name: with_stage_variations(
+            dilepton.top_control_channel(by_channel[name], era, switches.dy_correction, switches.fit_categories == "nn") if name in CONTROL_CHANNELS else channel(name, era, switches, by_channel[name]), era, switches,
+        )
         for name in config.channels
     }
     tau_channels = [c for name, c in channels.items() if name not in CONTROL_CHANNELS]
@@ -177,7 +256,10 @@ def build(config: RunConfig) -> Analysis:
         # the channels can differ in their processes
         lnn=lnn(process_union(channels.values()), jet_fakes_output(switches.jet_fakes), era, borrowed_processes(channels.values()), study(switches, config.channels), switches.dy_correction),
         lnn_variations=(PREFIRING_NUISANCE,),
-        symmetrised_variations=symmetrised_ff_shifts(tau_channels, era, switches),
+        symmetrised_variations=symmetrised_ff_shifts(tau_channels, era, switches) + pseudo_shift_names(era, any(switches.embedded(c.name) for c in tau_channels), switches.pseudo_shifts),
         style=style(era),
-        ml=ml_config(process_union(tau_channels), switches.jet_fakes),  # no NN training on a control channel
+        # no NN training on a control channel
+        ml=ml_config(process_union(tau_channels), switches),
+        signal_cross_section=CrossSection("ggF HH", SIGNAL_XS_FB, SIGNAL_XS_NUISANCES),  # ggF only (N23)
+        event_key=EVENT_KEY,  # data and embedding without repeated events
     )

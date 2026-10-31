@@ -403,7 +403,7 @@ def test_the_signal_and_the_new_samples_are_routed(run2):
     mt = tau(run2, "2017").channel("mt")
     assert [s.nick for s in mt.samples_of(SIGNAL)] == [nick(POWHEG["1p00"], "2017")]
     assert mt.process(NODE_SM).role == "auxiliary" and len(mt.samples_of(NODE_SM)) == 1
-    assert not mt.samples_of("HH2B2Tau_kl") and NODE_SM not in tau(run2, "2017").ml.processes
+    assert not mt.samples_of("HH2B2Tau_kl") and NODE_SM not in tau(run2, "2017", ml_labels="v7b5", ml_variables=["kinematics"]).ml.processes
     et = tau(run2, "2017").channel("et")
     assert all(s.nick.startswith("SingleElectron_") for s in et.samples_of("data"))
 
@@ -413,6 +413,19 @@ def test_the_node_sm_sample_stands_in_for_the_signal_without_powheg():
     mt = build(config(("mt",), sample_lists=["sm2018_binned_v6"], database=DATABASE)).channel("mt")
     (signal,) = mt.samples_of(SIGNAL)
     assert "node_SM" in signal.nick and NODE_SM not in {p.name for p in mt.processes} and VH_TAUTAU not in {p.name for p in mt.processes}
+
+
+@pytest.mark.parametrize("era", ERAS)
+def test_the_signal_from_the_node_sm_sample(run2, era):
+    """X7, N9: signal_sample node_sm takes the signal of every channel from the madgraph node_SM sample (R3, and its ML
+    export with thesis6) and leaves out the powheg sample."""
+    analysis = tau(run2, era, jet_fakes="mc", embedding=False, signal_sample="node_sm", ml_labels="thesis6", ml_variables=["kinematics"])
+    for channel in analysis.channels.values():
+        (signal,) = channel.samples_of(SIGNAL)
+        assert "node_SM" in signal.nick and not any("kl-1p00" in s.nick for s in channel.samples), channel.name
+        assert NODE_SM not in {p.name for p in channel.processes} and channel.process(SIGNAL).role == "signal"
+    assert analysis.ml.class_of[SIGNAL] == "HH2B2Tau" and analysis.ml.exported(analysis.channel("mt"))[0] == SIGNAL
+    assert [s.nick for s in tau(run2, era).channel("mt").samples_of(SIGNAL)] == [nick(POWHEG["1p00"], era)]
 
 
 @pytest.mark.parametrize("era", ERAS)

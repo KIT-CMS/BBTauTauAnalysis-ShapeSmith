@@ -1,0 +1,38 @@
+# NN phase, step 1 (nn_limit_spec.md 4.2, 9, N7; SH13): smrun2_binned_v7b_ff_nn_m0_v1.yaml with the fake-factor variant
+# QCD + W+jets + ttbar (friend ff_v7b_w, as smrun2_binned_v7b_ff_w.yaml): the models of FR2 nn_m0_v1 are trained with
+# ff, their limits are given for ff and ff_w. One YAML for every era.
+#   shapesmith skim -c configs/smrun2_binned_v7b_ff_w_nn_m0_v1.yaml -s era=<era>   # its own skims (the NN friend, em)
+#   shapesmith hist / estimate / datacards / fit -c configs/smrun2_binned_v7b_ff_w_nn_m0_v1.yaml -s era=<era>
+#   shapesmith combine -c configs/smrun2_binned_v7b_ff_w_nn_m0_v1.yaml --era 2016preVFP --era 2016postVFP --era 2017 \
+#       --era 2018 -o /ceph/sdaigler/shapesmith/smrun2_binned_v7b/combination/ff_w_nn_m0_v1
+# The model of a run is one column prefix of the friend, as in smrun2_binned_v7b_ff_nn_m0_v1.yaml: M0 here, M0-k4 with
+#   -s switches.nn_prefix=nn_m0k4_ -s "output_dir=/ceph/sdaigler/shapesmith/smrun2_binned_v7b/output/tau_ff_w_nn_m0k4_v1/{era}"
+# Systematics stage S0 (spec 8): the S0+ switches ttbar_shape (SH7) and heavy_flavour (SH8) are off; S0+ adds
+# -s switches.ttbar_shape=true -s switches.heavy_flavour=true. heavy_flavour reads bpair_hadronFlavour_{1,2} (MC): skim
+# with it on, so that one skim serves S0 and S0+. S1 (with the shift production P6) adds signal_theory.
+analysis: bbtautau_shapesmith.analysis:build
+era: "2018"
+channels: [et, mt, tt, em]                                # em: the ttbar control channel (in every final state)
+switches: {sample_lists: ["sm_{era}_binned", "sm_{era}_borrowed", "sm_{era}_embedding"], jet_fakes: ff, embedding: [et, mt], crown_shifts: false, nn_friend: true, fastmtt_friend: true, fit_categories: nn, control_regions: false, dy_correction: njets_btag, study_uncertainties: true, symmetrise_ff_shifts: true, ff_processes: [QCD, Wjets, ttbar],
+           nn_prefix: nn_m0_, nn_friend_prefixes: [nn_m0_, nn_m0k4_], nn_categories: k1, nn_binning: data_blind}
+sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
+ntuples:
+  server: root://cmsdcache-kit-disk.gridka.de
+  base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7/CROWNRun      # the data
+  bases:                                                  # the MC and the embedding: the re-production
+    mc: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNRun
+    embedding: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNRun
+  friends:                                                # the tau channels only: the em skim reads no friend
+    - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7/CROWNFriend/ff_v7b_w, applies_to: [data], channels: [et, mt, tt]}
+    - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNFriend/ff_v7b_w, applies_to: [mc, embedding], channels: [et, mt, tt]}
+    - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7/CROWNFriend/fastmtt, applies_to: [data], channels: [et, mt, tt]}
+    - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNFriend/fastmtt, applies_to: [mc, embedding], channels: [et, mt, tt]}
+    - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7/CROWNFriend/nn_m0_v1, applies_to: [data], channels: [et, mt, tt]}
+    - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNFriend/nn_m0_v1, applies_to: [mc, embedding], channels: [et, mt, tt]}
+skim_dir: /ceph/sdaigler/shapesmith/smrun2_binned_v7b/skims/tau_ff_w_nn_m0_v1/{era}   # its own (NN friend, em)
+output_dir: /ceph/sdaigler/shapesmith/smrun2_binned_v7b/output/tau_ff_w_nn_m0_v1/{era}
+workers: 16                                               # at most 16 cores on deepthought2 (taskset -c 16-31)
+log_level: DEBUG
+# a failed fit (Migrad status -1) again with Migrad at strategy 0: combine's default reports it as it is (a fit to the
+# data, NV1: a saturated statistic of ~1000); a fit that converges, as every Asimov limit so far, stays the same
+combine: {cmssw_dir: /work/sdaigler/smhtt_ul/CMSSW_14_1_9, scram_arch: el9_amd64_gcc12, minimizer: "--cminFallbackAlgo Minuit2,Migrad,0:0.1"}

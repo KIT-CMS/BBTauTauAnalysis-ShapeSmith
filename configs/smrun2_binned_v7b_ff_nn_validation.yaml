@@ -1,0 +1,37 @@
+# NN phase, input validation (nn_limit_spec.md 7.1, NV1-NV3; nn_validation.py): the signal region of
+# smrun2_binned_v7b_ff_nn.yaml (EMB in et/mt, jetFakes from the FF friend ff_v7b, the S0 systematics) with the NN inputs as
+# control variables in fine bins and the PRELIMINARY pseudo-shifts of the jet, tau_h and MET energies (switches
+# nn_validation, pseudo_shifts), without em, the ML export and the gallery. Its own skims (the pseudo-shifts move events
+# across the cuts, so the skim keeps them) and outputs under /ceph/sdaigler/shapesmith_test/nn-validate:
+#   shapesmith skim -c configs/smrun2_binned_v7b_ff_nn_validation.yaml -s era=<era>
+#   shapesmith hist -c configs/smrun2_binned_v7b_ff_nn_validation.yaml -s era=<era> --control     # with the variations
+#   shapesmith estimate -c configs/smrun2_binned_v7b_ff_nn_validation.yaml -s era=<era> --control
+#   shapesmith input-gof -c configs/smrun2_binned_v7b_ff_nn_validation.yaml --era 2016preVFP --era 2016postVFP --era 2017 --era 2018 \
+#       -o /ceph/sdaigler/nn/validation/<date>/gof/with_pseudo_shifts [--exclude CMS_pseudo -o .../without_pseudo_shifts]
+analysis: bbtautau_shapesmith.analysis:build
+era: "2018"
+channels: [et, mt, tt]
+switches: {sample_lists: ["sm_{era}_binned", "sm_{era}_borrowed", "sm_{era}_embedding"], jet_fakes: ff, embedding: [et, mt], crown_shifts: false, nn_friend: false, fastmtt_friend: true, fit_categories: control, control_regions: false, dy_correction: njets_btag, study_uncertainties: true, symmetrise_ff_shifts: true, ff_processes: [QCD, ttbar], nn_validation: true, pseudo_shifts: true}
+sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
+ntuples:
+  server: root://cmsdcache-kit-disk.gridka.de
+  base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7/CROWNRun      # the data
+  bases:                                                  # the MC and the embedding: the re-production
+    mc: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNRun
+    embedding: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNRun
+  friends:
+    - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7/CROWNFriend/ff_v7b, applies_to: [data], channels: [et, mt, tt]}
+    - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNFriend/ff_v7b, applies_to: [mc, embedding], channels: [et, mt, tt]}
+    - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7/CROWNFriend/fastmtt, applies_to: [data], channels: [et, mt, tt]}
+    - {base: /store/user/sdaigler/CROWN/ntuples/smrun2_binned_v7b/CROWNFriend/fastmtt, applies_to: [mc, embedding], channels: [et, mt, tt]}
+skim_dir: /ceph/sdaigler/shapesmith_test/nn-validate/skims/tau_ff_nn/{era}
+output_dir: /ceph/sdaigler/shapesmith_test/nn-validate/output/tau_ff_nn/{era}
+workers: 16                                               # at most 16 cores on deepthought2 per process
+log_level: INFO
+# Migrad again with strategy 0 when a fit fails (status -1): a failed observed fit gives a saturated statistic of
+# ~1000 and frequentist toys generated around the failed fit (input-gof)
+combine:
+  cmssw_dir: /work/sdaigler/smhtt_ul/CMSSW_14_1_9
+  scram_arch: el9_amd64_gcc12
+  parallel: 16
+  minimizer: --cminFallbackAlgo Minuit2,Migrad,0:0.1

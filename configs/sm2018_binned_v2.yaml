@@ -7,7 +7,7 @@
 analysis: bbtautau_shapesmith.analysis:build
 era: "2018"
 channels: [et, mt, tt]
-switches: {sample_lists: [sm2018_binned_v2], jet_fakes: mc, embedding: false, nn_friend: false}
+switches: {sample_lists: [sm2018_binned_v2], jet_fakes: mc, embedding: false, nn_friend: false, fit_categories: none}
 sample_database: ../../KingMaker_sample_database/nanoAOD_v15/datasets.json   # sibling checkout; relative to this file
 ntuples:
   server: root://cmsdcache-kit-disk.gridka.de

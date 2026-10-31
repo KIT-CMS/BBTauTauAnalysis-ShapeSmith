@@ -13,12 +13,16 @@ import pytest
 from shapesmith.combination import run_card
 from shapesmith.config import FriendConfig, load_analysis, load_config
 from shapesmith.model import AnalysisError
+from shapesmith.skim import needed_columns
 
 from bbtautau_shapesmith import weights
 from bbtautau_shapesmith.constants import DY_NJETS_BTAG, LUMI_PB
 from bbtautau_shapesmith.samples import inventory_names, inventory_path
 from tests.helpers import DATABASE, ERAS, REPO
 from tests.run2 import list_name
+from tests.test_nn_runs import NN_FRIEND_RUNS
+from tests.test_nn_outputs import OUTPUT_RUNS
+from tests.test_nn_validation import VALIDATION_RUNS
 
 P1, P3 = "smrun2_tau_id_v1", "smrun2_binned_v7"
 REPRODUCTION = {P3: ("smrun2_binned_v7b", ("mc", "embedding")), P1: ("smrun2_tau_id_v2", ("mc",))}  # tag, re-produced kinds
@@ -55,6 +59,11 @@ STUDY_UNCERTAINTIES = ("smrun2_binned_v7_ff", "smrun2_binned_v7_ff_w")
 # m, pt, eta and phi_fastmtt (switch fastmtt_friend, 2026-10-20); the v7 runs never read it
 FASTMTT = ("smrun2_binned_v7", "smrun2_binned_v7_noemb", "smrun2_binned_v7_ff", "smrun2_binned_v7_ff_w")
 RENAMED = {P3: (("ff_v7", "ff_v7b"),), P1: ()}  # the FF friends of v7b get their own names (ff_v7b, ff_v7b_w): P5 of v7 and v7b never overwrite each other
+# the NN phase (nn_limit_spec.md 3.1, 2026-10-25): the v7b classic run exports the training data of the thesis
+# comparison (X10, label profile thesis6) with the variables its skims hold, and the v7b FF run has a copy with the
+# export of the profile v7b5 and its own skims (the re-skim of X8)
+NN_EXPORT = {"smrun2_binned_v7_noemb": ("thesis6", {"ml_labels": "thesis6", "ml_variables": ["thesis", "objects", "kinematics"]})}
+NN_RUNS = {"smrun2_binned_v7b_ff_nn": "smrun2_binned_v7b_ff"}  # NN run -> the run it copies
 
 
 def load(name: str, era: str, *overrides: str):
@@ -73,7 +82,7 @@ def strings(value):
 
 
 def test_one_run_yaml_per_run_type():
-    assert {p.stem for p in (REPO / "configs").glob("*.yaml") if "smrun2" in p.stem} == set(RUNS) | set(REPRODUCED.values())
+    assert {p.stem for p in (REPO / "configs").glob("*.yaml") if "smrun2" in p.stem} == set(RUNS) | set(REPRODUCED.values()) | set(NN_RUNS) | set(NN_FRIEND_RUNS) | set(VALIDATION_RUNS) | set(OUTPUT_RUNS)
 
 
 def moved(value, old: str, new: str, renamed=()):
@@ -148,6 +157,13 @@ def test_the_reproduction_reads_its_kinds_from_the_new_tag(name, era):
         expected["switches"]["fastmtt_friend"] = True
     else:
         assert "fastmtt_friend" not in again.switches
+    if name in NN_EXPORT:
+        profile, switches = NN_EXPORT[name]
+        assert first.ml_dir is None and again.ml_dir == Path(f"/ceph/sdaigler/shapesmith/{tag}/ml/{profile}/{era}")
+        expected["ml_dir"] = str(again.ml_dir)
+        expected["switches"].update(switches)
+    else:
+        assert "ml_labels" not in again.switches
     assert rest[1] == expected
     if name.endswith("_id_es"):  # the MET fix: the recoil shifts of DY and W in 2018 only; v1 has them in every era
         assert first.switches["recoil_eras"] == list(ERAS) and again.switches["recoil_eras"] == ["2018"]
@@ -249,3 +265,24 @@ def test_the_runs_of_a_production_fit_together():
         assert runs["smrun2_tau_id_v1_trigger"].output_dir == runs["smrun2_tau_id_v1_id_es"].output_dir  # tau_trigger/<era>, tau_id_es/<era>
     cards = {run_card(load("smrun2_binned_v7_ff", era), "all") for era in ERAS}  # combine --era: one card per era
     assert cards == {Path(f"/ceph/sdaigler/shapesmith/{P3}/output/tau_ff/{era}/datacards/all/combined.txt") for era in ERAS}
+
+
+@pytest.mark.parametrize("era", ERAS)
+def test_the_nn_export_runs(era):
+    """The v7b5 run is the v7b FF run with the label profile v7b5, every variable set and its own skims, outputs and
+    ML directory and no gallery; the thesis6 export of the classic run needs no column its stored skims lack."""
+    for name, copied in NN_RUNS.items():
+        nn, ff = load(name, era), load(copied, era)
+        dumps = [{key: value for key, value in json.loads(c.model_dump_json()).items() if key not in ("skim_dir", "output_dir", "ml_dir", "web")} for c in (nn, ff)]
+        assert dumps[0]["switches"].pop("ml_labels") == "v7b5" and dumps[0] == dumps[1] and nn.web is None
+        root = "/ceph/sdaigler/shapesmith/smrun2_binned_v7b"
+        assert (nn.skim_dir, nn.output_dir, nn.ml_dir) == tuple(Path(f"{root}/{kind}/{era}") for kind in ("skims/tau_ff_nn", "output/tau_ff_nn", "ml/v7b5"))
+        overrides = [] if era in DY_NJETS_BTAG else ["switches.dy_correction=none"]
+        ml = load_analysis(load(name, era, *overrides)).ml
+        assert ml.profile == "v7b5" and {"bpair_mass_1", "jtag_value_2", "bpair_hadronFlavour_1", "jet_hadronFlavour_2"} <= set(ml.variables)
+    config = load("smrun2_binned_v7b_noemb", era, *([] if era in DY_NJETS_BTAG else ["switches.dy_correction=none"]))
+    analysis = load_analysis(config)
+    assert analysis.ml.profile == "thesis6" and config.skim_dir == load("smrun2_binned_v7b", era).skim_dir
+    for channel in analysis.channels.values():
+        for sample in channel.samples:
+            assert needed_columns(channel, sample, analysis.ml) == needed_columns(channel, sample), sample.nick
