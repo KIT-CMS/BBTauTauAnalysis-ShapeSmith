@@ -28,6 +28,8 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import math
+from collections import Counter
 from pathlib import Path
 
 import numpy as np
@@ -124,6 +126,30 @@ def bins_of(era: str, channel: str, category: str, limit_cards: Path) -> list[fl
     return [float(e) for e in record[channel][category]["edges"]]
 
 
+def fraction_response(*, truth, payload, delta_payload, template_shift, nominal, sigma) -> dict:
+    """A binned linear estimate, with no verdict for an undefined or nonphysical response.
+
+    Signed data-minus-MC averages need not lie in [0, 1], even for bounded event fractions.
+    Such averages, nonpositive Up responses and clipped/saturated probes cannot calibrate
+    this approximation. A valid result still assumes a common linear response in the bin.
+    """
+    empty = dict(dT=None, dT_over_T=None, dT_over_sigma_ff=None, within_ff=None)
+    if not all(math.isfinite(x) for x in (truth, payload, delta_payload, template_shift, nominal, sigma)):
+        return {**empty, "response_status": "nonfinite_input"}
+    if not (0 <= truth <= 1 and 0 <= payload <= 1 and 0 <= payload + delta_payload <= 1 + 1e-8):
+        return {**empty, "response_status": "nonphysical_fraction_average"}
+    if delta_payload <= 1e-8:
+        return {**empty, "response_status": "saturated_or_signed_response"}
+    if nominal <= 0 or sigma < 0:
+        return {**empty, "response_status": "invalid_template_or_uncertainty"}
+    shift = float(template_shift * (truth - payload) / delta_payload)
+    if not math.isfinite(shift):
+        return {**empty, "response_status": "nonfinite_response"}
+    return {"dT": shift, "dT_over_T": shift / nominal,
+            "dT_over_sigma_ff": shift / sigma if sigma > 0 else None,
+            "within_ff": abs(shift) <= sigma, "response_status": "linear_estimate"}
+
+
 def results_of(config_path: str, overrides: list[str], era: str, channels: list[str], limit_run: str) -> list[dict]:
     config = load_config(config_path, [f"era={era}", *overrides])
     analysis = load_analysis(config)
@@ -141,16 +167,16 @@ def results_of(config_path: str, overrides: list[str], era: str, channels: list[
             t, p, tpl = entry["truth"], entry["payload"], entry["template"]
             with np.errstate(divide="ignore", invalid="ignore"):
                 delta = np.array(t["f_ttbar"]) - np.array(p["f_ttbar"])
-                shift = np.array(tpl["T_fraction_up_minus_T"]) * delta / np.array(p["delta_f"])
-                sigma = np.array(tpl["sigma_ff"])
                 entry["delta_f"] = delta.tolist()
                 entry["delta_f_significance"] = (delta / np.array(t["f_ttbar_error"])).tolist()
-                entry["dT"] = shift.tolist()
-                entry["dT_over_T"] = (shift / np.array(tpl["T"])).tolist()
-                entry["dT_over_sigma_ff"] = (shift / sigma).tolist()
-                entry["within_ff"] = [bool(abs(s) <= u) if np.isfinite(s) else None for s, u in zip(shift, sigma)]
+            response = [fraction_response(truth=f, payload=p0, delta_payload=df, template_shift=dt, nominal=nom, sigma=sigma)
+                        for f, p0, df, dt, nom, sigma in zip(t["f_ttbar"], p["f_ttbar"], p["delta_f"],
+                            tpl["T_fraction_up_minus_T"], tpl["T"], tpl["sigma_ff"])]
+            for key in ("dT", "dT_over_T", "dT_over_sigma_ff", "within_ff", "response_status"):
+                entry[key] = [row[key] for row in response]
             results.append(entry)
-            logger.info(f"{era} {channel} {category}: |dT|/sigma_FF max {np.nanmax(np.abs(entry['dT_over_sigma_ff'])) if np.isfinite(entry['dT_over_sigma_ff']).any() else float('nan'):.2f}")
+            finite = [x for x in entry["dT_over_sigma_ff"] if x is not None and math.isfinite(x)]
+            logger.info(f"{era} {channel} {category}: |dT|/sigma_FF max {max(map(abs, finite)) if finite else float('nan'):.2f}; unassessed {sum(x is None for x in entry['within_ff'])}")
     return results
 
 
@@ -162,11 +188,15 @@ def summary_lines(results: list[dict]) -> list[str]:
     bins = [(r, i) for r in results for i in range(len(r["dT"]))]
     finite = [(r, i) for r, i in bins if r["within_ff"][i] is not None]
     outside = [(r, i) for r, i in finite if not r["within_ff"][i]]
+    unknown = Counter(r.get("response_status", ["undefined_response"] * len(r["dT"]))[i]
+                      for r, i in bins if r["within_ff"][i] is None)
     lines = ["# NV4b: fake-factor fractions per NN category", "",
-             f"{len(finite)} card bins with a fraction; outside the fake-factor uncertainty (|dT| > sigma_FF): {len(outside)}", ""]
+             f"{len(finite)} assessed card bins out of {len(bins)}; outside the fake-factor uncertainty (|dT| > sigma_FF): {len(outside)}", "",
+             f"Unassessed bins (no pass/fail verdict): {sum(unknown.values())}; reasons: {dict(unknown)}.", "",
+             "The template response is a binned linear approximation. It does not establish event-level closure or resolve a saturated fraction probe.", ""]
     for r, i in outside:
         lines.append(f"- {r['era']} {r['channel']} {r['category']} bin {i} [{r['edges'][i]}, {r['edges'][i + 1]}]: f_truth {r['truth']['f_ttbar'][i]:.3f} +- {r['truth']['f_ttbar_error'][i]:.3f}, "
-                     f"payload {r['payload']['f_ttbar'][i]:.3f}, dT/T {r['dT_over_T'][i]:+.3f}, dT/sigma_FF {r['dT_over_sigma_ff'][i]:+.2f}")
+                     f"payload {r['payload']['f_ttbar'][i]:.3f}, dT/T {r['dT_over_T'][i]:+.3f}, dT/sigma_FF {_cell([r['dT_over_sigma_ff'][i]], '{:+.2f}')}")
     lines += ["", "| era | channel | category | f_ttbar truth | +- | payload | delta_f (payload shift) | dT / T | dT / sigma_FF | sigma_FF / T |", "|---|---|---|---|---|---|---|---|---|---|"]
     for r in results:
         sigma_rel = np.array(r["template"]["sigma_ff"]) / np.array(r["template"]["T"])

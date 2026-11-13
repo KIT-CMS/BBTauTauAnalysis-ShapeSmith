@@ -422,3 +422,59 @@ def test_the_fractions_of_a_bin_in_the_definition_of_the_payload():
     template = fractions.template(limit, "mt", "Top", edges)
     assert template["T"] == [20.0, 20.0] and template["T_fraction_up_minus_T"] == [3.0, 3.0] and template["ff_shifts"] == 3  # both legs' fractions
     assert template["sigma_ff"] == pytest.approx([np.sqrt(2.0**2 + 1.0**2 + 4.0**2)] * 2)
+
+
+def _fraction_response(**changes):
+    script = _script("nn_outputs_fractions")
+    response = getattr(script, "fraction_response", None)
+    assert callable(response), "missing saturation-safe fraction response diagnostic"
+    values = dict(truth=0.6, payload=0.4, delta_payload=0.1, template_shift=2.0, nominal=100.0, sigma=5.0)
+    return response(**(values | changes))
+
+
+def test_fraction_response_preserves_the_finite_linear_estimate():
+    result = _fraction_response()
+    assert result["dT"] == pytest.approx(4.0)
+    assert result["dT_over_T"] == pytest.approx(0.04)
+    assert result["dT_over_sigma_ff"] == pytest.approx(0.8)
+    assert result["within_ff"] is True
+    assert _fraction_response(truth=0.9)["within_ff"] is False
+
+
+@pytest.mark.parametrize("changes", [
+    {"delta_payload": 0.0, "template_shift": 0.0},
+    {"delta_payload": 1e-14},
+    {"delta_payload": -0.01},
+    {"payload": 1.01},
+    {"payload": 0.95, "delta_payload": 0.1},
+    {"truth": float("nan")},
+    {"nominal": 0.0},
+    {"sigma": -1.0},
+])
+def test_undefined_or_nonphysical_fraction_response_has_no_verdict(changes):
+    result = _fraction_response(**changes)
+    assert result["within_ff"] is None
+    assert result["dT"] is None
+    assert result["response_status"] != "linear_estimate"
+    json.dumps(result, allow_nan=False)
+
+
+def test_zero_ff_band_does_not_turn_a_nonzero_shift_into_a_pass():
+    result = _fraction_response(sigma=0.0)
+    assert result["within_ff"] is False
+    assert result["dT"] == pytest.approx(4.0)
+    assert result["dT_over_sigma_ff"] is None
+    json.dumps(result, allow_nan=False)
+
+
+def test_fraction_report_can_render_an_outside_bin_with_zero_ff_band():
+    result = _fraction_response(sigma=0.0)
+    entry = {"era": "2018", "channel": "mt", "category": "Top", "edges": [0.0, 1.0],
+             "truth": {"f_ttbar": [0.6], "f_ttbar_error": [0.1],
+                       "shares": {name: [0.25] for name in ("ttbar_J", "W", "other_J", "QCD")}},
+             "payload": {"f_ttbar": [0.4], "delta_f": [0.1]},
+             "template": {"T": [100.0], "sigma_ff": [0.0]},
+             **{name: [value] for name, value in result.items()}}
+    lines = _script("nn_outputs_fractions").summary_lines([entry])
+    assert "outside the fake-factor uncertainty (|dT| > sigma_FF): 1" in "\n".join(lines)
+    assert "dT/sigma_FF -" in "\n".join(lines)
