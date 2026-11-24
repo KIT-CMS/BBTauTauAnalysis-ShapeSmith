@@ -156,6 +156,11 @@ def test_2018_keeps_the_measured_tables_but_the_reviewed_quantities():
     for era in ("2016", "2017", "2018"):
         for channel in ("et", "mt"):
             assert ff_tables.tables(era)[0][channel]["ttbar"]["fake_factors"].fits == (ff_tables.Fit("smoothed", 6.0),) * 2
+        # FF v7c: the QCD isolation non-closure of mt is smoothed like the one of et, in both variants
+        for wjets in (False, True):
+            for channel in ("et", "mt"):
+                (iso,) = [b for b in ff_tables.tables(era, wjets=wjets)[0][channel]["QCD"]["non_closures"] if b.variable == "iso_1"]
+                assert iso.fits == (ff_tables.Fit("smoothed", 0.02, binwise_left=1),), (era, channel, wjets)
 
 
 def test_every_table_quantity_has_its_suggest_binning_name():

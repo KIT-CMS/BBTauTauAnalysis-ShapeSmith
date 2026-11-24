@@ -240,6 +240,12 @@ PER_ERA_LOW = {era: {"mt": dict.fromkeys(_MT_LEPTON_PT, low)} for era, low in ((
 # up to -14 % / +8 % (chi2 13-250 for 8-12 points with 2 % MC errors, 6 GeV: 1-10), a non-closure in the tau pT that
 # no later correction removes (DR closure after all corrections 0.83-1.06 in et 2018).
 FIT_OVERRIDES = {channel: {"ttbar_fake_factors": (Fit("smoothed", 6.0), Fit("smoothed", 6.0))} for channel in ("et", "mt")}
+# FF v7c (v8 spec Q15, user 2026-11-24): the mt QCD isolation non-closure is smoothed like the et one and every ttbar
+# isolation non-closure (legacy smhtt_ul template "binwise#[0]+smoothed", bandwidth 0.02) instead of jvoss's binwise
+# fit. A smoothed correction that is compatible with 1 is set to 1: that is the case in 2018, where the bin
+# [5e-05, 0.009] (0.48 +- 0.61) made the coherent StatShift +-26 % of the QCD prediction (v7_analyse.md 11.1 Nr. 4);
+# 2016 (p = 0.049) and 2017 (p = 0.019) keep their correction.
+FIT_OVERRIDES["mt"]["QCD_non_closure_iso_1"] = (Fit("smoothed", 0.02, binwise_left=1),)
 
 
 def _resolved(binned: Binned, n_bins: tuple[int, ...] | None, edges: list[list[float]] | None, name: str, low: float | None = None, fits: tuple[Fit, ...] | None = None) -> Binned:

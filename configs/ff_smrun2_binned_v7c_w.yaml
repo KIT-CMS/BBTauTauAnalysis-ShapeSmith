@@ -1,8 +1,8 @@
 # FF v7c (v8 spec 9.0 Nr. 2, S8; v7_analyse.md 11.1 Nr. 4): the fake-factor measurement of ff_v7b_w again on the same
 # n-tuples (under V1 v8-nominal = v7b-nominal), with (1) data and embedding read without repeated events
 # (Analysis.event_key; the 2018D mutau embedding files nano_35/nano_53 share 44 497 events), which needs a new skim with
-# run and lumi, and (2) the mt QCD isolation non-closure rebinned (its noisy lowest iso bin, v7_analyse.md 11.1 Nr. 4;
-# the method is open, until then the v7b edges and fits).
+# run and lumi, and (2) the mt QCD isolation non-closure smoothed like the et one (its noisy lowest iso bin,
+# v7_analyse.md 11.1 Nr. 4; ff_tables.FIT_OVERRIDES, user decision of 2026-11-24). Edges as in v7b.
 # Skims under ff_measurement_v7c, outputs under output/ff_v7c; everything else as in ff_smrun2_binned_v7b_w.yaml:
 #   shapesmith skim    -c configs/ff_smrun2_binned_v7c_w.yaml -s era=<era>   # once for both variants
 #   shapesmith measure -c configs/ff_smrun2_binned_v7c_w.yaml -s era=<era>
