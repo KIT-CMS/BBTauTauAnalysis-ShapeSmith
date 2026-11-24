@@ -1,17 +1,15 @@
 """The names CROWN gives the shifts and the theory and scale-factor columns of the v8 shift production, in one place.
 
 Source: sm_config of CROWN bbtautau built with -DSHIFTS=all (v8 spec section 4; the inventory per era, sample type
-and scope is docs/analysen/v8/v8_spec_files/shift_inventory_after_paket1.json, its copy for the tests
-tests/fixtures/v8_shift_inventory.json.gz, which tests/test_v8_shifts.py compares with what the analysis declares). A
-shifted column is `<column>__<shift><direction>` (shifted()), the suffix of a shift `__<shift><direction>` (suffix()).
-Every name carries the era of the n-tuples it is in: for a sample borrowed from another era that era, not the run's.
+and scope is docs/analysen/v8/v8_spec_files/shift_inventory_final.json of CROWN feat-v8-shifts f0d2b9b, its copy for
+the tests tests/fixtures/v8_shift_inventory.json.gz, which tests/test_v8_shifts.py compares with what the analysis
+declares). A shifted column is `<column>__<shift><direction>` (shifted()), the suffix of a shift
+`__<shift><direction>` (suffix()). Every name carries the era of the n-tuples it is in: for a sample borrowed from
+another era that era, not the run's.
 
-Not in the inventory, from the CROWN package that follows it (C23, C24, C40; the names are fixed, the nominal column of
-the parton-shower weight is PS_WEIGHT):
-- the weight shifts ps_isr and ps_fsr (PARTON_SHOWER) on every simulated sample;
-- the columns lhe_pdf_weight_<i>, i = 1..100 (pdf_weight), of the signal sample type hh2b2tau in the nominal tree;
-- the columns id_wgt_tau_vsJet_<WP>_highpt[_up|_down]_<leg> (highpt_columns) of every hadronic tau leg of the simulated
-  samples in the nominal tree.
+Columns of the nominal tree that the inventory does not list (C24, C40): lhe_pdf_weight_<i>, i = 1..100 (pdf_weight),
+of the signal sample type hh2b2tau, and id_wgt_tau_vsJet_<WP>_highpt[_up|_down]_<leg> (highpt_columns) of every
+hadronic tau leg of the simulated samples. The parton-shower weight is PS_WEIGHT with the shifts ps_isr and ps_fsr.
 """
 from __future__ import annotations
 
@@ -31,8 +29,7 @@ VSJET_STAT = (1, 2)  # the two statistical components of the DM-binned vsJet SF
 QCD_SCALES = ("QCDscale_ren", "QCDscale_fac")  # shifts of LHE_SCALE_WEIGHT: muR and muF times 2 (Up) and 0.5 (Down)
 PARTON_SHOWER = ("ps_isr", "ps_fsr")  # shifts of PS_WEIGHT: the ISR and FSR scale times 2 (Up) and 0.5 (Down)
 LHE_SCALE_WEIGHT = "lhe_scale_weight"
-# ASSUMPTION: the output column of the CROWN parton-shower producer (C23), whose shifts are ps_isr and ps_fsr; the
-# running CROWN package fixes the shift names, this column name is the one ShapeSmith expected before (SH14)
+# the output column of the CROWN parton-shower producer (C23): 1 in the nominal, PSWeight[0..3] under ps_isr/ps_fsr
 PS_WEIGHT = "ps_weight"
 PDF_MEMBERS = tuple(range(1, 101))  # the Hessian eigenvectors of LHEPdfWeight (member 0 is the central one)
 HIGHPT_THRESHOLD = 140.0  # GeV: from here the POG gives the pT-binned vsJet SF (C40)

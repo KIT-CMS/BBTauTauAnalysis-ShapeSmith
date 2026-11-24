@@ -1,10 +1,10 @@
 """Write tests/fixtures/v8_shift_inventory.json.gz, the copy of the CROWN shift inventory that tests/test_v8_shifts.py
 compares with the shifts the analysis declares:
 
-    python scripts/make_shift_inventory_fixture.py <shift_inventory_after_paket1.json>
+    python scripts/make_shift_inventory_fixture.py <shift_inventory_final.json>
 
 The source is the inventory of sm_config with -DSHIFTS=all that the CROWN tests pin (v8 spec 3.2,
-docs/analysen/v8/v8_spec_files/shift_inventory_after_paket1.json): per era, sample type and scope the shift names by
+docs/analysen/v8/v8_spec_files/shift_inventory_final.json): per era, sample type and scope the shift names by
 family. The copy keeps the pairs (names without Up/Down) of the scopes produced with shifts (V3: et, mt, tt, em) and
 the kind of every family; it checks that every pair has both directions and that the counts are those of the source.
 """
@@ -50,7 +50,7 @@ def compact(source: dict, name: str) -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("source", type=Path, help="shift_inventory_after_paket1.json of the v8 spec")
+    parser.add_argument("source", type=Path, help="shift_inventory_final.json of the v8 spec")
     parser.add_argument("--output", type=Path, default=FIXTURE)
     args = parser.parse_args()
     fixture = compact(json.loads(args.source.read_text()), args.source.name)

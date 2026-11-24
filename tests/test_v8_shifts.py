@@ -34,12 +34,10 @@ from tests.helpers import FIXTURES, REPO, sample_types
 from tests.test_run2 import run2, tau  # noqa: F401 (the fixture)
 
 INVENTORY = json.loads(gzip.open(FIXTURES / "v8_shift_inventory.json.gz").read())
-SPEC_INVENTORY = REPO.parents[1] / "docs" / "analysen" / "v8" / "v8_spec_files" / "shift_inventory_after_paket1.json"
+SPEC_INVENTORY = REPO.parents[1] / "docs" / "analysen" / "v8" / "v8_spec_files" / "shift_inventory_final.json"
 CHANNELS = ("et", "mt", "tt", "em")
 DIRECTIONS = ("Up", "Down")
 DMS = (0, 1, 10, 11)
-# the weight shifts of the CROWN package after the inventory (C23), on every simulated sample
-PARTON_SHOWER = {f"__{shift}{d}" for shift in ("ps_isr", "ps_fsr") for d in DIRECTIONS}
 FF_SUFFIXES = {f"__{key}{d}" for key in FF_SHIFTS_TT + FF_SHIFTS_W for d in DIRECTIONS}  # the shifts of the fake-factor friend
 NN = ("nn_m3abnv1_predicted_class", "nn_m3abnv1_predicted_max_value")
 V8 = {"shift_set": "v8", "crown_shifts": True}
@@ -51,11 +49,10 @@ def v8(database, era, **switches):
 
 
 def inventory_suffixes(era: str, sample_type: str, channel: str) -> set[str]:
-    """The suffixes of the shifts the n-tuples of a sample type have in a scope: the inventory and, on simulated
-    samples, the parton shower."""
+    """The suffixes of the shifts the n-tuples of a sample type have in a scope (the inventory)."""
     families = INVENTORY["pairs"].get(f"{era}/{sample_type}", {}).get(channel, {})
     suffixes = {f"__{pair}{d}" for pairs in families.values() for pair in pairs for d in DIRECTIONS}
-    return suffixes | (PARTON_SHOWER if sample_type not in ("data", "embedding") else set())
+    return suffixes
 
 
 def crown_variations(channel) -> list[ColumnVariation]:
@@ -120,9 +117,13 @@ def test_the_inventory_has_every_era_sample_type_and_scope():
     assert {key.split("/")[1] for key in surfaces} == set(sample_types().values()) | {"embedding"}
     assert all(set(scopes) == (set(TAU_CHANNELS) if key.endswith("/embedding") else set(CHANNELS)) for key, scopes in surfaces.items())
     counts = {scope: len([pair for pairs in surfaces["2018/ttbar"][scope].values() for pair in pairs]) for scope in CHANNELS}
-    assert counts == {"et": 64, "mt": 63, "tt": 58, "em": 30}  # the pairs of v8 spec 3.2 after the CROWN package
+    assert counts == {"et": 66, "mt": 65, "tt": 60, "em": 32}  # the pairs of the final CROWN inventory (f0d2b9b)
     assert {scope: sum(len(pairs) for pairs in families.values()) for scope, families in surfaces["2018/embedding"].items()} == {"et": 10, "mt": 10, "tt": 8}
-    assert not any(pair for scopes in surfaces.values() for families in scopes.values() for pairs in families.values() for pair in pairs if pair.startswith("ps_"))
+    # the parton shower (C23) on every simulated sample, nowhere else
+    for key, scopes in surfaces.items():
+        for families in scopes.values():
+            shower = {pair for pairs in families.values() for pair in pairs if pair.startswith("ps_")}
+            assert shower == (set() if key.endswith(("/embedding", "/data")) else {"ps_isr", "ps_fsr"}), key
 
 
 @pytest.mark.parametrize("era", ERAS)
