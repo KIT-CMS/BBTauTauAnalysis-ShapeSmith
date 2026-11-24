@@ -141,13 +141,13 @@ def test_dy_correction_weights_the_dy_processes_only():
 
 
 def test_data_and_embedding_are_read_without_repeated_events():
-    """event_key (run, lumi, event) in the tau and the dilepton analysis, whose skims keep these columns for data and
-    embedding; not in the fake-factor measurement, whose skims hold no run and lumi."""
+    """event_key (run, lumi, event) in the tau and the dilepton analysis and the fake-factor measurement, whose skims
+    keep these columns for data and embedding."""
     tau = analysis_for("ff", ["et", "mt"])
     controls = dilepton.build(config(["em", "mm", "ee"], "bbtautau_shapesmith.dilepton:build"))
     fake_factors = ff_measurement.build(config(analysis="bbtautau_shapesmith.ff_measurement:build", sample_lists=["sm2018_binned_v3"]))
-    assert tau.event_key == controls.event_key == EVENT_KEY == ("run", "lumi", "event") and fake_factors.event_key == ()
-    for analysis in (tau, controls):
+    assert tau.event_key == controls.event_key == fake_factors.event_key == EVENT_KEY == ("run", "lumi", "event")
+    for analysis in (tau, controls, fake_factors):
         for channel in analysis.channels.values():
             for sample in channel.samples:
                 if sample.kind != "mc":

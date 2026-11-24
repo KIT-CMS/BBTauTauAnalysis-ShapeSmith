@@ -62,7 +62,7 @@ from shapesmith.measurements.fake_factors import DataScale, DrSr, FakeFactorMeas
 from shapesmith.model import Analysis, AnalysisError, Channel, Process, Region, Sample, Selection
 
 from bbtautau_shapesmith import cuts, ff_tables
-from bbtautau_shapesmith.constants import LT_CHANNELS, TAU_CHANNELS, TAU_LEGS, check_measurement_era, lumi_pb
+from bbtautau_shapesmith.constants import EVENT_KEY, LT_CHANNELS, TAU_CHANNELS, TAU_LEGS, check_measurement_era, lumi_pb
 from bbtautau_shapesmith.processes import EMBEDDED, SPLITS, PLOT_GROUP
 from bbtautau_shapesmith.samples import sample_database, samples
 from bbtautau_shapesmith.switches import FF_VARIANTS, FakeFactorSwitches, parse
@@ -235,6 +235,7 @@ def build(config: RunConfig) -> Analysis:
         signal=None,
         channels={name: channel(name, era, switches, by_channel[name], measurement) for name in config.channels},
         measurement=measurement,
-        # no event_key: the ff_measurement skims hold no run and lumi (keep_columns), so the repeated events of the 2018D
-        # mutau embedding stay in (252 of its 147 416 mt rows repeat an event number); EVENT_KEY here needs a new skim
+        # data and embedding without repeated events (FF v7c, v8 spec 9.0 Nr. 2): the skims keep run and lumi; the
+        # skims made before (ff_v7b, without run and lumi) are incompatible for data and embedding and need a new skim
+        event_key=EVENT_KEY,
     )

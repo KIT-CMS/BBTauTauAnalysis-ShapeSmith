@@ -303,13 +303,15 @@ holds only the samples of its processes. The skim contract records `nevents` for
 corrected count, and re-skim a skim made with the old one once with
 `shapesmith skim --force --samples EmbeddingRun2018D_cwinter-embedding_2018UL_mutau`.
 
-Repeated events (decided 2026-10-26): the tau, dilepton, tau-ID and trigger analyses set `event_key` = (run, lumi,
+Repeated events (decided 2026-10-26): the tau, dilepton, tau-ID, trigger and fake-factor analyses set `event_key` = (run, lumi,
 event) (`constants.EVENT_KEY`), so every data and embedding sample is read without the skim rows that repeat an event of
 an earlier row of the sample, in file order (core README, "Steps"); the skims keep every row, and `hist`, `measure` and
 `ml-export` list the dropped rows in `repeated_events.json`. The only case in v7b is the mutau 2018D embedding: its
 input files `nano_35` and `nano_53` share 44 497 events, which leaves 59 repeated rows in the `tau_ff`/`tau_ff_nn`
 skims (2018 mt) and 243 in `tau_control`; every other data and embedding sample of the `tau_ff_nn`, `tau_control` and
-`dilepton` skims has none. The fake-factor measurement keeps them: its skims hold no run and lumi.
+`dilepton` skims has none. The fake-factor measurement drops them since FF v7c (v8 spec 9.0): its skims made for
+`ff_v7b` and `ff_v7b_w` hold no run and lumi, so the skim refuses them for data and embedding; FF v7c skims anew
+(`configs/ff_smrun2_binned_v7c*.yaml`).
 
 `tests/fixtures/datasets.json` holds the database entries of exactly the nicks in `inventory/`, taken from the sibling
 checkout `KingMaker_sample_database` at `feat-run2-nanoaodv15-samples` `0de63ebe` (the v7 registration and the HH-WG

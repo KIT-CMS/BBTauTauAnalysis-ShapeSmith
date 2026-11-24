@@ -64,6 +64,9 @@ RENAMED = {P3: (("ff_v7", "ff_v7b"),), P1: ()}  # the FF friends of v7b get thei
 # export of the profile v7b5 and its own skims (the re-skim of X8)
 NN_EXPORT = {"smrun2_binned_v7_noemb": ("thesis6", {"ml_labels": "thesis6", "ml_variables": ["thesis", "objects", "kinematics"]})}
 NN_RUNS = {"smrun2_binned_v7b_ff_nn": "smrun2_binned_v7b_ff"}  # NN run -> the run it copies
+# FF v7c (v8 spec 9.0 Nr. 2): the v7b fake-factor measurement again on the same n-tuples, with its own skims (run and lumi
+# for the event key of data and embedding) and outputs, without a gallery until the payload is final
+FF_V7C_RUNS = {"ff_smrun2_binned_v7c": "ff_smrun2_binned_v7b", "ff_smrun2_binned_v7c_w": "ff_smrun2_binned_v7b_w"}
 
 
 def load(name: str, era: str, *overrides: str):
@@ -82,7 +85,7 @@ def strings(value):
 
 
 def test_one_run_yaml_per_run_type():
-    assert {p.stem for p in (REPO / "configs").glob("*.yaml") if "smrun2" in p.stem} == set(RUNS) | set(REPRODUCED.values()) | set(NN_RUNS) | set(NN_FRIEND_RUNS) | set(VALIDATION_RUNS) | set(OUTPUT_RUNS)
+    assert {p.stem for p in (REPO / "configs").glob("*.yaml") if "smrun2" in p.stem} == set(RUNS) | set(REPRODUCED.values()) | set(NN_RUNS) | set(NN_FRIEND_RUNS) | set(VALIDATION_RUNS) | set(OUTPUT_RUNS) | set(FF_V7C_RUNS)
 
 
 def moved(value, old: str, new: str, renamed=()):
@@ -286,3 +289,21 @@ def test_the_nn_export_runs(era):
     for channel in analysis.channels.values():
         for sample in channel.samples:
             assert needed_columns(channel, sample, analysis.ml) == needed_columns(channel, sample), sample.nick
+
+
+@pytest.mark.parametrize("era", ERAS)
+@pytest.mark.parametrize("name", FF_V7C_RUNS)
+def test_ff_v7c_copies_the_v7b_measurement_with_its_own_skims_and_outputs(name, era):
+    """FF v7c reads the n-tuples of its v7b run with the same switches; its skims hold run and lumi for data and
+    embedding, which the measurement reads without repeated events."""
+    v7c, v7b = load(name, era), load(FF_V7C_RUNS[name], era)
+    dumps = [{key: value for key, value in json.loads(c.model_dump_json()).items() if key not in ("skim_dir", "output_dir", "web")} for c in (v7c, v7b)]
+    root = "/ceph/sdaigler/shapesmith/smrun2_binned_v7b"
+    assert dumps[0] == dumps[1] and v7c.web is None and v7b.web is not None
+    assert (v7c.skim_dir, v7c.output_dir) == (Path(f"{root}/skims/ff_measurement_v7c/{era}"), Path(f"{root}/output/ff_v7c"))
+    analysis = load_analysis(load(name, era, *([] if era in DY_NJETS_BTAG else ["switches.dy_correction=none"])))
+    assert analysis.event_key == ("run", "lumi", "event")
+    for channel in analysis.channels.values():
+        for sample in channel.samples:
+            if sample.kind != "mc":
+                assert {"run", "lumi", "event"} <= needed_columns(channel, sample, None, analysis.event_key)
