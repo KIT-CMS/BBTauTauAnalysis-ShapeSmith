@@ -104,17 +104,30 @@ class TauSwitches(_EmbeddedChannels, _FakeFactorProcesses, BaseModel):
     fit_categories: Literal["nn", "control", "none"] = "nn"
     control_regions: bool = False  # wider skim plus the named pass/fail control regions (needs jet_fakes: mc)
     diagnostics: bool = False  # QCD in the control regions and the diagnostic variables (needs control_regions; npv_good, rho from v6)
-    shape_systematics: bool = True  # the embedding and fake-factor shifts (column variations)
-    # the production has CROWN shifts (the embedding tau ES and vsJet ID); false for a nominal-only production (v7, E34),
-    # which keeps the fake-factor friend shifts and the weight variations of the nominal tree
+    shape_systematics: bool = True  # the CROWN shifts and the fake-factor friend shifts (column variations)
+    # the CROWN shifts of the production are nuisances; false for a nominal-only production (v7, E34), which keeps the
+    # fake-factor friend shifts and the weight variations of the nominal tree, and for the S0 cards of a production with
+    # shifts (shift_set v8: every shift is then declared for the skim but none is filled)
     crown_shifts: bool = True
+    # the shifts the production has: embedding, the embedding tau ES and vsJet ID of the productions up to v6 (v7 has
+    # none: crown_shifts false); v8, the shift set of smrun2_binned_v8 on the simulation and the embedding (v8 spec 6.1,
+    # systematics.crown_shifts_v8). With v8 every shift of the n-tuples is declared: the skim fails on an undeclared one.
+    # The shifts that are no nuisance (lepton ID and trigger, the QCD scale of the backgrounds, the muon ES: V7, V25) and,
+    # with crown_shifts false, all of them are declared without regions (SH26); the kinematic shifts need the friend
+    # columns an expression reads (NN outputs, FastMTT, fake factors) shifted wherever they are filled (SH19), and they
+    # are filled in the nominal region only (V31)
+    shift_set: Literal["embedding", "v8"] = "embedding"
+    # the JER as the six JERC regions CMS_res_j_<region>_<era> instead of their sum CMS_res_j_<era> (V23: if the fit
+    # constrains the one nuisance); needs the v8 shifts
+    jer_regions: bool = False
     dy_correction: DyCorrection = "none"  # on every DY process (ZTT, ZL, ZJ)
     # the fake-factor payload variant of the friend: the CROWN shifts of its W+jets keys in et and mt (jet_fakes: ff)
     ff_processes: FfProcesses = Field(default_factory=lambda: ["QCD", "ttbar"])
-    # the uncertainties sized in the v7b studies (study_uncertainties.py, systematics_v7b_summary.md): embedding tau ID
-    # (weight factors) and ES, POG MC tau ES, vsJet components (in place of the flat eff_t_vsJet) and di-tau trigger SF,
-    # MET residual, HIPM, the fake-factor decay-mode non-closure (shape) and 2016 halves, K4; only for the fake-factor run
-    # of a nominal-only production (the MC tau ES and the vsJet replacement of the MC jet fakes have no other source)
+    # the uncertainties sized in the v7b studies (study_uncertainties.py, systematics_v7b_summary.md), for the
+    # fake-factor run. Stand-ins that the CROWN shifts replace where the production has them (SH17): embedding tau ID
+    # (weight factors) and ES (the embedding shifts of either shift set), POG MC tau ES, vsJet components (in place of
+    # the flat eff_t_vsJet) and di-tau trigger SF per decay mode (the v8 shifts). They stay with or without shifts: MET
+    # residual, HIPM, the fake-factor decay-mode non-closure (shape) and 2016 halves, K4
     study_uncertainties: bool = False
     # the datacards symmetrise the fake-factor friend shifts whose Up and Down move a process to the same side of the
     # nominal or by more than twice as much on one side (Analysis.symmetrised_variations, shapesmith.datacards; on in the
@@ -125,11 +138,14 @@ class TauSwitches(_EmbeddedChannels, _FakeFactorProcesses, BaseModel):
     # CMS_htt_ttbarShape (SH7) and the 30 % normalisation of the heavy-flavour component at >= 3 b tags
     # CMS_htt_heavy_flavour (SH8; needs skims with bpair_hadronFlavour_{1,2}, as the re-skim of NN spec X8), on the
     # tau channels and em; S1 the signal theory shapes normalised to the inclusive rate (SH14): qcd_scale (the CROWN
-    # shifts QCDscale_ren and QCDscale_fac of lhe_scale_weight), parton_shower and pdf (columns the shift production P6 is
-    # to add); they need crown_shifts: true and the powheg signal
+    # shifts QCDscale_ren and QCDscale_fac of lhe_scale_weight), parton_shower (the shifts ps_isr and ps_fsr) and pdf (the
+    # quadrature sum per bin of the 100 eigenvector weights, V27); they need the v8 shifts (crown_shifts: true, shift_set:
+    # v8) and the powheg signal. ttbar_parton_shower: ps_isr_ttbar and ps_fsr_ttbar on ttbar, normalised before the
+    # acceptance (Q6, P8); needs the v8 shifts
     ttbar_shape: bool = False
     heavy_flavour: bool = False
     signal_theory: list[Literal["qcd_scale", "parton_shower", "pdf"]] = Field(default_factory=list)
+    ttbar_parton_shower: bool = False
     # the input validation of the NN phase (nn_validation.py, nn_limit_spec.md 7.1, NV1-NV3): the control variables are
     # the NN inputs of each channel in fine bins (shapesmith input-gof merges them), the eta-phi occupancy of the legs and
     # jets and yield; the skims keep the inputs of FastMTT with the MET covariance (a refit, scripts/fastmtt_refit.py)
@@ -197,10 +213,24 @@ class TauSwitches(_EmbeddedChannels, _FakeFactorProcesses, BaseModel):
             raise ValueError("diagnostics requires control_regions: true")
         return self
 
+    @property
+    def mc_shifts(self) -> bool:
+        """The v8 shifts of the simulation and the embedding are nuisances (shift_set v8 with crown_shifts)."""
+        return self.crown_shifts and self.shift_set == "v8"
+
     @model_validator(mode="after")
-    def _study_uncertainties_need_a_nominal_fake_factor_run(self) -> TauSwitches:
-        if self.study_uncertainties and (self.jet_fakes != "ff" or self.crown_shifts):
-            raise ValueError("study_uncertainties requires jet_fakes: ff and crown_shifts: false")
+    def _study_uncertainties_need_a_fake_factor_run(self) -> TauSwitches:
+        if self.study_uncertainties and self.jet_fakes != "ff":
+            raise ValueError("study_uncertainties requires jet_fakes: ff")
+        return self
+
+    @model_validator(mode="after")
+    def _v8_switches_need_the_v8_shifts(self) -> TauSwitches:
+        for name in ("jer_regions", "ttbar_parton_shower"):
+            if getattr(self, name) and not self.mc_shifts:
+                raise ValueError(f"{name} requires crown_shifts: true and shift_set: v8")
+        if self.pseudo_shifts and self.mc_shifts:
+            raise ValueError("pseudo_shifts stand in for the kinematic shifts of the shift production: not with crown_shifts: true and shift_set: v8")
         return self
 
     @model_validator(mode="after")
@@ -213,8 +243,8 @@ class TauSwitches(_EmbeddedChannels, _FakeFactorProcesses, BaseModel):
     def _signal_theory_needs_the_shift_production(self) -> TauSwitches:
         if len(set(self.signal_theory)) < len(self.signal_theory):
             raise ValueError(f"signal_theory lists a kind twice: {self.signal_theory}")
-        if self.signal_theory and not self.crown_shifts:
-            raise ValueError("signal_theory requires crown_shifts: true (the theory weights come with the shift production P6)")
+        if self.signal_theory and not self.mc_shifts:
+            raise ValueError("signal_theory requires crown_shifts: true and shift_set: v8 (the theory weights come with the shift production)")
         if self.signal_theory and self.signal_sample != "powheg":
             raise ValueError("signal_theory requires signal_sample: powheg (the normalisation is that of the powheg sample)")
         return self

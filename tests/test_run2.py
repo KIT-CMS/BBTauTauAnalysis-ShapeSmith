@@ -330,7 +330,7 @@ def test_the_correlation_scheme():
     assert tokens["tau_vse"] == tokens["tau_e_es"] == ("2018", "2018", "2017", "2018")  # K6: copies of 2018 (E12)
     assert tokens["tau_vsmu"] == ("2018", "2018", "2018", "2018")
     assert tokens["tau_vslep"] == ("2018", "2018", "2017", "2018")  # the flat VSe + VSmu lnN: a copy where both are
-    assert tokens["jes_year"] == ("2016APV", "2016", "2017", "2018")
+    assert tokens["jes_year"] == tokens["jer"] == tokens["met_unclustered"] == tokens["tau_highpt"] == ERAS  # the CMS list names the JES sources by era (V32)
     assert nuisance("CMS_btag_fixedWP_bc_correlated", "btag_correlated", "2017") == "CMS_btag_fixedWP_bc_correlated"
     assert nuisance("CMS_ff_QCDStatShift_mt", "fake_factors", "2016preVFP") == nuisance("CMS_ff_QCDStatShift_mt", "fake_factors", "2016postVFP") == "CMS_ff_QCDStatShift_mt_2016"
     with pytest.raises(ValueError, match="unknown era"):

@@ -12,7 +12,7 @@ from shapesmith.model import ABCD, Analysis, AnalysisError, Category, Channel, C
 
 from bbtautau_shapesmith import cuts, dilepton
 from bbtautau_shapesmith.constants import (
-    BTAG_BINS, CONTROL_CHANNELS, EVENT_KEY, LT_CHANNELS, LUMI_PB, NN_CLASS_COLUMN, NN_SCORE_COLUMN, PREFIRING_NUISANCE, TAU_CHANNELS, YEAR, check_era,
+    BTAG_BINS, CONTROL_CHANNELS, EVENT_KEY, FF_COLUMNS, FF_RAW_COLUMNS, LT_CHANNELS, LUMI_PB, NN_CLASS_COLUMN, NN_SCORE_COLUMN, PREFIRING_NUISANCE, TAU_CHANNELS, YEAR, check_era,
 )
 from bbtautau_shapesmith.ml import ML_CLASSES, ml_config, raw_count_groups
 from bbtautau_shapesmith.nn_outputs import blinding_edges, fraction_regions, output_variables
@@ -24,11 +24,11 @@ from bbtautau_shapesmith.samples import sample_database, samples
 from bbtautau_shapesmith.style import style
 from bbtautau_shapesmith.switches import TauSwitches, parse
 from bbtautau_shapesmith.systematics import (
-    HEAVY_FLAVOUR_WEIGHT, SIGNAL_THEORY_WEIGHT, Study, btag_variations, embedding_id_variations, embedding_ttbar_nuisance, embedding_variation_sums,
-    embedding_variations, ff_dm_nonclosure_variations, ff_variant, ff_variations, heavy_flavour_variations, lnn, prefiring_variations,
-    signal_theory_variations, ttbar_shape_variations, with_weights,
+    HEAVY_FLAVOUR_WEIGHT, SIGNAL_THEORY_WEIGHT, TTBAR_GROUP, TTBAR_THEORY_WEIGHT, Study, btag_variations, embedding_id_variations, embedding_ttbar_nuisance,
+    embedding_variation_sums, embedding_variations, ff_dm_nonclosure_variations, ff_variant, ff_variations, heavy_flavour_variations, lnn, prefiring_variations,
+    signal_theory_sums, signal_theory_variations, tau_highpt_variations, ttbar_shape_variations, ttbar_theory_variations, v8_variation_sums, v8_variations, with_weights,
 )
-from bbtautau_shapesmith.variables import categories, control_variables, nn_score_blinding, nominal_category
+from bbtautau_shapesmith.variables import FASTMTT_VARIABLES, categories, control_variables, nn_score_blinding, nominal_category
 
 def process_union(channels: Iterable[Channel]) -> tuple[Process, ...]:
     """The processes of all channels, each name once in channel order; a process that is auxiliary in one channel and
@@ -54,12 +54,54 @@ def diagnostic_estimators(name: str, every_mc: tuple[str, ...]) -> tuple:
     return tuple(DataMinus("QCD", region, every_mc, clip_negative=True, target=target) for region, target in pairs)
 
 
+def v8_shifts(switches: TauSwitches) -> bool:
+    """The run declares the shifts of the v8 production (shift_set v8 with shape_systematics): as nuisances with
+    crown_shifts, else only for the skim (the S0 cards of a production with shifts)."""
+    return switches.shift_set == "v8" and switches.shape_systematics
+
+
+def shift_nuisances(switches: TauSwitches) -> bool:
+    """The v8 shifts of the simulation and the embedding are nuisances of the run."""
+    return v8_shifts(switches) and switches.crown_shifts
+
+
+def sample_groups(channel_samples: Iterable[Sample], era: str) -> dict[str, tuple[str, str]]:
+    """Sample group -> (kind, era of its n-tuples) of the simulated and embedded samples: what the v8 shifts of a
+    channel are declared for (systematics.v8_variations). A group borrowed from another era has the shifts of that era;
+    one of samples of several eras could not be declared."""
+    result = {}
+    for sample in channel_samples:
+        if sample.kind == "data":
+            continue
+        entry = (sample.kind, sample.era or era)
+        if result.setdefault(sample.group, entry) != entry:
+            raise AnalysisError(f"the samples of the group {sample.group} are of the kinds or eras {result[sample.group]} and {entry}: the CROWN shifts of one group need one of each")
+    return result
+
+
+def friend_columns(name: str, switches: TauSwitches) -> tuple[str, ...]:
+    """The friend columns of a tau channel that a kinematic shift must move (SH19): the outputs of the NN model, the
+    FastMTT variables and the fake factors. The skim demands them shifted wherever a region of the shift reads them; the
+    anti-isolated region books no kinematic shift (V31), so the fake factors are demanded only if that changes."""
+    if name not in TAU_CHANNELS:
+        return ()
+    fake_factors = (*FF_COLUMNS.values(), *FF_RAW_COLUMNS.values()) if switches.jet_fakes == "ff" or switches.ff_transfer else ()
+    return nn_output_columns(switches) + (FASTMTT_VARIABLES if switches.fastmtt_friend else ()) + fake_factors
+
+
+def crown_shift_variations(name: str, era: str, switches: TauSwitches, channel_samples: Iterable[Sample]) -> tuple:
+    """The column variations of the v8 shifts of a channel (a tau channel or em), declared for its simulated and
+    embedded samples: nuisances with crown_shifts, else declared only."""
+    return v8_variations(name, era, sample_groups(channel_samples, era), switches.crown_shifts, friend_columns(name, switches), switches.jer_regions)
+
+
 def estimators(name: str, era: str, processes: tuple[Process, ...], switches: TauSwitches) -> tuple:
     """jetFakes = data - (genuine + lepton fakes) in the fake-factor region (with ff_same_sign also those of the
     same-sign region from its anti-isolated part), or QCD from ABCD with every MC subtracted (with diagnostics also in
     the control regions); in an embedded channel the sums of the embedding shifts of DM10 and DM11 (after the
     estimates, which carry them too; only with the CROWN shifts) and the ttbar contamination of the embedded sample
-    (+-10 % of genuine ttbar)."""
+    (+-10 % of genuine ttbar). With the v8 shifts as nuisances the sums are those of systematics.v8_variation_sums (the
+    JER regions, the embedding tau ES with its partial correlation to the simulation)."""
     genuine_and_lepton_fakes = backgrounds_in(processes, GENUINE) + backgrounds_in(processes, LEPTON_FAKE)
     every_mc = genuine_and_lepton_fakes + backgrounds_in(processes, JET_FAKE)
     output = jet_fakes_output(switches.jet_fakes)
@@ -71,27 +113,34 @@ def estimators(name: str, era: str, processes: tuple[Process, ...], switches: Ta
         result = (ABCD(output, "abcd_anti_iso", "abcd_same_sign", "abcd_same_sign_anti_iso", every_mc),)
     if switches.diagnostics:
         result += diagnostic_estimators(name, every_mc)
-    if switches.embedded(name) and switches.shape_systematics and switches.crown_shifts:
+    if shift_nuisances(switches):
+        result += v8_variation_sums(name, era, switches.embedded(name), switches.jer_regions)
+    elif switches.embedded(name) and switches.shape_systematics and switches.crown_shifts and switches.shift_set == "embedding":
         result += embedding_variation_sums(name, era)
     if switches.embedded(name):
         result += (TemplateShift(embedding_ttbar_nuisance(era), EMBEDDED, SPLITS["TT"]["T"], 0.1),)
     return result
 
 
-def column_variations(name: str, era: str, switches: TauSwitches) -> tuple:
-    """The embedding tau shifts (CROWN shifts, not in a nominal-only production) and the fake-factor friend shifts; with
-    study_uncertainties the embedding tau ID as weight factors in a nominal-only production and the decay-mode
-    non-closure of the fake factors, which ff_transfer (the MC jet fakes in AR x FF) carries too."""
+def column_variations(name: str, era: str, switches: TauSwitches, channel_samples: Iterable[Sample] = ()) -> tuple:
+    """The CROWN shifts of the production and the fake-factor friend shifts: with shift_set embedding the embedding tau
+    shifts (not in a nominal-only production), with v8 every shift of the simulated and embedded samples of the channel
+    (`channel_samples`; crown_shift_variations). With study_uncertainties the embedding tau ID as weight factors where
+    the CROWN shifts are no nuisances, and the decay-mode non-closure of the fake factors, which ff_transfer (the MC jet
+    fakes in AR x FF) carries too."""
     if not switches.shape_systematics:
         return ()
-    embedding = embedding_variations(name, era) if switches.embedded(name) and switches.crown_shifts else ()
+    if switches.shift_set == "v8":
+        shifts = crown_shift_variations(name, era, switches, channel_samples)
+    else:
+        shifts = embedding_variations(name, era) if switches.embedded(name) and switches.crown_shifts else ()
     if switches.study_uncertainties and switches.embedded(name) and not switches.crown_shifts and name in LT_CHANNELS:
-        embedding += embedding_id_variations(name, era)
+        shifts += embedding_id_variations(name, era)
     fakes = ff_variations(name, era, switches.wjets) if switches.jet_fakes == "ff" or switches.ff_transfer else ()
     if (switches.study_uncertainties and switches.jet_fakes == "ff") or switches.ff_transfer:
         fakes += ff_dm_nonclosure_variations(name, era, ff_variant(switches.wjets))
     pseudo = pseudo_shift_variations(name, era, switches.embedded(name), nn_output_columns(switches)) if switches.pseudo_shifts else ()
-    return embedding + fakes + pseudo
+    return shifts + fakes + pseudo
 
 
 def study(switches: TauSwitches, channels: Iterable[str]) -> Study | None:
@@ -99,7 +148,7 @@ def study(switches: TauSwitches, channels: Iterable[str]) -> Study | None:
     if not switches.study_uncertainties:
         return None
     embedded = tuple(name for name in channels if name in TAU_CHANNELS and switches.embedded(name))
-    return Study(embedded, ff_variant(switches.wjets) if switches.jet_fakes == "ff" else None, switches.crown_shifts)
+    return Study(embedded, ff_variant(switches.wjets) if switches.jet_fakes == "ff" else None, switches.crown_shifts, shift_nuisances(switches))
 
 
 def nn_classes(switches: TauSwitches) -> tuple[str, ...]:
@@ -178,35 +227,53 @@ def channel(name: str, era: str, switches: TauSwitches, channel_samples: tuple[S
         variables = control_variables(switches.nn_friend, switches.diagnostics, switches.fastmtt_friend, switches.nn_prefix, blinded)
     if switches.nn_outputs:
         variables = {**variables, **output_controls(name, era, switches, blinded)}
+    own = tuple(s for s in channel_samples if s.group in groups)
+    highpt = tau_highpt_variations(name, era) if shift_nuisances(switches) else ()  # V35: it comes with the shift model of v8
     return Channel(
         name=name,
-        samples=tuple(s for s in channel_samples if s.group in groups),
+        samples=own,
         skim=cuts.skim_cuts(name, era, switches.control_regions),
         cuts=baseline,
         processes=table,
         regions=regions,
         categories=fit_categories(switches, table),
         variables=variables,
-        variations=btag_variations(era) + prefiring_variations() + column_variations(name, era, switches),
+        variations=btag_variations(era) + prefiring_variations() + column_variations(name, era, switches, own) + highpt,
         estimators=estimates,
         keep_columns=("event", "run", "lumi", *nn_friend_columns(switches)) + (FASTMTT_INPUTS if switches.nn_validation else ()),
     )
 
 
+def control_channel(era: str, switches: TauSwitches, channel_samples: tuple[Sample, ...]) -> Channel:
+    """em, the ttbar control channel of the fits (dilepton.top_control_channel); with the v8 shifts its simulated
+    samples declare theirs, so that their nuisances correlate with the tau channels."""
+    channel = dilepton.top_control_channel(channel_samples, era, switches.dy_correction, switches.fit_categories == "nn")
+    if not v8_shifts(switches):
+        return channel
+    sums = v8_variation_sums(channel.name, era, False, switches.jer_regions) if switches.crown_shifts else ()
+    return dataclasses.replace(channel, variations=channel.variations + crown_shift_variations(channel.name, era, switches, channel.samples), estimators=channel.estimators + sums)
+
+
 def with_stage_variations(channel: Channel, era: str, switches: TauSwitches) -> Channel:
     """A tau or control channel with the weight variations of the NN systematics stages (nn_limit_spec.md 8):
-    ttbar_shape on the processes with the top-pT weight, heavy_flavour on the simulated backgrounds and signal_theory on
-    the signal, each of the last two with the nominal factor 1.0 it replaces (systematics.with_weights)."""
-    processes, variations = channel.processes, ()
+    ttbar_shape on the processes with the top-pT weight, heavy_flavour on the simulated backgrounds, signal_theory on
+    the signal (the PDF with the quadrature sum of its eigenvector templates) and ttbar_parton_shower on the ttbar
+    processes, each of the last three with the nominal factor 1.0 it replaces (systematics.with_weights)."""
+    processes, variations, sums = channel.processes, (), ()
     if switches.ttbar_shape:
         variations += ttbar_shape_variations(era)
     if switches.heavy_flavour:
         processes = with_weights(processes, {p.name for p in processes if p.role == "background" and p.group != EMBEDDED}, HEAVY_FLAVOUR_WEIGHT)
         variations += heavy_flavour_variations(era)
     if switches.signal_theory:
-        processes = with_weights(processes, {p.name for p in processes if p.role == "signal"}, SIGNAL_THEORY_WEIGHT)
-        variations += signal_theory_variations(era, switches.signal_theory)
-    return dataclasses.replace(channel, processes=processes, variations=channel.variations + variations) if variations else channel
+        signal = [p for p in processes if p.role == "signal"]
+        processes = with_weights(processes, {p.name for p in signal}, SIGNAL_THEORY_WEIGHT)
+        variations += signal_theory_variations(era, switches.signal_theory, (s for p in signal for s in channel.samples_of(p.group)))
+        sums += signal_theory_sums(era, switches.signal_theory)
+    if switches.ttbar_parton_shower:
+        processes = with_weights(processes, {p.name for p in processes if p.group == TTBAR_GROUP}, TTBAR_THEORY_WEIGHT)
+        variations += ttbar_theory_variations(era, channel.samples_of(TTBAR_GROUP))
+    return dataclasses.replace(channel, processes=processes, variations=channel.variations + variations, estimators=channel.estimators + sums) if variations else channel
 
 
 def symmetrised_ff_shifts(channels: Iterable[Channel], era: str, switches: TauSwitches) -> tuple[str, ...]:
@@ -240,9 +307,7 @@ def build(config: RunConfig) -> Analysis:
     signal = NODE_SM if switches.signal_sample == "node_sm" else SIGNAL
     by_channel = samples(sample_database(config), switches.sample_lists, config.channels, era, signal)
     channels = {
-        name: with_stage_variations(
-            dilepton.top_control_channel(by_channel[name], era, switches.dy_correction, switches.fit_categories == "nn") if name in CONTROL_CHANNELS else channel(name, era, switches, by_channel[name]), era, switches,
-        )
+        name: with_stage_variations(control_channel(era, switches, by_channel[name]) if name in CONTROL_CHANNELS else channel(name, era, switches, by_channel[name]), era, switches)
         for name in config.channels
     }
     tau_channels = [c for name, c in channels.items() if name not in CONTROL_CHANNELS]
@@ -254,7 +319,8 @@ def build(config: RunConfig) -> Analysis:
         channels=channels,
         control_channels=tuple(name for name in config.channels if name in CONTROL_CHANNELS),
         # the channels can differ in their processes
-        lnn=lnn(process_union(channels.values()), jet_fakes_output(switches.jet_fakes), era, borrowed_processes(channels.values()), study(switches, config.channels), switches.dy_correction),
+        lnn=lnn(process_union(channels.values()), jet_fakes_output(switches.jet_fakes), era, borrowed_processes(channels.values()), study(switches, config.channels), switches.dy_correction,
+                shift_nuisances(switches)),
         lnn_variations=(PREFIRING_NUISANCE,),
         symmetrised_variations=symmetrised_ff_shifts(tau_channels, era, switches) + pseudo_shift_names(era, any(switches.embedded(c.name) for c in tau_channels), switches.pseudo_shifts),
         style=style(era),
