@@ -204,12 +204,16 @@ Switches of the tau run YAML (typed in `switches.py`; an unknown or mistyped swi
 | `signal_sample` | `powheg` (default), `node_sm` | the signal `HH2B2Tau` from the powheg κλ = 1 sample, or from the madgraph node_SM sample of the master's thesis (R3, N9), the powheg sample then left out |
 | `control_regions` | `false` (default), `true` | wider skim plus the named pass/fail control regions; needs `jet_fakes: mc` |
 | `diagnostics` | `false` (default), `true` | QCD in the control regions (et/mt: same-sign data minus MC, tt: ABCD with the fail regions) and the variables `met_uncorrected`, `metphi_uncorrected`, `npv_good`, `rho` (the last two from production v6 on); needs `control_regions: true` |
-| `shape_systematics` | `true` (default), `false` | the CROWN shifts of the embedded samples and of the fake-factor friend as shape variations |
-| `crown_shifts` | `true` (default), `false` | `false` for a production without CROWN shifts (v7 is nominal only, E34): no embedding tau shifts; the fake-factor friend shifts and the weight variations of the nominal tree (b tag, prefiring) stay |
+| `shape_systematics` | `true` (default), `false` | the CROWN shifts of the production (`shift_set`) and of the fake-factor friend as shape variations |
+| `crown_shifts` | `true` (default), `false` | the CROWN shifts of the production are nuisances; `false` for a production without CROWN shifts (v7 is nominal only, E34): no embedding tau shifts; the fake-factor friend shifts and the weight variations of the nominal tree (b tag, prefiring) stay. With `shift_set: v8` and `false` every shift is declared for the skim and none is filled: the S0 cards of a production with shifts |
+| `shift_set` | `embedding` (default), `v8` | the shifts the production has: the embedding tau ES and vsJet ID of the productions up to v6, or the shift set of `smrun2_binned_v8` on the simulation and the embedding (see "Shift production v8") |
+| `jer_regions` | `false` (default), `true` | the JER as the six JERC regions `CMS_res_j_<region>_<era>` instead of their sum `CMS_res_j_<era>` (V23); needs `crown_shifts: true` and `shift_set: v8` |
 | `dy_correction` | `none` (default), `njets_btag` | every DY process (ZTT, ZL, ZJ) times the DY data/MC table `DY_NJETS_BTAG` (`constants.py`) of its n_bjets (0, 1, ≥ 2) and n_jets (≤ 2, 3, ≥ 4) |
 | `ttbar_shape` | `false` (default), `true` | stage S0+ of the NN phase (SH7): the top-pT shape `CMS_htt_ttbarShape` of ttbar, see "Systematics stages" |
 | `heavy_flavour` | `false` (default), `true` | stage S0+ (SH8): `CMS_htt_heavy_flavour`, 30 % on the heavy-flavour component at ≥ 3 b tags; reads `bpair_hadronFlavour_{1,2}` (skims of the re-skim X8 or later) |
-| `signal_theory` | `[]` (default), a list of `qcd_scale`, `parton_shower`, `pdf` | stage S1 (SH14): the signal theory shapes normalised to the inclusive rate; needs `crown_shifts: true` (the shift production P6) and `signal_sample: powheg` |
+| `signal_theory` | `[]` (default), a list of `qcd_scale`, `parton_shower`, `pdf` | stage S1 (SH14, v8 SH20): the signal theory shapes normalised to the inclusive rate, the PDF as the quadrature sum per bin of its 100 eigenvector templates (V27); needs `crown_shifts: true`, `shift_set: v8` and `signal_sample: powheg` |
+| `ttbar_parton_shower` | `false` (default), `true` | `ps_isr_ttbar` and `ps_fsr_ttbar` on ttbar (tau channels and em), normalised before the acceptance (Q6, P8); needs `crown_shifts: true` and `shift_set: v8` |
+| `study_uncertainties` | `false` (default), `true` | the uncertainties sized in the v7b studies (`study_uncertainties.py`); needs `jet_fakes: ff`. A CROWN shift replaces its stand-in (the embedding tau ID and ES with `crown_shifts: true`; the MC tau ES, vsJet components and di-tau trigger SF with the v8 shifts), the other lnN stay (see "Shift production v8") |
 | `nn_validation` | `false` (default), `true` | the input validation of the NN phase (see "NN input validation"): the control variables are the NN inputs of the channel in fine bins, their eta-phi occupancy cells and `yield`; the skims keep the inputs of FastMTT |
 | `pseudo_shifts` | `false` (default), `true` | PRELIMINARY shape nuisances of the input validation: jets ±3 %, tau_h ±1.5 % with the MET propagated and the derived quantities recomputed (`CMS_pseudo_jes_<era>`, `CMS_pseudo_tes_<era>`, `CMS_pseudo_emb_tes_<era>`), symmetrised in the cards; with the NN friend also of its outputs (NV9 in S0+: the friend columns `<column>__<shift>` of `scripts/pseudo_nn_friend.py --pseudo-shifts`); needs `nn_validation` or `nn_friend` |
 | `ff_transfer` | `false` (default), `true` | the region `anti_iso` with the fake factor of the friend and its shifts (with the decay-mode non-closure of the fake factors) in `mc` mode (MC jet fakes in AR x FF against the nominal region); needs `jet_fakes: mc` and the fake-factor friend |
@@ -365,7 +369,8 @@ nuisances they share are named so. Spec: `docs/v7_spec.md` of the workspace, sec
   both 2016 halves, whose VSe and VSmu payloads are 2018 copies, K6); the fake-factor shifts `CMS_ff_<key>_<channel>_<year>` and
   `jetFakesNorm_<channel>_<year>`; `CMS_htt_emb_ttbar_<era>`; HH theory per E26 (`QCDscale_HH` +7.25/−21.12 %,
   `PDF_alphas_HH` 2.47 %). The families of CROWN shifts (TES, JES, JER, MET, recoil, the MC vsJet/VSe/VSmu components,
-  the shared EMB/MC parts of TES and the tt trigger) come with the shift production; `correlations.py` names them.
+  the shared EMB/MC part of the TES and the tt trigger) come with the shift production v8 (next section);
+  `correlations.py` gives them their era tokens.
 - **Fake factors** (spec 6.8, E18; `ff_measurement.py`, `ff_tables.py`): two payload variants, switch
   `ff_processes`: `[QCD, ttbar]` (output `fake_factors/<era>/`, as v6) and `[QCD, Wjets, ttbar]` (`fake_factors_w/<era>/`).
   The W+jets fake factors (et, mt) are measured from data in the DR mt_1 > 70, no b tag, >= 2 jets, isolated lepton,
@@ -425,6 +430,82 @@ nuisances they share are named so. Spec: `docs/v7_spec.md` of the workspace, sec
   their copies; `tests/test_v7_runs.py` every v7 run YAML in every era, its paths, productions and gallery column;
   `tests/test_ff_variants.py`, `tests/test_tau_trigger_measurement.py` and `tests/test_dy_correction.py` the
   fake-factor variants and eras, the trigger measurement and the DY table.
+
+## Shift production v8
+
+`shift_set: v8` (with `shape_systematics: true`) is the shift model of the production `smrun2_binned_v8` (v8 spec
+section 6, SH16-SH28): every CROWN shift of the simulated and embedded n-tuples of et, mt, tt and em is declared, and
+`crown_shifts` decides whether they are nuisances. No run YAML has it yet (the production does not exist): the model is
+tested on synthetic n-tuples and against the inventory of the CROWN tests.
+
+- **One table** (`systematics.crown_shifts_v8`, the table of spec 6.1): per channel and era every CROWN shift with
+  its datacard nuisance, its kind (kinematic or weight) and the samples that have it. The CROWN names are those of
+  `crown_names.py`, the only module that spells them (also the theory and pT-binned vsJet columns), the era tokens
+  those of `correlations.py`. `tests/test_v8_shifts.py` compares what every sample declares with
+  `tests/fixtures/v8_shift_inventory.json.gz`, the copy of the inventory of the CROWN tests
+  (`scripts/make_shift_inventory_fixture.py`), for every era, channel and sample: nothing missing, nothing more.
+
+| Family | CROWN shifts | Datacard nuisance | On |
+|---|---|---|---|
+| JES, regrouped | `CMS_scale_j_<source>`, `CMS_scale_j_<source>_<era>` | the same names (6 correlated, 5 per era) | MC |
+| JER | `CMS_res_j_<region>_<era>`, six regions | `CMS_res_j_<era>`, their sum (`jer_regions`: the six) | MC |
+| unclustered energy | `CMS_scale_met_unclustered_energy_<era>` | the same | MC but DY and W of 2018 |
+| recoil | `CMS_{scale,res}_met_RecoilCalibration_2018` | `CMS_htt_boson_scale_met_2018`, `CMS_htt_boson_res_met_2018` | DY and W of 2018 |
+| electron ES | `CMS_scale_e_<era>`, `CMS_res_e_<era>` | `CMS_scale_e_13TeV`, `CMS_res_e_13TeV` | MC |
+| tau ES | `CMS_scale_t_DeepTau2018v2p5_DM<dm>_genTau_<era>` | `CMS_scale_t_dm<dm>_<era>` | MC; the embedded sample with 0.5 of its own shift (V20) |
+| e → tau ES (et) | `..._DM<dm>_genElectron_{barrel,endcap}_<era>` | the same, the 2016 eras with the 2018 token | MC |
+| mu → tau ES (mt) | `..._DM<dm>_genMuon_<era>` | the same | MC |
+| vsJet SF | `CMS_eff_t_DeepTau2018v2p5_VSjet_dm_{stat1,stat2}_DM<dm>_<era>`, `..._syst_alleras`, `..._syst_<era>`, `..._syst_TES_<era>_dm<dm>` | the same (`..._syst_TES_dm<dm>_<era>`) | MC |
+| vsEle, vsMu SF | `CMS_fake_t_DeepTau2018v2p5_VSe_DM<dm>_{barrel,endcap}_<era>`, `..._VSmu_wheel<n>_<era>` | `CMS_fake_e_dm<dm>_{barrel,endcap}_<era>`, `CMS_fake_m_WH<n>_<era>` (2018 token where the payload is a 2018 copy) | MC |
+| pileup | `CMS_pileup_<era>` | `CMS_pileup` | MC |
+| di-tau trigger (tt) | `CMS_eff_trigger_tt_dm<dm>_<era>` | the same | MC |
+| embedding tau ES | `CMS_scale_t_emb_DeepTau2018v2p5_DM<dm>_<era>` | `CMS_scale_t_emb_dm{0,1,1011}_vsEle<WP>_<era>` with 0.866 of the shift | EMB |
+| embedding vsJet ID | `CMS_eff_t_emb_DeepTau2018v2p5_VSjet_DM<dm>_<era>` | `CMS_eff_t_emb_dm{0,1,1011}_vsEle<WP>_<era>` | EMB |
+| embedding electron ES (et) | `CMS_scale_e_{barrel,endcap}_emb_<era>` | the same | EMB |
+| tau_h above 140 GeV | the columns `id_wgt_tau_vsJet_Medium_highpt[_up,_down]_<leg>` | `CMS_eff_t_highpT_<era>` | MC |
+| signal theory (`signal_theory`) | `lhe_scale_weight__QCDscale_{ren,fac}`, `ps_weight__ps_{isr,fsr}`, `lhe_pdf_weight_<1..100>` | `QCDscale_{ren,fac}_HH_acc`, `ps_{isr,fsr}_HH`, `pdf_HH_acc` | signal |
+| ttbar parton shower (`ttbar_parton_shower`) | `ps_weight__ps_{isr,fsr}` | `ps_isr_ttbar`, `ps_fsr_ttbar` | ttbar |
+| declared, no nuisance | `CMS_eff_m_{id,iso,trigger}_<era>`, `CMS_eff_e_{id,trigger}_<era>`, `QCDscale_{ren,fac}`, `ps_{isr,fsr}`, `CMS_scale_m_<eta range>_<era>` | none (the lepton ID and trigger lnN stay, V7; the muon ES is produced only, V25) | MC (muon ES: MC and EMB) |
+
+- **Declared without nuisance** (SH26): a shift that is no nuisance is a column variation without regions. The skim
+  accepts its branches (and fails if a file has none), reads none of them and keeps no event for it; nothing is filled,
+  so the card cannot get a shape line of it. With `crown_shifts: false` every shift is declared this way: a v8 run
+  with its shifts off is the nominal-only run it would be on v7b (`tests/test_v8_regression.py`: the same Analysis but
+  for the declared-only shifts, the same cards from the same histograms).
+- **Regions** (V31): a CROWN shift is filled in the nominal region only. The anti-isolated region books none, so the
+  jet fakes carry the fake-factor uncertainties alone and the fake-factor friend needs no kinematic shift.
+- **Friends** (SH19): a kinematic shift requires the friend columns shifted that an expression reads where the shift
+  is filled: the class, score and class scores of the NN model (`nn_prefix`), the FastMTT variables, and the fake
+  factors if a region with them ever books a shift. A friend produced without the shift stops the skim
+  (`declared shift ... the required column ... has no shifted branch`) instead of entering nominal under the shift;
+  a stored skim without the shifted columns is not reused.
+- **Sums of shifts**: `CMS_res_j_<era>` is the `VariationSum` of the six region shifts. The embedding tau ES of a decay
+  mode is read once and enters two nuisances (V20, 50 % correlation): its own with 0.866 of the shift and
+  `CMS_scale_t_dm<dm>_<era>`, the nuisance of the simulation, with 0.5. The embedding vsJet ID keeps its shifts whole.
+- **Samples borrowed from another era** (VH → ττ of 2016postVFP from 2016preVFP): their n-tuples name the shifts with
+  their own era; they are read under those names into the nuisances of the run's era.
+- **tau_h above 140 GeV** (V35): `CMS_eff_t_highpT_<era>`, a weight shape on the simulated processes; per genuine
+  tau_h leg above 140 GeV Up is max(SF_pt_up, SF_pt, SF_dm) / SF_dm and Down min(SF_pt_down, SF_pt, SF_dm) / SF_dm
+  (the pT-binned vsJet SF of the POG against the nominal DM-binned one), 1 for every other leg.
+- **Theory weights** (SH20): a varied weight is divided by its inclusive normalisation, sum(genWeight w) /
+  sum(genWeight) over every generated event of the sample (`theory_norms.RUNS_NORM`, per nick, from the `Runs` trees of
+  the NanoAOD: `scripts/signal_theory_sums.py`; the n-tuples hold only the selected events). The table has the 20 signal
+  samples (powheg κλ = 0, 1, 2.45, 5 and madgraph node_SM, four eras) with their 100 PDF eigenvectors and the 17 ttbar
+  samples; a process of several samples (ttbar) takes their cross-section-weighted mean. A sample without an entry fails
+  the build.
+- **The study switch with shifts** (SH17): `study_uncertainties` and `crown_shifts: true` go together. A shift
+  replaces its stand-in: the embedding tau ID weight factors and ES lnN (the embedding shifts of either shift set), the
+  MC tau ES lnN, the vsJet component lnN and the di-tau trigger lnN per decay mode (the v8 shifts; four trigger shapes
+  per era instead, Q18). They stay: the muon statistics and the electron reconstruction (K4), the mT acceptance of 2016
+  and 2017, HIPM, the 2016 halves of the fake factors and the decay-mode non-closure shape of the fake factors. Without
+  the study switch the flat `eff_t_vsJet` lnN gives way to the vsJet shapes; `eff_t_vsLep` stays (the vsEle and vsMu
+  shifts act on lepton fakes only).
+- **Names** (SH27): with the v8 shifts the electron reconstruction lnN is `CMS_eff_e_reco_13TeV`; the JES sources of
+  an era carry the era as in the CMS list (`CMS_scale_j_Absolute_2016preVFP`). `CMS_eff_m_stat_<era>` keeps its name:
+  the CMS list has `CMS_eff_m_id_stat_<era>` and `CMS_eff_m_iso_stat_<era>`, and the study kept only their sum.
+- **Old runs** (`tests/test_run_snapshot.py`): the Analysis of every run YAML in every era is pinned by a digest
+  (`tests/fixtures/run_snapshot.json`, taken before the shift model); `scripts/run_snapshot.py` shows what moved a run
+  and writes the digests after an intended change.
 
 ## Embedding and fake factors
 
@@ -557,7 +638,10 @@ must follow its keys.
 | NN categories, control variables and binning | `variables.py` |
 | the scores of an installed NN payload in a copy of stored skims, as the NN friend writes them (dress rehearsal without a friend production) | `scripts/pseudo_nn_friend.py` |
 | the NN input validation: the inputs and the models that read them, their binning, the b-tag WPs of NV2, the occupancy cells, the pseudo-shifts | `nn_validation.py`, `scripts/nn_validation_*.py`, `scripts/fastmtt_refit.py` |
-| b-tag weight variations, embedding and fake-factor shifts, lnN table; the stages S0+ and S1 of the NN phase (ttbar shape, heavy flavour, signal theory and its inclusive normalisation) | `systematics.py`, `scripts/signal_theory_sums.py` |
+| b-tag weight variations, embedding and fake-factor shifts, lnN table; the stages S0+ and S1 of the NN phase (ttbar shape, heavy flavour, signal theory); the shift model of the v8 production (`crown_shifts_v8`, `v8_variations`, `v8_variation_sums`), the tau_h shape above 140 GeV, the parton shower of ttbar | `systematics.py` |
+| the names of the CROWN shifts and of the theory and pT-binned vsJet columns of the v8 production | `crown_names.py` |
+| the inclusive normalisations of the theory weights per sample (generated) and their measurement from the NanoAOD `Runs` trees | `theory_norms.py`, `scripts/signal_theory_sums.py` |
+| the shift inventory of the CROWN tests as a test fixture; the pinned content of every run YAML | `scripts/make_shift_inventory_fixture.py`, `scripts/run_snapshot.py`, `tests/snapshot.py` |
 | colours, labels, axis titles of all six channels | `style.py` |
 | tau analysis assembly (with the control channel em), estimators, ML export | `analysis.py` |
 | fake-factor measurement: regions, processes, legs (QCD, W+jets, ttbar); its tables per era | `ff_measurement.py`, `ff_tables.py` |
@@ -876,7 +960,7 @@ stays at S0; `tests/test_nn_systematics.py`):
 |---|---|---|
 | S0 (now, nominal only, E34) | data statistics and autoMCStats; the lnN (Cholesky lumi, cross sections, HH theory, BR, lepton and τ ID, EMB ES, syst_TES as acceptance lnN); the weight shapes of the nominal trees (b tag, prefiring as lnN, FF friend shifts with the FF DM non-closure, EMB ID weight factors) | the v7b FF runs as they are (`study_uncertainties`, `symmetrise_ff_shifts`) |
 | S0+ (ShapeSmith only, before P6) | + the ttbar top-pT shape (SH7), + the heavy-flavour normalisation (SH8; a no-op in K1 and K2, see below), + the pseudo-shifts of NV9 as preliminary shapes of the NN outputs (see below); em_tt btag1/btag2 (SH4) and the merge and clip of negative jetFakes bins (SH6) come with the NN categories at every stage | `ttbar_shape: true`, `heavy_flavour: true`, `pseudo_shifts: true` |
-| S1 (after P6) | + every kinematic CROWN shift (needs the NN friend with `--shifts all` and the `fastmtt` friend with shifts), PS, PU, the signal theory shapes (SH14) | `crown_shifts: true`, `signal_theory: [qcd_scale, parton_shower, pdf]` |
+| S1 (the shift production v8) | + every CROWN shift of the table in "Shift production v8" (needs the NN friend and the `fastmtt` friend with every kinematic shift), the tau_h shape above 140 GeV, the signal theory shapes (SH14) and the parton shower of ttbar | `shift_set: v8`, `crown_shifts: true`, `signal_theory: [qcd_scale, parton_shower, pdf]`, `ttbar_parton_shower: true`, `ttbar_shape: true` |
 | S2 | unblinding, see the blinding rules | - |
 
 - **SH7 `CMS_htt_ttbarShape`** (v7_analyse 4.1, 11.2 no. 2): the ttbar n_jets slope (≥ 4 against 2 jets -3 to -7 %
@@ -909,18 +993,17 @@ stays at S0; `tests/test_nn_systematics.py`):
   skims of the input validation (`/ceph/sdaigler/shapesmith_test/nn-validate/skims/tau_ff_nn`); em from the skims of the
   run. The pairs are symmetrised in the cards like those of NV1. Objects below the CROWN thresholds are not in the
   n-tuples, so an Up shift misses the events that would enter there; n_jets and n_bjets stay.
-- **SH14 signal theory** (S1, N19, N23): the QCD scales `QCDscale_ren_HH_acc` and `QCDscale_fac_HH_acc` from the CROWN
-  shifts `lhe_scale_weight__QCDscale_{ren,fac}{Up,Down}` (bbtautau `variations/theory.py`, muR or muF 2 and 0.5), the
-  parton shower `ps_isr_HH`, `ps_fsr_HH` (ISR/FSR scale 2 Up, 0.5 Down, NanoAOD `PSWeight`) and `pdf_HH_acc` (1 ± the
-  Hessian sum of `LHEPdfWeight`, CROWN `event::reweighting::LHEpdf`), each the varied weight over its inclusive mean
-  (`systematics.SIGNAL_THEORY_NORM`, measured per era by `scripts/signal_theory_sums.py` on the NanoAOD of the powheg
-  sample: the Runs sums `LHEScaleSumw`, `PSSumw`, and the PDF from the Events of one file), so only acceptance and shape
-  remain and nothing is counted twice with `QCDscale_HH` and `PDF_alphas_HH`. Inclusively the scales move the signal by
-  -10.6/+12.0 % (muR) and -1.8/+2.3 % (muF), the PS by ≤ 0.1 %, the per-event PDF sum by ±1.8 %. The v7b n-tuples have
-  only the nominal `lhe_scale_weight` (no `LHEScaleWeight`, `PSWeight` or `LHEPdfWeight`, checked on the HH files of
-  2018): the QCD scales need the CROWN shift production (P6); the PS and PDF columns need producers in `sm_config` (their
-  names `ps_weight__ps_{isr,fsr}*` and `lhe_pdf_weight__pdf*` are aligned with them at P6). Without the columns the skim
-  reports them missing.
+- **SH14 signal theory** (S1, N19, N23; v8 spec SH20, V27): the QCD scales `QCDscale_ren_HH_acc` and
+  `QCDscale_fac_HH_acc` from the CROWN shifts `lhe_scale_weight__QCDscale_{ren,fac}{Up,Down}` (bbtautau
+  `variations/theory.py`, muR or muF 2 and 0.5), the parton shower `ps_isr_HH`, `ps_fsr_HH` from the shifts
+  `ps_weight__ps_{isr,fsr}{Up,Down}` (ISR/FSR scale 2 Up, 0.5 Down, NanoAOD `PSWeight`: Up is less radiation), each the
+  varied weight over its inclusive normalisation (`theory_norms.RUNS_NORM` of the signal sample, see "Shift production
+  v8"), so only acceptance and shape remain and nothing is counted twice with `QCDscale_HH` and `PDF_alphas_HH`.
+  `pdf_HH_acc` is the quadrature sum per bin of the 100 Hessian eigenvector templates (`lhe_pdf_weight_<i>` over its
+  normalisation; core `QuadratureSum`), not the sum per event, which overestimates (1.8 % against 1.0 % inclusively);
+  alpha_s stays in the inclusive lnN. Inclusively the scales move the signal by -10.6/+12.0 % (muR) and -1.8/+2.3 %
+  (muF), the PS by ≤ 0.1 %. The columns come with the shift production v8 (the name `ps_weight` of the parton-shower
+  column is `crown_names.PS_WEIGHT`, to be confirmed on its n-tuples); without them the skim reports them missing.
 
 ## Prerequisites outside this repository
 
